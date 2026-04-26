@@ -1,0 +1,156 @@
+{{define "navbar"}}
+<aside id="ms-sidebar" class="ms-sidebar">
+	<div class="ms-sidebar-brand">
+		<div class="ms-brand-dot"></div>
+		<span class="ms-sidebar-label">MiniSMS</span>
+	</div>
+	<nav class="ms-sidebar-nav" aria-label="Main navigation">
+		<a href="/admin/dashboard" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/dashboard"}} active{{end}}" aria-label="Dashboard">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<rect x="3" y="3" width="7" height="7" rx="1"/>
+					<rect x="14" y="3" width="7" height="7" rx="1"/>
+					<rect x="3" y="14" width="7" height="7" rx="1"/>
+					<rect x="14" y="14" width="7" height="7" rx="1"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Dashboard</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Dashboard</span>
+		</a>
+		<a href="/admin/carriers" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/carriers"}} active{{end}}" aria-label="Carriers">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<circle cx="12" cy="12" r="10"/>
+					<line x1="2" y1="12" x2="22" y2="12"/>
+					<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Carriers</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Carriers</span>
+		</a>
+		<a href="/admin/rate-groups" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/rate-groups"}} active{{end}}" aria-label="Rate Groups">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<line x1="12" y1="1" x2="12" y2="23"/>
+					<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Rate Groups</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Rate Groups</span>
+		</a>
+		<a href="/admin/routing-groups" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/routing-groups"}} active{{end}}" aria-label="Routing Groups">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<polyline points="17 1 21 5 17 9"/>
+					<path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+					<polyline points="7 23 3 19 7 15"/>
+					<path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Routing Groups</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Routing Groups</span>
+		</a>
+		<a href="/admin/clients" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/clients"}} active{{end}}" aria-label="Clients">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+					<circle cx="9" cy="7" r="4"/>
+					<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+					<path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Clients</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Clients</span>
+		</a>
+		<!-- Currencies icon choice: Feather "dollar-sign" -->
+		<a href="/admin/currencies" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/currencies"}} active{{end}}" aria-label="Currencies">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<line x1="12" y1="1" x2="12" y2="23"/>
+					<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Currencies</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Currencies</span>
+		</a>
+		<!-- Sender IDs icon choice: Feather "tag" -->
+		<a href="/admin/sender-ids" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/sender-ids"}} active{{end}}" aria-label="Sender IDs">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M20.59 13.41 11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z"/>
+					<line x1="7" y1="7" x2="7.01" y2="7"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Sender IDs</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Sender IDs</span>
+		</a>
+		<a href="/admin/sms-logs" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/sms-logs"}} active{{end}}" aria-label="SMS Logs">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">SMS Logs</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">SMS Logs</span>
+		</a>
+		<!-- Simulate icon choice: Feather "play-circle" -->
+		<a href="/admin/simulate" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/simulate"}} active{{end}}" aria-label="Simulate">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<circle cx="12" cy="12" r="10"/>
+					<polygon points="10 8 16 12 10 16 10 8"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Simulate</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Simulate</span>
+		</a>
+		<div class="ms-sidebar-spacer"></div>
+		<hr class="ms-sidebar-divider" />
+		<a href="/admin/settings" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/settings"}} active{{end}}" aria-label="Settings">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<circle cx="12" cy="12" r="3"/>
+					<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83
+               l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0
+               v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06
+               a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15
+               a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9
+               a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06
+               A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0
+               v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
+               a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9
+               a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Settings</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Settings</span>
+		</a>
+	</nav>
+	<button class="ms-sidebar-toggle" id="ms-sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">
+		<svg class="ms-toggle-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<polyline points="6,2 3,5 6,8"/>
+		</svg>
+	</button>
+</aside>
+<script>
+(function () {
+  var sidebar = document.getElementById('ms-sidebar');
+  var toggleBtn = document.getElementById('ms-sidebar-toggle');
+  var STORAGE_KEY = 'minisms_sidebar_collapsed';
+  if (!sidebar || !toggleBtn) return;
+  if (localStorage.getItem(STORAGE_KEY) === '1') {
+    sidebar.classList.add('ms-collapsed');
+  }
+  toggleBtn.addEventListener('click', function () {
+    var isCollapsed = sidebar.classList.toggle('ms-collapsed');
+    localStorage.setItem(STORAGE_KEY, isCollapsed ? '1' : '0');
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      toggleBtn.click();
+    }
+  });
+})();
+</script>
+{{end}}

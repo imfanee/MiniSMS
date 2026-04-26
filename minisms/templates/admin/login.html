@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="row justify-content-center">
+	<div class="col-12 login-card-wrap">
+		<div x-data="{ sending: false }" class="card bg-body-tertiary border">
+			<div class="card-body p-4">
+				<h1 class="h4 text-center mb-1">MiniSMS Admin</h1>
+				<p class="text-secondary text-center small mb-4">Sign in to your account</p>
+				<form method="post" action="/admin/login" novalidate @submit="sending = true" class="border-0" hx-boost="false">
+					<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+					<div class="mb-3">
+						<label for="username" class="form-label">Email / Username</label>
+						<input type="text" class="form-control" id="username" name="username" required autofocus />
+					</div>
+					<div class="mb-3">
+						<label for="password" class="form-label">Password</label>
+						<input type="password" class="form-control" id="password" name="password" required />
+					</div>
+					<div class="d-grid">
+						<button type="submit" class="btn btn-primary" x-bind:disabled="sending">Sign In</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+{{end}}

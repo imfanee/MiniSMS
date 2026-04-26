@@ -1,0 +1,44 @@
+{{define "content"}}
+<div class="d-flex justify-content-between align-items-center mb-3">
+	<h1 class="h4 mb-0">Audit Log</h1>
+	<span class="text-secondary small">Showing latest 500 entries</span>
+</div>
+
+<div class="card border-0 shadow-sm">
+	<div class="table-responsive">
+		<table class="table table-dark table-striped table-hover align-middle mb-0">
+			<thead>
+				<tr>
+					<th>Created At (UTC)</th>
+					<th>Action</th>
+					<th>Actor Type</th>
+					<th>Actor ID</th>
+					<th>Entity Type</th>
+					<th>Entity ID</th>
+					<th>Metadata</th>
+				</tr>
+			</thead>
+			<tbody>
+				{{if .Rows}}
+					{{range .Rows}}
+					<tr>
+						<td class="text-nowrap">{{.CreatedAt.UTC.Format "2006-01-02 15:04:05"}}</td>
+						<td><span class="badge bg-info-subtle text-info-emphasis">{{.Action}}</span></td>
+						<td>{{.ActorType}}</td>
+						<td>{{if .ActorID}}{{.ActorID}}{{else}}-{{end}}</td>
+						<td>{{if .EntityType}}{{.EntityType}}{{else}}-{{end}}</td>
+						<td>{{if .EntityID}}{{.EntityID}}{{else}}-{{end}}</td>
+						<td><code class="small">{{if .Meta}}{{.Meta}}{{else}}-{{end}}</code></td>
+					</tr>
+					{{end}}
+				{{else}}
+					<tr>
+						<td colspan="7" class="text-center text-secondary py-4">No audit entries found.</td>
+					</tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+</div>
+{{end}}
+

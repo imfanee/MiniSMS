@@ -1,0 +1,23 @@
+{{define "add_auth_header_row"}}
+<tr class="table-warning" id="add-header-form-row">
+	<td colspan="3">
+		<form class="row g-2" hx-post="/admin/carriers/{{.CarrierID}}/auth-headers" hx-target="closest tr" hx-swap="outerHTML">
+			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}"/>
+			<div class="col-12 col-md-4">
+				<label class="form-label">Header name</label>
+				<input name="header_name" class="form-control form-control-sm {{if index .Errors "header_name"}}is-invalid{{end}}" value="{{.HName}}" required />
+				{{if index .Errors "header_name"}}<div class="invalid-feedback d-block">{{index .Errors "header_name"}}</div>{{end}}
+			</div>
+			<div class="col-12 col-md-6">
+				<label class="form-label">Value</label>
+				<input name="header_value" class="form-control form-control-sm {{if index .Errors "header_value"}}is-invalid{{end}}" value="{{.HValue}}" type="password" required autocomplete="off" />
+				{{if index .Errors "header_value"}}<div class="invalid-feedback d-block">{{index .Errors "header_value"}}</div>{{end}}
+			</div>
+			<div class="col-12 d-flex gap-2">
+				<button class="btn btn-sm btn-primary" type="submit">Save</button>
+				<button class="btn btn-sm btn-secondary" type="button" hx-on:click="this.closest('tr')?.remove()">Cancel</button>
+			</div>
+		</form>
+	</td>
+</tr>
+{{end}}

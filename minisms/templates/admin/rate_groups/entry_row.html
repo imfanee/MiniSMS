@@ -1,0 +1,18 @@
+{{define "entry_row"}}
+<tr id="entry-row-{{.Entry.RateEntryID}}">
+	<td class="font-monospace">{{.PrefixLabel}}</td>
+	<td>{{if .Entry.Description}}{{.Entry.Description}}{{else}}—{{end}}</td>
+	<td class="font-monospace text-end">
+		<span>{{.RateFmt}}</span>
+		<span class="badge bg-secondary ms-1">{{.Currency}}</span>
+	</td>
+	<td>{{.Entry.EffectiveFrom}}</td>
+	<td>{{.EffectiveToLbl}}</td>
+	<td>{{if .IsActive}}<span class="badge bg-success">Active</span>{{else}}<span class="badge bg-secondary">Expired</span>{{end}}</td>
+	<td class="d-flex gap-1">
+		<button type="button" class="btn btn-sm btn-outline-primary" hx-get="/admin/rate-groups/{{.Entry.RateGroupID}}/entries/{{.Entry.RateEntryID}}/edit" hx-target="closest tr" hx-swap="outerHTML">Edit</button>
+		<button type="button" class="btn btn-sm btn-outline-danger" hx-delete="/admin/rate-groups/{{.Entry.RateGroupID}}/entries/{{.Entry.RateEntryID}}" hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Delete this rate entry?">Delete</button>
+	</td>
+</tr>
+{{end}}
+

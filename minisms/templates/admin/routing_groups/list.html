@@ -1,0 +1,18 @@
+{{define "content"}}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<h1 class="h2 mb-0">Routing Groups</h1>
+	<button type="button" class="btn btn-primary" hx-get="/admin/routing-groups/new" hx-target="#routing-table-body" hx-swap="afterbegin">+ Add Routing Group</button>
+</div>
+{{if not .HasRows}}
+<div class="text-center text-secondary py-5">No routing groups configured yet.</div>
+{{end}}
+<div class="table-responsive">
+	<table class="table table-dark table-hover align-middle">
+		<thead><tr><th>Name</th><th>Status</th><th>Total Routes</th><th>Active Routes</th><th>Has Failover</th><th>Clients</th><th>Actions</th></tr></thead>
+		<tbody id="routing-table-body">
+			{{range .Rows}}{{template "rog_row" .}}{{end}}
+		</tbody>
+	</table>
+</div>
+{{end}}
+

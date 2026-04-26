@@ -1,0 +1,29 @@
+{{define "content"}}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<h1 class="h2 mb-0">Rate Groups</h1>
+	<button class="btn btn-primary" type="button" hx-get="/admin/rate-groups/new" hx-target="#rg-table-body" hx-swap="afterbegin">+ Add Rate Group</button>
+</div>
+{{if not .HasRows}}
+<div class="text-center text-secondary py-5">No rate groups configured yet.</div>
+{{end}}
+<div class="table-responsive">
+	<table class="table table-dark table-hover align-middle">
+		<thead>
+			<tr>
+				<th>Name</th>
+				<th>Currency</th>
+				<th>Entries</th>
+				<th>Assigned to Carriers</th>
+				<th>Assigned to Clients</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody id="rg-table-body">
+			{{range .Rows}}
+			{{template "rg_row" .}}
+			{{end}}
+		</tbody>
+	</table>
+</div>
+{{end}}
+

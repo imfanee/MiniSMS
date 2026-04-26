@@ -1,0 +1,40 @@
+{{define "sms_logs_table"}}
+<div class="table-responsive">
+	<table class="table table-sm align-middle">
+		<thead>
+			<tr><th>Received</th><th>Message ID</th><th>Client</th><th>To</th><th>From</th><th>Segments</th><th>Charged</th><th>Carrier</th><th>Failover</th><th>Status</th><th>Actions</th></tr>
+		</thead>
+		<tbody>
+			{{range .Rows}}
+			<tr>
+				<td>{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td>
+				<td><span data-bs-toggle="tooltip" title="{{.MessageID}}">{{slice .MessageID 0 8}}...</span></td>
+				<td>{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</td>
+				<td>{{.ToNumber}}</td>
+				<td>{{if .FromNumber}}{{.FromNumber}}{{else}}-{{end}}</td>
+				<td>{{.Segments}}</td>
+				<td>{{.TotalCharged}}</td>
+				<td>{{if .CarrierName}}{{.CarrierName}}{{else}}-{{end}}</td>
+				<td>{{if eq .FailoverSequence 0}}<span class="badge bg-light text-dark">Primary</span>{{else if eq .FailoverSequence 1}}<span class="badge bg-warning text-dark">F1</span>{{else}}<span class="badge bg-danger">F2</span>{{end}}</td>
+				<td>{{if or (eq .Status "accepted") (eq .Status "sent")}}<span class="badge bg-success">{{.Status}}</span>{{else if eq .Status "delivered"}}<span class="badge bg-primary">{{.Status}}</span>{{else if eq .Status "failed"}}<span class="badge bg-danger">{{.Status}}</span>{{else if eq .Status "rejected"}}<span class="badge bg-secondary">{{.Status}}</span>{{else}}<span class="badge bg-info text-dark">{{.Status}}</span>{{end}}</td>
+				<td><a href="/admin/sms-logs/{{.MessageID}}" hx-get="/admin/sms-logs/{{.MessageID}}" hx-target="#modal-container">Detail</a></td>
+			</tr>
+			{{else}}
+			<tr><td colspan="11" class="text-secondary">No SMS logs found.</td></tr>
+			{{end}}
+		</tbody>
+	</table>
+</div>
+<div class="d-flex justify-content-between align-items-center">
+	<div class="small text-secondary">Showing {{.Start}}-{{.End}} of {{.Total}}</div>
+	<nav>
+		<ul class="pagination pagination-sm mb-0">
+			<li class="page-item{{if le .Filter.Page 1}} disabled{{end}}"><a class="page-link" href="#" hx-get="/admin/sms-logs?page={{.PrevPage}}{{.QueryBase}}" hx-target="#log-table-container" hx-push-url="true">Previous</a></li>
+			{{range .Pages}}
+			<li class="page-item{{if eq $.Filter.Page .}} active{{end}}"><a class="page-link" href="#" hx-get="/admin/sms-logs?page={{.}}{{$.QueryBase}}" hx-target="#log-table-container" hx-push-url="true">{{.}}</a></li>
+			{{end}}
+			<li class="page-item{{if ge .Filter.Page .PageCount}} disabled{{end}}"><a class="page-link" href="#" hx-get="/admin/sms-logs?page={{.NextPage}}{{.QueryBase}}" hx-target="#log-table-container" hx-push-url="true">Next</a></li>
+		</ul>
+	</nav>
+</div>
+{{end}}

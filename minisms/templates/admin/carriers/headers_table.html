@@ -1,0 +1,20 @@
+{{define "headers_table"}}
+<div>
+	<div class="d-flex justify-content-between align-items-center mb-2">
+		<h2 class="h5 mb-0">Auth headers</h2>
+		<button class="btn btn-sm btn-primary" type="button" hx-get="/admin/carriers/{{.CarrierID}}/auth-headers/new" hx-target="#auth-header-body" hx-swap="afterbegin" hx-boost="false">Add header</button>
+	</div>
+	<div class="table-responsive">
+		<table class="table table-dark table-sm align-middle">
+			<thead>
+				<tr><th scope="col">Header name</th><th scope="col">Value</th><th scope="col" class="w-0"></th></tr>
+			</thead>
+			<tbody id="auth-header-body">
+				{{range .Headers}}
+					{{template "header_row" .}}
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+</div>
+{{end}}

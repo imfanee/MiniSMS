@@ -1,0 +1,19 @@
+{{define "client_add_form_row"}}
+<tr class="table-warning"><td colspan="8">
+	<form class="row g-2" hx-post="/admin/clients" hx-target="closest tr" hx-swap="outerHTML">
+		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+		<div class="col-md-2"><label class="form-label">Name</label><input class="form-control form-control-sm {{if index .Errors "name"}}is-invalid{{end}}" name="name" value="{{.Name}}" required />{{if index .Errors "name"}}<div class="invalid-feedback d-block">{{index .Errors "name"}}</div>{{end}}</div>
+		<div class="col-md-2"><label class="form-label">Email</label><input class="form-control form-control-sm {{if index .Errors "email"}}is-invalid{{end}}" name="email" value="{{.Email}}" required />{{if index .Errors "email"}}<div class="invalid-feedback d-block">{{index .Errors "email"}}</div>{{end}}</div>
+		<div class="col-md-1"><label class="form-label">Status</label><select class="form-select form-select-sm" name="status"><option value="active" {{if eq .Status "active"}}selected{{end}}>active</option><option value="suspended" {{if eq .Status "suspended"}}selected{{end}}>suspended</option><option value="disabled" {{if eq .Status "disabled"}}selected{{end}}>disabled</option></select></div>
+		<div class="col-md-1"><label class="form-label">Currency</label><select class="form-select form-select-sm {{if index .Errors "currency"}}is-invalid{{end}}" name="currency" required>{{range .Currencies}}<option value="{{.Code}}" {{if eq $.Currency .Code}}selected{{end}}>{{.Code}} — {{.Name}} ({{.Symbol}})</option>{{end}}</select>{{if index .Errors "currency"}}<div class="invalid-feedback d-block">{{index .Errors "currency"}}</div>{{end}}</div>
+		<div class="col-md-2"><label class="form-label">Rate Group</label><select class="form-select form-select-sm" name="rate_group_id"><option value="">— None —</option>{{range .RateGroups}}<option value="{{.ID}}" {{if eq .ID $.RateGroupID}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
+		<div class="col-md-2"><label class="form-label">Routing Group</label><select class="form-select form-select-sm" name="routing_group_id"><option value="">— None —</option>{{range .RoutingGroups}}<option value="{{.RoutingGroupID}}" {{if eq .RoutingGroupID $.RoutingGroupID}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
+		<div class="col-md-2"><label class="form-label">Default Sender ID</label><input class="form-control form-control-sm" name="default_sender_id_value" maxlength="15" /></div>
+		<div class="col-md-1"><label class="form-label">Allow Any</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_any_sender_id"></div></div>
+		<div class="col-md-1"><label class="form-label">Allow In-Loss</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_in_loss_delivery" checked></div></div>
+		<div class="col-md-2"><label class="form-label">Notes</label><input class="form-control form-control-sm" name="notes" value="{{.Notes}}" /></div>
+		<div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary" type="submit">Save</button><button class="btn btn-sm btn-secondary" type="button" hx-on:click="this.closest('tr').remove()">Cancel</button></div>
+	</form>
+</td></tr>
+{{end}}
+

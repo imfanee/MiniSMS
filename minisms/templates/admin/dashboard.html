@@ -1,0 +1,74 @@
+{{define "content"}}
+<h1 class="h2 mb-4">Dashboard</h1>
+<div id="dashboard-stats" hx-get="/admin/dashboard/stats" hx-trigger="every 30s" hx-target="#dashboard-stats" hx-swap="outerHTML">
+	{{template "dashboard_stats" .}}
+</div>
+
+<section class="mt-4">
+	<h2 class="h5 mb-3">Failover Activity (Last 24h)</h2>
+	<div class="row g-3 mb-3">
+		<div class="col-md-4"><div class="card bg-body-tertiary"><div class="card-body"><div class="small text-secondary">Primary Deliveries</div><div class="h4 mb-0">{{.Failover.Primary}}</div></div></div></div>
+		<div class="col-md-4"><div class="card bg-body-tertiary"><div class="card-body"><div class="small text-secondary">Failover 1 Deliveries</div><div class="h4 mb-0">{{.Failover.F1}}</div></div></div></div>
+		<div class="col-md-4"><div class="card bg-body-tertiary"><div class="card-body"><div class="small text-secondary">Failover 2 Deliveries</div><div class="h4 mb-0">{{.Failover.F2}}</div></div></div></div>
+	</div>
+	<p class="mb-2">Failover deliveries last 24h: {{.Failover.F1}} (F1) + {{.Failover.F2}} (F2)</p>
+	{{if or (gt .Failover.F1 0) (gt .Failover.F2 0)}}<div class="alert alert-warning py-2">Failover activity detected - check carrier health.</div>{{end}}
+</section>
+
+<section class="mt-4">
+	<h2 class="h5 mb-3">7-Day SMS Throughput</h2>
+	<div class="table-responsive">
+		<table class="table table-sm table-bordered align-middle">
+			<thead><tr><th>Date</th><th>Total SMS</th><th>Via Primary</th><th>Via Failover</th><th>% Failover</th></tr></thead>
+			<tbody>
+				{{range .Throughput}}
+				<tr{{if gt .FailoverPct 10.0}} class="table-warning"{{end}}>
+					<td>{{.Day.Format "2006-01-02"}}</td>
+					<td>{{.Total}}</td>
+					<td>{{.ViaPrimary}}</td>
+					<td>{{.ViaFailover}}</td>
+					<td>{{printf "%.2f%%" .FailoverPct}}</td>
+				</tr>
+				{{else}}
+				<tr><td colspan="5" class="text-secondary">No throughput data in last 7 days.</td></tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+</section>
+
+<section class="mt-4">
+	<h2 class="h5 mb-3">Recent Failures</h2>
+	<div class="table-responsive">
+		<table class="table table-sm align-middle">
+			<thead><tr><th>Time</th><th>Client</th><th>To</th><th>Carrier</th><th>Status</th><th>Response Code</th><th>Detail</th></tr></thead>
+			<tbody>
+				{{range .Failures}}
+				<tr>
+					<td>{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td>
+					<td>{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</td>
+					<td>{{.ToNumber}}</td>
+					<td>{{if .CarrierName}}{{.CarrierName}}{{else}}-{{end}}</td>
+					<td>{{.Status}}</td>
+					<td>{{if .CarrierResponseCode}}{{.CarrierResponseCode}}{{else}}-{{end}}</td>
+					<td><a href="/admin/sms-logs/{{.MessageID}}" hx-get="/admin/sms-logs/{{.MessageID}}" hx-target="#modal-container">Detail</a></td>
+				</tr>
+				{{else}}
+				<tr><td colspan="7" class="text-secondary">No failures in recent history.</td></tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+</section>
+
+<section class="mt-4">
+	<h2 class="h5 mb-3">Dashboard Reports</h2>
+	<div id="reports-container" hx-get="/admin/dashboard/reports" hx-trigger="load" hx-target="this" hx-swap="outerHTML">
+		<div class="card"><div class="card-body text-secondary">Loading reports...</div></div>
+	</div>
+</section>
+{{end}}
+
+{{define "extra_scripts"}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{{end}}

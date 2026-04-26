@@ -1,0 +1,20 @@
+{{define "client_apikey_panel"}}
+<div id="apikey-panel">
+	{{if .Meta}}
+	<div class="card border">
+		<div class="card-body">
+			<div class="mb-2"><strong>Key prefix:</strong> <span class="font-monospace">{{.Meta.KeyPrefix}}••••••••••••••••••••••••••••••••</span></div>
+			<div class="text-secondary small mb-3">Created: {{.Meta.CreatedAt}} (UTC)</div>
+			<div class="d-flex gap-2">
+				<button class="btn btn-warning" type="button" hx-post="/admin/clients/{{.ClientID}}/api-key/generate" hx-target="#apikey-panel" hx-swap="innerHTML" hx-confirm="Generate a new key? This revokes the current key.">Generate New Key</button>
+				<button class="btn btn-danger" type="button" hx-post="/admin/clients/{{.ClientID}}/api-key/revoke" hx-target="#apikey-panel" hx-swap="innerHTML" hx-confirm="Revoke current API key?">Revoke Key</button>
+			</div>
+		</div>
+	</div>
+	{{else}}
+	<div class="alert alert-secondary">No API key configured for this client.</div>
+	<button class="btn btn-primary" type="button" hx-post="/admin/clients/{{.ClientID}}/api-key/generate" hx-target="#apikey-panel" hx-swap="innerHTML">Generate Key</button>
+	{{end}}
+</div>
+{{end}}
+

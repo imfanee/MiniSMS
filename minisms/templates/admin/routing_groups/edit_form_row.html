@@ -1,0 +1,14 @@
+{{define "rog_edit_form_row"}}
+<tr class="table-info" id="rog-row-{{.RoutingGroupID}}">
+	<td colspan="7">
+		<form class="row g-2" hx-put="/admin/routing-groups/{{.RoutingGroupID}}" hx-target="closest tr" hx-swap="outerHTML">
+			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+			<div class="col-md-3"><label class="form-label">Name</label><input class="form-control form-control-sm {{if index .Errors "name"}}is-invalid{{end}}" name="name" value="{{.Name}}" required />{{if index .Errors "name"}}<div class="invalid-feedback d-block">{{index .Errors "name"}}</div>{{end}}</div>
+			<div class="col-md-3"><label class="form-label">Description</label><input class="form-control form-control-sm" name="description" value="{{.Description}}" /></div>
+			<div class="col-md-2"><label class="form-label">Status</label><select class="form-select form-select-sm" name="status"><option value="active" {{if eq .Status "active"}}selected{{end}}>active</option><option value="inactive" {{if eq .Status "inactive"}}selected{{end}}>inactive</option></select></div>
+			<div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary" type="submit">Save</button><button class="btn btn-sm btn-secondary" type="button" hx-get="/admin/routing-groups/{{.RoutingGroupID}}/row" hx-target="closest tr" hx-swap="outerHTML">Cancel</button></div>
+		</form>
+	</td>
+</tr>
+{{end}}
+

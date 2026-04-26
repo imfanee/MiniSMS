@@ -1,0 +1,119 @@
+{{define "ledger_panel"}}
+<div id="ledger-panel" class="d-flex flex-column gap-3 position-relative" style="z-index:0">
+	<div class="card bg-body border">
+		<div class="card-body d-flex flex-wrap justify-content-between align-items-start gap-2">
+			<div>
+				<div class="text-secondary small">Account balance</div>
+				<div class="h2 mb-0 font-monospace">{{.FormatBal}}</div>
+			</div>
+			<div class="text-end text-secondary small">
+				{{if .Carrier.UpdatedAt}}Carrier last updated: {{.Carrier.UpdatedAt}} (UTC){{end}}
+			</div>
+		</div>
+	</div>
+	<div>
+		<button class="btn btn-sm btn-primary" type="button" onclick="(function(){var m=document.getElementById('recordPaymentModal'); if(m){m.style.display='block';}})()">Record payment</button>
+	</div>
+	<div
+		id="recordPaymentModal"
+		style="{{if .PayErrors}}display:block;{{else}}display:none;{{end}} position:fixed; inset:0; z-index:1050; background: rgba(0,0,0,0.55); overflow-y:auto;"
+		onclick="if(event.target===this){this.style.display='none';}"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="modal-dialog modal-dialog-centered" style="margin: 4rem auto; width: min(92vw, 560px); max-width: 560px;">
+			<div class="modal-content text-bg-light text-dark p-2 border border-2 border-primary shadow-lg rounded-3" style="pointer-events:auto;">
+				<div class="modal-header">
+					<h2 class="modal-title h5 mb-0">Record payment</h2>
+					<button type="button" class="btn-close" aria-label="Close" onclick="(function(){var m=document.getElementById('recordPaymentModal'); if(m){m.style.display='none';}})()"></button>
+				</div>
+				<form
+					hx-post="/admin/carriers/{{.Carrier.CarrierID}}/payments"
+					hx-target="#ledger-panel"
+					hx-swap="outerHTML"
+					class="modal-body"
+				>
+					<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}"/>
+					{{if .PayErrors}}
+					<div class="alert alert-danger small py-2" role="alert">Please correct the fields below.</div>
+					{{end}}
+					<div class="mb-2">
+						<label for="pay-amount-fld" class="form-label">Amount ({{.Carrier.Currency}})</label>
+						<input id="pay-amount-fld" name="amount" type="number" class="form-control" step="0.000001" min="0" value="" required />
+						{{if index .PayErrors "amount"}}<div class="text-danger small">{{index .PayErrors "amount"}}</div>{{end}}
+					</div>
+					<div class="mb-2">
+						<label for="pay-ref" class="form-label">Payment reference</label>
+						<input name="payment_reference" id="pay-ref" class="form-control" />
+					</div>
+					<div class="mb-2">
+						<label for="inv-no" class="form-label">Invoice number</label>
+						<input name="invoice_number" id="inv-no" class="form-control" />
+					</div>
+					<div class="mb-2">
+						<label for="pay-date" class="form-label">Payment date</label>
+						<input name="payment_date" type="date" class="form-control" id="pay-date" value="{{.DefaultPayDate}}"/>
+						{{if index .PayErrors "payment_date"}}<div class="text-danger small">{{index .PayErrors "payment_date"}}</div>{{end}}
+					</div>
+					<div class="mb-3">
+						<label for="pay-notes" class="form-label">Notes</label>
+						<textarea class="form-control" name="notes" id="pay-notes" rows="2"></textarea>
+					</div>
+					<div class="d-flex justify-content-end gap-2">
+						<button class="btn btn-secondary" type="button" onclick="(function(){var m=document.getElementById('recordPaymentModal'); if(m){m.style.display='none';}})()">Cancel</button>
+						<button type="submit" class="btn btn-primary">Record</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+	<div class="table-responsive">
+		<table class="table table-sm table-dark align-middle">
+			<thead>
+				<tr>
+					<th scope="col">Date</th>
+					<th scope="col">Type</th>
+					<th class="text-end" scope="col">Amount</th>
+					<th class="text-end" scope="col">Balance after</th>
+					<th scope="col">Reference</th>
+					<th scope="col">Notes</th>
+				</tr>
+			</thead>
+			<tbody>
+			{{range .Entries}}
+				<tr>
+					<td class="text-nowrap text-secondary small">{{.CreatedAt}}</td>
+					<td>
+						{{if eq .EntryType "payment"}}
+						<span class="badge bg-success">payment</span>
+						{{else if eq .EntryType "charge"}}
+						<span class="badge bg-danger">charge</span>
+						{{else if eq .EntryType "adjustment"}}
+						<span class="badge bg-warning text-dark">adjustment</span>
+						{{else if eq .EntryType "refund"}}
+						<span class="badge bg-info text-dark">refund</span>
+						{{else}}<span class="badge bg-secondary">{{.EntryType}}</span>
+						{{end}}
+					</td>
+					<td class="text-end font-monospace">
+						{{if eq .Direction 1}}+{{else if eq .Direction -1}}−{{else}} {{end}}
+						{{.Amount}} {{.Currency}}
+					</td>
+					<td class="text-end font-monospace text-secondary small">{{.BalanceAfter}}</td>
+					<td class="text-break" style="max-width:8rem">
+						{{if .PaymentReference}}{{.PaymentReference}}{{else}}—{{end}}
+					</td>
+					<td class="text-break small" style="max-width: 12rem;">
+						{{if .Notes}}{{.Notes}}{{else}}—{{end}}
+					</td>
+				</tr>
+			{{else}}
+				<tr>
+					<td colspan="6" class="text-secondary text-center py-4">No ledger entries yet.</td>
+				</tr>
+			{{end}}
+			</tbody>
+		</table>
+	</div>
+</div>
+{{end}}

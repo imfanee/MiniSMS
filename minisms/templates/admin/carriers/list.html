@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<h1 class="h2 mb-0">Carriers</h1>
+	<button type="button" class="btn btn-primary" hx-get="/admin/carriers/new" hx-target="#carrier-table-body" hx-swap="afterbegin">+ Add Carrier</button>
+</div>
+{{if not .HasRows}}
+<div class="text-center text-secondary py-5">No carriers configured. Click <strong>+ Add Carrier</strong> to get started.</div>
+{{end}}
+<div class="table-responsive">
+	<table class="table table-dark table-hover align-middle" id="carrier-table">
+		<thead>
+			<tr>
+				<th>Name</th>
+				<th>Endpoint</th>
+				<th>Method</th>
+				<th>Status</th>
+				<th>Currency</th>
+				<th class="text-end">Balance</th>
+				<th>Rate Group</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody id="carrier-table-body">
+			{{range .RowViews}}
+			{{template "carrier_row" .}}
+			{{end}}
+		</tbody>
+	</table>
+</div>
+{{end}}

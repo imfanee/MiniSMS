@@ -1,0 +1,36 @@
+{{define "route_edit_form_row"}}
+<tr class="table-info" id="route-row-{{.RouteID}}" x-data="{primary:'{{.PrimaryCarrierID}}', f1:'{{.Failover1CarrierID}}', f2:'{{.Failover2CarrierID}}', primarySet: '{{.PrimaryCarrierID}}' !== '', failover1Set: '{{.Failover1CarrierID}}' !== ''}">
+	<td colspan="7">
+		<form class="row g-2" hx-put="/admin/routing-groups/{{.RoutingGroupID}}/routes/{{.RouteID}}" hx-target="closest tr" hx-swap="outerHTML">
+			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+			<div class="col-md-2"><label class="form-label">Prefix</label><input class="form-control form-control-sm {{if index .Errors "prefix"}}is-invalid{{end}}" name="prefix" value="{{.Prefix}}" pattern="^(\*|[0-9]+)$" required />{{if index .Errors "prefix"}}<div class="invalid-feedback d-block">{{index .Errors "prefix"}}</div>{{end}}</div>
+			<div class="col-md-1"><label class="form-label">Priority</label><input class="form-control form-control-sm {{if index .Errors "priority"}}is-invalid{{end}}" name="priority" type="number" min="0" value="{{.Priority}}" /></div>
+			<div class="col-md-2">
+				<label class="form-label">Primary</label>
+				<select class="form-select form-select-sm {{if index .Errors "primary_carrier_id"}}is-invalid{{end}}" name="primary_carrier_id" x-model="primary" @change="primarySet = $event.target.value !== ''">
+					<option value="">Select</option>
+					{{range .Carriers}}<option value="{{.CarrierID}}" {{if eq .CarrierID $.PrimaryCarrierID}}selected{{end}} :disabled="f1==='{{.CarrierID}}' || f2==='{{.CarrierID}}'">{{.Name}} {{if ne .Status "active"}}(inactive){{end}}</option>{{end}}
+				</select>{{if index .Errors "primary_carrier_id"}}<div class="invalid-feedback d-block">{{index .Errors "primary_carrier_id"}}</div>{{end}}
+			</div>
+			<div class="col-md-2" x-show="primarySet">
+				<label class="form-label">Failover 1</label>
+				<select class="form-select form-select-sm {{if index .Errors "failover1_carrier_id"}}is-invalid{{end}}" name="failover1_carrier_id" x-model="f1" @change="failover1Set = $event.target.value !== ''">
+					<option value="">None</option>
+					{{range .Carriers}}<option value="{{.CarrierID}}" {{if eq .CarrierID $.Failover1CarrierID}}selected{{end}} :disabled="primary==='{{.CarrierID}}' || f2==='{{.CarrierID}}'">{{.Name}} {{if ne .Status "active"}}(inactive){{end}}</option>{{end}}
+				</select>{{if index .Errors "failover1_carrier_id"}}<div class="invalid-feedback d-block">{{index .Errors "failover1_carrier_id"}}</div>{{end}}
+			</div>
+			<div class="col-md-2" x-show="failover1Set">
+				<label class="form-label">Failover 2</label>
+				<select class="form-select form-select-sm {{if index .Errors "failover2_carrier_id"}}is-invalid{{end}}" name="failover2_carrier_id" x-model="f2">
+					<option value="">None</option>
+					{{range .Carriers}}<option value="{{.CarrierID}}" {{if eq .CarrierID $.Failover2CarrierID}}selected{{end}} :disabled="primary==='{{.CarrierID}}' || f1==='{{.CarrierID}}'">{{.Name}} {{if ne .Status "active"}}(inactive){{end}}</option>{{end}}
+				</select>{{if index .Errors "failover2_carrier_id"}}<div class="invalid-feedback d-block">{{index .Errors "failover2_carrier_id"}}</div>{{end}}
+			</div>
+			<div class="col-md-1"><label class="form-label">Status</label><select class="form-select form-select-sm" name="status"><option value="active" {{if eq .Status "active"}}selected{{end}}>active</option><option value="inactive" {{if eq .Status "inactive"}}selected{{end}}>inactive</option></select></div>
+			<div class="col-md-2"><label class="form-label">Description</label><input class="form-control form-control-sm" name="description" value="{{.Description}}" /></div>
+			<div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary" type="submit">Save</button><button class="btn btn-sm btn-secondary" type="button" hx-get="/admin/routing-groups/{{.RoutingGroupID}}/routes/{{.RouteID}}/row" hx-target="closest tr" hx-swap="outerHTML">Cancel</button></div>
+		</form>
+	</td>
+</tr>
+{{end}}
+

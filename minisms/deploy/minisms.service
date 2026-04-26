@@ -1,0 +1,53 @@
+[Unit]
+Description=MiniSMS SMS Middleware Gateway
+Documentation=https://github.com/YOUR_ORG/minisms
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=minisms
+Group=minisms
+WorkingDirectory=/opt/minisms
+
+# All configuration via environment file — never hard-code secrets in unit file
+EnvironmentFile=/etc/minisms/minisms.env
+
+# Binary path
+ExecStart=/usr/local/bin/minisms
+
+# Graceful reload (sends SIGHUP — Go handles via signal.NotifyContext)
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Logging — structured JSON to journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=minisms
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+ReadWritePaths=/tmp
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,74 @@
+{{define "content"}}
+<h1 class="h2 mb-3">Currencies</h1>
+
+<div class="card bg-body-tertiary border mb-3">
+  <div class="card-body">
+    <h2 class="h6 mb-3">+ Add Currency</h2>
+    <form class="row g-2" method="post" action="/admin/currencies" hx-post="/admin/currencies" hx-target="#currencies-table-body" hx-swap="afterbegin">
+      <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+      <div class="col-md-2">
+        <label class="form-label">Code</label>
+        <input class="form-control form-control-sm {{if index .Form.Errors "code"}}is-invalid{{end}}" name="code" value="{{.Form.Code}}" maxlength="3" required x-data @input="$el.value=$el.value.toUpperCase()">
+        {{if index .Form.Errors "code"}}<div class="invalid-feedback d-block">{{index .Form.Errors "code"}}</div>{{end}}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Name</label>
+        <input class="form-control form-control-sm {{if index .Form.Errors "name"}}is-invalid{{end}}" name="name" value="{{.Form.Name}}" required>
+        {{if index .Form.Errors "name"}}<div class="invalid-feedback d-block">{{index .Form.Errors "name"}}</div>{{end}}
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Symbol</label>
+        <input class="form-control form-control-sm {{if index .Form.Errors "symbol"}}is-invalid{{end}}" name="symbol" value="{{.Form.Symbol}}" required>
+        {{if index .Form.Errors "symbol"}}<div class="invalid-feedback d-block">{{index .Form.Errors "symbol"}}</div>{{end}}
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Decimal Places</label>
+        <input type="number" min="0" max="6" class="form-control form-control-sm {{if index .Form.Errors "decimal_places"}}is-invalid{{end}}" name="decimal_places" value="{{.Form.DecimalPlaces}}" required>
+        {{if index .Form.Errors "decimal_places"}}<div class="invalid-feedback d-block">{{index .Form.Errors "decimal_places"}}</div>{{end}}
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary btn-sm w-100" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr><th>Code</th><th>Name</th><th>Symbol</th><th>Decimal Places</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody id="currencies-table-body">
+      {{range .Rows}}
+        {{template "currency_row" .}}
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{define "currency_row"}}
+<tr id="currency-row-{{.Code}}">
+  <td><code>{{.Code}}</code></td>
+  <td>
+    <input class="form-control form-control-sm" name="name" value="{{.Name}}" form="currency-edit-{{.Code}}">
+  </td>
+  <td>
+    <input class="form-control form-control-sm" name="symbol" value="{{.Symbol}}" form="currency-edit-{{.Code}}">
+  </td>
+  <td>
+    <input type="number" min="0" max="6" class="form-control form-control-sm" name="decimal_places" value="{{.DecimalPlaces}}" form="currency-edit-{{.Code}}">
+  </td>
+  <td>
+    {{if .IsActive}}<span class="badge bg-success">Active</span>{{else}}<span class="badge bg-secondary">Inactive</span>{{end}}
+  </td>
+  <td class="d-flex gap-2">
+    <form id="currency-edit-{{.Code}}" hx-put="/admin/currencies/{{.Code}}" hx-target="#currency-row-{{.Code}}" hx-swap="outerHTML">
+      <button class="btn btn-sm btn-primary" type="submit">Edit</button>
+    </form>
+    <form hx-post="/admin/currencies/{{.Code}}/toggle" hx-target="#currency-row-{{.Code}}" hx-swap="outerHTML">
+      <button class="btn btn-sm btn-outline-secondary" type="submit">{{if .IsActive}}Deactivate{{else}}Activate{{end}}</button>
+    </form>
+  </td>
+</tr>
+{{end}}

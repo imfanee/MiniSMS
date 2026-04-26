@@ -1,0 +1,96 @@
+{{define "dlr_panel"}}
+<div id="carrier-dlr-panel" x-data="{showSecret:false}">
+  {{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+  <form class="row g-3" hx-post="/admin/carriers/{{.CarrierID}}/dlr-settings" hx-target="#carrier-dlr-panel" hx-swap="outerHTML">
+    <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+    <div class="col-12">
+      <label class="form-label">DLR Callback URL Template</label>
+      <input class="form-control {{if index .Errors "dlr_callback_url_template"}}is-invalid{{end}}" name="dlr_callback_url_template" value="{{if .Carrier.DLRCallbackURLTemplate}}{{.Carrier.DLRCallbackURLTemplate}}{{end}}" placeholder="https://minisms.example.com/api/v1/dlr/{{`{{message_id}}`}}" />
+      <div class="form-text">URL template sent to carrier for DLR callbacks. Use {{`{{message_id}}`}} to embed MiniSMS message id.</div>
+      {{if index .Errors "dlr_callback_url_template"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_callback_url_template"}}</div>{{end}}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">DLR Field Name (carrier request)</label>
+      <input class="form-control" name="dlr_field_name" value="{{if .Carrier.DLRFieldName}}{{.Carrier.DLRFieldName}}{{end}}" placeholder="notify_url" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">DLR Message ID Field (callback)</label>
+      <input class="form-control" name="dlr_message_id_field" value="{{if .Carrier.DLRMessageIDField}}{{.Carrier.DLRMessageIDField}}{{end}}" placeholder="ref" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">DLR Status Field (callback)</label>
+      <input class="form-control" name="dlr_status_field" value="{{if .Carrier.DLRStatusField}}{{.Carrier.DLRStatusField}}{{end}}" placeholder="status" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">DLR Inbound Secret</label>
+      <div class="input-group">
+        <input :type="showSecret ? 'text' : 'password'" class="form-control {{if index .Errors "dlr_inbound_secret"}}is-invalid{{end}}" name="dlr_inbound_secret" value="" placeholder="leave blank to keep current" />
+        <button type="button" class="btn btn-outline-secondary" @click="showSecret = !showSecret"><span x-text="showSecret ? 'Hide' : 'Show'"></span></button>
+      </div>
+      {{if .MaskedInboundSecret}}<div class="form-text">Saved secret: {{.MaskedInboundSecret}}</div>{{end}}
+      {{if index .Errors "dlr_inbound_secret"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_inbound_secret"}}</div>{{end}}
+    </div>
+    <div class="col-12">
+      <label class="form-label">DLR Status Map (JSON)</label>
+      <textarea class="form-control font-monospace {{if index .Errors "dlr_status_map"}}is-invalid{{end}}" rows="3" name="dlr_status_map" placeholder='{"DELIVRD":"delivered","UNDELIV":"undelivered"}'>{{if .Carrier.DLRStatusMap}}{{.Carrier.DLRStatusMap}}{{end}}</textarea>
+      {{if index .Errors "dlr_status_map"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_status_map"}}</div>{{end}}
+    </div>
+    <div class="col-12"><h6 class="mb-2">SMPP Parameters</h6></div>
+    <div class="col-md-3">
+      <label class="form-label">Source Addr TON</label>
+      <select class="form-select {{if index .Errors "smpp_source_addr_ton"}}is-invalid{{end}}" name="smpp_source_addr_ton">
+        {{template "ton_options" .Carrier.SMPPSourceAddrTON}}
+      </select>
+      {{if index .Errors "smpp_source_addr_ton"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_source_addr_ton"}}</div>{{end}}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Source Addr NPI</label>
+      <select class="form-select {{if index .Errors "smpp_source_addr_npi"}}is-invalid{{end}}" name="smpp_source_addr_npi">
+        {{template "npi_options" .Carrier.SMPPSourceAddrNPI}}
+      </select>
+      {{if index .Errors "smpp_source_addr_npi"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_source_addr_npi"}}</div>{{end}}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Dest Addr TON</label>
+      <select class="form-select {{if index .Errors "smpp_dest_addr_ton"}}is-invalid{{end}}" name="smpp_dest_addr_ton">
+        {{template "ton_options" .Carrier.SMPPDestAddrTON}}
+      </select>
+      {{if index .Errors "smpp_dest_addr_ton"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_dest_addr_ton"}}</div>{{end}}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Dest Addr NPI</label>
+      <select class="form-select {{if index .Errors "smpp_dest_addr_npi"}}is-invalid{{end}}" name="smpp_dest_addr_npi">
+        {{template "npi_options" .Carrier.SMPPDestAddrNPI}}
+      </select>
+      {{if index .Errors "smpp_dest_addr_npi"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_dest_addr_npi"}}</div>{{end}}
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Save DLR Settings</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "ton_options"}}
+<option value="dynamic" {{if eq . "dynamic"}}selected{{end}}>dynamic - Resolve automatically</option>
+<option value="0" {{if eq . "0"}}selected{{end}}>0 - Unknown</option>
+<option value="1" {{if eq . "1"}}selected{{end}}>1 - International (E.164)</option>
+<option value="2" {{if eq . "2"}}selected{{end}}>2 - National</option>
+<option value="3" {{if eq . "3"}}selected{{end}}>3 - Network specific</option>
+<option value="4" {{if eq . "4"}}selected{{end}}>4 - Subscriber number</option>
+<option value="5" {{if eq . "5"}}selected{{end}}>5 - Alphanumeric</option>
+<option value="6" {{if eq . "6"}}selected{{end}}>6 - Abbreviated</option>
+{{end}}
+
+{{define "npi_options"}}
+<option value="dynamic" {{if eq . "dynamic"}}selected{{end}}>dynamic - Resolve automatically</option>
+<option value="0" {{if eq . "0"}}selected{{end}}>0 - Unknown</option>
+<option value="1" {{if eq . "1"}}selected{{end}}>1 - ISDN/E.164</option>
+<option value="3" {{if eq . "3"}}selected{{end}}>3 - Data numbering</option>
+<option value="4" {{if eq . "4"}}selected{{end}}>4 - Telex numbering</option>
+<option value="6" {{if eq . "6"}}selected{{end}}>6 - Land mobile numbering</option>
+<option value="8" {{if eq . "8"}}selected{{end}}>8 - National numbering</option>
+<option value="9" {{if eq . "9"}}selected{{end}}>9 - Private numbering</option>
+<option value="10" {{if eq . "10"}}selected{{end}}>10 - ERMES numbering</option>
+<option value="18" {{if eq . "18"}}selected{{end}}>18 - Internet (IP)</option>
+{{end}}

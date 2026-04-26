@@ -1,0 +1,440 @@
+/* MiniSMS — minimal app overrides; Bootstrap is primary. */
+[x-cloak] {
+	display: none !important;
+}
+body {
+	min-height: 100vh;
+}
+.login-card-wrap {
+	max-width: 400px;
+	margin: 0 auto;
+}
+.navbar-brand {
+	font-weight: 600;
+}
+
+/* ================================================================
+   MiniSMS Navbar Tab Beautification
+   Appended by UI patch — do not edit above this line
+   ================================================================ */
+
+/*
+  .ms-nav-item transforms every nav <a> from a plain text link into a
+  raised tab-style button that sits on the bottom edge of the navbar.
+  It works alongside whatever classes and styles already exist on the <a>.
+  It does not interfere with Bootstrap's own nav-link active state.
+*/
+.ms-nav-item {
+  position: relative;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px !important;
+  margin-top: 6px;               /* lifts tab so bottom edge touches navbar floor */
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-decoration: none !important;
+  border-radius: 6px 6px 0 0;   /* tab shape: rounded top only */
+  border-top: 2px solid transparent;
+  border-left: 0.5px solid transparent;
+  border-right: 0.5px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ms-nav-item:hover,
+.ms-nav-item:focus {
+  background: rgba(255,255,255,0.07) !important;
+  color: rgba(255,255,255,0.9) !important;
+  border-top-color: rgba(255,255,255,0.2);
+  border-left-color: rgba(255,255,255,0.08);
+  border-right-color: rgba(255,255,255,0.08);
+  text-decoration: none !important;
+}
+
+/*
+  Active state. Bootstrap adds class "active" to the matching nav item.
+  We layer our tab styling on top of that existing active class.
+  This means we do NOT need to change any template logic — the existing
+  active-state mechanism continues to drive which item is highlighted.
+*/
+.ms-nav-item.active {
+  background: #1e293b !important;  /* match page body bg — tab "connects" to page */
+  color: #22d3ee !important;
+  border-top-color: #22d3ee !important;
+  border-left-color: rgba(255,255,255,0.1) !important;
+  border-right-color: rgba(255,255,255,0.1) !important;
+  font-weight: 500 !important;
+}
+
+/*
+  The ::after strip covers the 1px gap between the active tab bottom and
+  the page content below, making the tab appear to merge into the page.
+  This only works if the active tab's background matches the page body bg.
+  If your page body background is not #1e293b, update both values to match.
+*/
+.ms-nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #1e293b;           /* must match page body background */
+}
+
+/*
+  If the existing navbar uses a class other than Bootstrap's "active" for
+  the active state (e.g., "current", "is-active"), add a second rule:
+
+  .ms-nav-item.current,
+  .ms-nav-item.is-active { ... same declarations as .ms-nav-item.active ... }
+
+  Check navbar.html and add the correct selector if needed.
+*/
+
+
+/* ================================================================
+   MiniSMS LED Footer
+   ================================================================ */
+
+.ms-footer {
+  background: #0f172a;
+  padding: 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 0.5px solid rgba(255,255,255,0.08);
+  margin-top: auto;              /* pushes footer to bottom on short pages */
+  flex-shrink: 0;
+}
+
+.ms-footer-inner {
+  position: relative;
+  padding: 4px 20px;
+  border: 0.5px solid rgba(34,211,238,0.15);
+  border-radius: 3px;
+  background: rgba(34,211,238,0.03);
+  overflow: hidden;
+}
+
+/* CRT scanline overlay — subtle horizontal line texture */
+.ms-footer-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.06) 2px,
+    rgba(0,0,0,0.06) 4px
+  );
+  pointer-events: none;
+}
+
+.led-text {
+  font-family: 'Courier New', 'Lucida Console', 'DejaVu Sans Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  color: #22d3ee;
+  text-shadow:
+    0 0 6px  rgba(34,211,238,0.70),
+    0 0 12px rgba(34,211,238,0.35),
+    0 0 24px rgba(34,211,238,0.15);
+  text-transform: uppercase;
+  white-space: nowrap;
+  position: relative;   /* sits above ::before scanline */
+}
+
+.led-label {
+  color: rgba(34,211,238,0.4);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  margin-right: 8px;
+}
+
+.led-sep {
+  color: rgba(34,211,238,0.4);
+  margin: 0 10px;
+}
+
+.led-email {
+  color: rgba(34,211,238,0.65);
+  text-shadow:
+    0 0 4px  rgba(34,211,238,0.40),
+    0 0 10px rgba(34,211,238,0.20);
+}
+/* end of patch */
+
+/* ================================================================
+   MiniSMS Vertical Sidebar — appended by sidebar patch
+   ================================================================ */
+
+.ms-sidebar {
+  width: 220px;
+  height: 100vh;
+  background: #0f172a;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.ms-sidebar.ms-collapsed {
+  width: 52px;
+}
+
+/* ── Brand ── */
+
+.ms-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px 12px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  min-height: 56px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ms-brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22d3ee;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.22);
+  flex-shrink: 0;
+}
+
+/* ── Nav ── */
+
+.ms-sidebar-nav {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.ms-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  position: relative;
+  text-decoration: none !important;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ms-nav-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  text-decoration: none !important;
+}
+
+.ms-nav-item.active {
+  background: #1e293b;
+  border-left-color: #22d3ee;
+}
+
+.ms-nav-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 0.12s ease;
+}
+
+.ms-nav-item:hover .ms-nav-icon {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ms-nav-item.active .ms-nav-icon {
+  color: #22d3ee;
+}
+
+.ms-sidebar-label {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.18s ease, width 0.18s ease, max-width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 160px;
+}
+
+.ms-nav-item.active .ms-sidebar-label {
+  color: #22d3ee;
+  font-weight: 500;
+}
+
+/*
+  When collapsed: hide all labels and footer text.
+  The sidebar width transition hides them by clipping overflow.
+  We also fade opacity for a cleaner feel.
+*/
+.ms-sidebar.ms-collapsed .ms-sidebar-label {
+  opacity: 0;
+  max-width: 0;
+}
+
+/* ── Spacer and divider ── */
+
+.ms-sidebar-spacer {
+  flex: 1;
+  min-height: 8px;
+}
+
+.ms-sidebar-divider {
+  border: none;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.08);
+  margin: 0 4px 4px;
+}
+
+/* ── Tooltip (shown only when collapsed) ── */
+
+.ms-nav-tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1e293b;
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 400;
+  padding: 5px 10px;
+  border-radius: 5px;
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  /*
+    Small left-pointing triangle on the tooltip
+  */
+}
+
+.ms-nav-tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: rgba(255, 255, 255, 0.12);
+}
+
+.ms-nav-tooltip::after {
+  content: '';
+  position: absolute;
+  right: calc(100% - 1px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #1e293b;
+}
+
+/*
+  Tooltips only visible when sidebar is collapsed AND item is hovered.
+  When expanded, labels are visible so tooltips are not needed.
+*/
+.ms-sidebar:not(.ms-collapsed) .ms-nav-tooltip {
+  display: none;
+}
+
+.ms-sidebar.ms-collapsed .ms-nav-item:hover .ms-nav-tooltip {
+  opacity: 1;
+}
+
+/* ── Toggle button ── */
+/*
+  Sits on the right edge of the sidebar, vertically centred.
+  The cyan circle with a chevron inside. On click it toggles ms-collapsed.
+  When collapsed, chevron rotates 180deg pointing right (to indicate "expand").
+*/
+
+.ms-sidebar-toggle {
+  position: absolute;
+  top: 50%;
+  right: -13px;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #22d3ee;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  box-shadow: 0 0 0 3px #0f172a;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.ms-sidebar-toggle:hover {
+  background: #38bdf8;
+}
+
+.ms-sidebar-toggle:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+.ms-toggle-chevron {
+  color: #0f172a;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+/*
+  When collapsed: rotate chevron 180deg to point right -> tells user "click to expand"
+*/
+.ms-sidebar.ms-collapsed .ms-toggle-chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Remove OLD horizontal navbar styles ── */
+/*
+  The previous patch added .ms-nav-item styles for horizontal tab behaviour
+  (margin-top, border-top, border-radius top-only, ::after bottom strip).
+  Those horizontal-specific properties must be overridden for the vertical layout.
+  Add these overrides at the END of the block you are appending:
+*/
+
+.ms-sidebar .ms-nav-item {
+  margin-top: 0 !important;
+  border-radius: 6px !important;
+  border-top: none !important;
+  border-left: 2px solid transparent;
+}
+
+.ms-sidebar .ms-nav-item::after {
+  display: none !important;
+}
+
+.ms-sidebar .ms-nav-item.active {
+  border-top: none !important;
+  border-left-color: #22d3ee !important;
+  border-radius: 6px !important;
+}
+
+/* end of sidebar patch */

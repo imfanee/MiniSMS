@@ -1,0 +1,17 @@
+{{define "content"}}
+<nav class="text-secondary small mb-2"><a href="/admin/clients">Clients</a> / <span class="text-body">{{.Client.Name}}</span></nav>
+<div class="card bg-body-tertiary border mb-4" x-data="{tab:'info'}">
+	<div class="card-body d-flex justify-content-between align-items-start gap-3">
+		<div><h2 class="h2 mb-1">{{.Client.Name}}</h2><span class="badge {{if eq .Client.Status "active"}}bg-success{{else if eq .Client.Status "suspended"}}bg-warning text-dark{{else}}bg-secondary{{end}}">{{.Client.Status}}</span></div>
+		<div class="text-end"><div class="h4 font-monospace mb-0">{{.Client.Currency}} {{.Client.Balance}}</div><div class="text-secondary small">{{.Client.Email}}</div></div>
+	</div>
+	<ul class="nav nav-tabs px-3">
+		<li class="nav-item"><button class="nav-link" :class="{ 'active': tab==='info' }" @click="tab='info'" type="button" hx-get="/admin/clients/{{.Client.ClientID}}/info" hx-target="#client-tab-content" hx-swap="innerHTML">Info</button></li>
+		<li class="nav-item"><button class="nav-link" :class="{ 'active': tab==='ledger' }" @click="tab='ledger'" type="button" hx-get="/admin/clients/{{.Client.ClientID}}/ledger" hx-target="#client-tab-content" hx-swap="innerHTML">Ledger</button></li>
+		<li class="nav-item"><button class="nav-link" :class="{ 'active': tab==='apikey' }" @click="tab='apikey'" type="button" hx-get="/admin/clients/{{.Client.ClientID}}/api-key" hx-target="#client-tab-content" hx-swap="innerHTML">API Key</button></li>
+		<li class="nav-item"><button class="nav-link" :class="{ 'active': tab==='senderids' }" @click="tab='senderids'" type="button" hx-get="/admin/clients/{{.Client.ClientID}}/sender-ids" hx-target="#client-tab-content" hx-swap="innerHTML">Sender IDs</button></li>
+	</ul>
+	<div class="p-3"><div id="client-tab-content" hx-get="/admin/clients/{{.Client.ClientID}}/info" hx-trigger="load" hx-target="this" hx-swap="innerHTML"></div></div>
+</div>
+{{end}}
+

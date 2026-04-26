@@ -1,0 +1,48 @@
+{{define "carrier_sender_ids_panel"}}
+<div id="sender-ids-panel" class="card bg-body-tertiary border">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h3 class="h6 mb-0">Sender IDs</h3>
+      <span class="badge bg-secondary">Policy: {{.Policy}}</span>
+    </div>
+    <div class="text-secondary small mb-2">Default Sender ID: {{if .DefaultSID}}{{.DefaultSID}}{{else}}(none){{end}}</div>
+    <p class="text-secondary small mb-2">Add allowed Sender IDs from the <a href="/admin/sender-ids" class="link-secondary">library</a> when policy is <strong>list</strong>. Other policies use the carrier default or system default instead.</p>
+    {{if ne .Carrier.Status "active"}}
+      <div class="alert alert-info py-2">Carrier inactive.</div>
+    {{end}}
+    <form class="row g-2 mb-3" hx-post="/admin/carriers/{{.CarrierID}}/sender-ids" hx-target="#sender-ids-panel" hx-swap="outerHTML">
+      <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+      <div class="col-md-8">
+        <select class="form-select form-select-sm" name="sender_id" aria-label="Add sender ID from library">
+          <option value="">Select Sender ID from library…</option>
+          {{range .Available}}
+          <option value="{{.SenderID}}" title="Type: {{.SenderIDType}}">{{.Value}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="col-md-4"><button class="btn btn-sm btn-primary w-100" type="submit">Add Sender ID</button></div>
+    </form>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Value</th><th>Type</th><th>Default</th><th>Actions</th></tr></thead>
+        <tbody>
+          {{range .Rows}}
+          <tr>
+            <td>{{.SenderIDValue}}</td>
+            <td>{{.SenderIDType}}</td>
+            <td>
+              <button class="btn btn-sm {{if .IsDefault}}btn-warning{{else}}btn-outline-warning{{end}}" hx-post="/admin/carriers/{{$.CarrierID}}/sender-ids/{{.CarrierSenderID}}/set-default" hx-target="#sender-ids-panel" hx-swap="outerHTML">★</button>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-outline-danger" hx-delete="/admin/carriers/{{$.CarrierID}}/sender-ids/{{.CarrierSenderID}}" hx-target="#sender-ids-panel" hx-swap="outerHTML">Remove</button>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="4" class="text-secondary">No Sender IDs configured.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}

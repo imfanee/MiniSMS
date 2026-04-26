@@ -1,0 +1,11 @@
+{{define "content"}}
+<h1 class="h2 mb-3">System Settings</h1>
+<div class="table-responsive">
+	<table class="table align-middle">
+		<thead><tr><th>Setting Key</th><th>Description</th><th>Current Value</th><th>Save</th><th>Updated</th></tr></thead>
+		<tbody>
+			{{range .Rows}}{{template "setting_row" .}}{{end}}
+		</tbody>
+	</table>
+</div>
+{{end}}

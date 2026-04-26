@@ -1,0 +1,88 @@
+{{define "content"}}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Simulate Routing</h1>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <p class="text-secondary mb-3">This runs routing decisions only. It does not dispatch to carriers and does not create SMS logs.</p>
+    <form method="post" action="/admin/simulate" class="row g-3"
+      hx-post="/admin/simulate" hx-target="#simulate-result" hx-swap="innerHTML">
+      <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}">
+      <div class="col-md-4">
+        <label class="form-label">Client</label>
+        <select class="form-select{{if index .Form.Errors "client_id"}} is-invalid{{end}}" name="client_id" required>
+          <option value="">Select client...</option>
+          {{range .Clients}}
+          <option value="{{.ClientID}}" {{if eq $.Form.ClientID .ClientID}}selected{{end}}>{{.Name}}</option>
+          {{end}}
+        </select>
+        {{with index .Form.Errors "client_id"}}<div class="invalid-feedback">{{.}}</div>{{end}}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Destination Number</label>
+        <input type="text" class="form-control{{if index .Form.Errors "destination"}} is-invalid{{end}}" name="destination" value="{{.Form.Destination}}" placeholder="+447700900123" required>
+        {{with index .Form.Errors "destination"}}<div class="invalid-feedback">{{.}}</div>{{end}}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Sender ID</label>
+        <input type="text" class="form-control" name="sender_id" value="{{.Form.SenderID}}" placeholder="MiniSMS or 441234567890">
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary">Simulate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="simulate-result">
+  {{template "simulate_result" .}}
+</div>
+{{end}}
+
+{{define "simulate_result"}}
+{{if .Result}}
+<div class="card shadow-sm border-0">
+  <div class="card-header">Simulation Result</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6"><strong>Sender ID check:</strong> {{.Result.SenderCheck}}</div>
+      <div class="col-md-6"><strong>Sender ID passed:</strong> {{if .Result.ResolvedSenderID}}{{.Result.ResolvedSenderID}}{{else}}-{{end}}</div>
+      <div class="col-md-6"><strong>Selected rate:</strong> {{if .Result.SelectedRate}}{{.Result.SelectedRate}} {{else}}-{{end}}</div>
+      <div class="col-md-6"><strong>Rate prefix:</strong> {{if .Result.SelectedPrefix}}{{.Result.SelectedPrefix}}{{else}}-{{end}}</div>
+      <div class="col-md-6"><strong>Selected route:</strong> {{if .Result.SelectedRoute}}{{.Result.SelectedRoute}}{{else}}-{{end}}</div>
+      <div class="col-md-6"><strong>Selected carrier:</strong> {{if .Result.Carrier}}{{.Result.Carrier}}{{else}}-{{end}}</div>
+      <div class="col-md-6"><strong>Carrier rate:</strong> {{if .Result.CarrierRate}}{{.Result.CarrierRate}}{{else}}-{{end}}</div>
+      <div class="col-md-12"><strong>Final decision:</strong> {{.Result.FinalDecision}}</div>
+    </div>
+
+    {{if .Result.CarrierChecks}}
+    <hr>
+    <h2 class="h6">Carrier chain evaluation</h2>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Position</th>
+            <th>Carrier</th>
+            <th>Eligible</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Result.CarrierChecks}}
+          <tr>
+            <td>{{.Position}}</td>
+            <td>{{.Name}}</td>
+            <td>{{if .Eligible}}Yes{{else}}No{{end}}</td>
+            <td>{{.Reason}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{end}}

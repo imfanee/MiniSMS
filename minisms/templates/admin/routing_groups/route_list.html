@@ -1,0 +1,11 @@
+{{define "route_list"}}
+<div class="table-responsive">
+	<table class="table table-dark table-sm align-middle" id="route-table">
+		<thead><tr><th>Prefix</th><th>Primary Carrier</th><th>Failover 1</th><th>Failover 2</th><th>Priority <span class="text-secondary" data-bs-toggle="tooltip" title="Lower value = higher precedence">&#9432;</span></th><th>Status</th><th>Actions</th></tr></thead>
+		<tbody id="route-table-body">
+			{{range .Rows}}{{template "route_row" .}}{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">No routes yet.</td></tr>{{end}}
+		</tbody>
+	</table>
+</div>
+{{end}}
+

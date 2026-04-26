@@ -1,0 +1,293 @@
+{{define "dashboard_reports"}}
+<div id="reports-container">
+  <div class="card mb-4" x-data="{fromDate: '{{.DefaultFrom}}', toDate: '{{.DefaultTo}}'}">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label">From</label>
+          <input type="date" class="form-control" id="report-from" name="from" x-model="fromDate" value="{{.DefaultFrom}}">
+        </div>
+        <div class="col-auto">
+          <label class="form-label">To</label>
+          <input type="date" class="form-control" id="report-to" name="to" x-model="toDate" value="{{.DefaultTo}}">
+        </div>
+        <div class="col-auto">
+          <label class="form-label d-block">&nbsp;</label>
+          <button class="btn btn-primary" hx-get="/admin/dashboard/reports" hx-include="#report-from,#report-to" hx-target="#reports-container" hx-swap="outerHTML" hx-indicator="#report-spinner">
+            <span id="report-spinner" class="htmx-indicator spinner-border spinner-border-sm me-1"></span>Refresh
+          </button>
+        </div>
+        <div class="col-auto">
+          <label class="form-label d-block">&nbsp;</label>
+          <div class="btn-group">
+            <button class="btn btn-outline-secondary btn-sm" @click="fromDate=toDate='{{.Today}}'" hx-get="/admin/dashboard/reports" hx-vals='{"from":"{{.Today}}","to":"{{.Today}}"}' hx-target="#reports-container">Today</button>
+            <button class="btn btn-outline-secondary btn-sm" @click="fromDate=toDate='{{.Yesterday}}'" hx-get="/admin/dashboard/reports" hx-vals='{"from":"{{.Yesterday}}","to":"{{.Yesterday}}"}' hx-target="#reports-container">Yesterday</button>
+            <button class="btn btn-outline-secondary btn-sm" hx-get="/admin/dashboard/reports" hx-vals='{"from":"{{.Last7From}}","to":"{{.Today}}"}' hx-target="#reports-container">7 Days</button>
+            <button class="btn btn-outline-secondary btn-sm" hx-get="/admin/dashboard/reports" hx-vals='{"from":"{{.Last30From}}","to":"{{.Today}}"}' hx-target="#reports-container">30 Days</button>
+            <button class="btn btn-outline-secondary btn-sm" hx-get="/admin/dashboard/reports" hx-vals='{"from":"{{.MonthFrom}}","to":"{{.Today}}"}' hx-target="#reports-container">This Month</button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-2 text-muted small">Showing data from {{.FromDate}} to {{.ToDate}}</div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center"><h6 class="mb-0">SMS Sent by All Clients</h6><span class="badge bg-secondary">{{len .SMSByClient}} clients</span></div>
+    <div class="card-body"><canvas id="chart-sms-by-client" height="80"></canvas></div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center"><h6 class="mb-0">SMS by Carrier (Primary vs Failovers)</h6><span class="badge bg-secondary">{{len .SMSByCarrier}} carriers</span></div>
+    <div class="card-body"><canvas id="chart-sms-by-carrier" height="90"></canvas></div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0">Client Success Ratio</h6></div>
+    <div class="card-body"><canvas id="chart-success-clients" height="90"></canvas></div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0">Carrier Success Ratio</h6></div>
+    <div class="card-body"><canvas id="chart-success-carriers" height="90"></canvas></div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0">Carrier Success Ratio by Routing Prefix</h6></div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Carrier</th><th>Prefix</th><th>Total</th><th>Success</th><th>Failed</th><th>Success %</th></tr></thead>
+        <tbody>
+          {{range .CarrierPrefix}}
+          <tr>
+            <td>{{.CarrierName}}</td><td><code>{{.PrefixMatched}}</code></td><td>{{.Total}}</td><td class="text-success">{{.SuccessCount}}</td><td class="text-danger">{{.FailedCount}}</td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:6px">
+                  <div class="progress-bar {{if ge .SuccessRatePct 95.0}}bg-success{{else if ge .SuccessRatePct 80.0}}bg-warning{{else}}bg-danger{{end}}" style="width: min(100%, {{printf "%.2f" .SuccessRatePct}}%)"></div>
+                </div>
+                <span class="text-nowrap">{{printf "%.2f" .SuccessRatePct}}%</span>
+              </div>
+            </td>
+          </tr>
+          {{else}}<tr><td colspan="6" class="text-center text-muted py-3">No data for selected date range</td></tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0">Bill Comparison (Client Billed vs Carrier Cost)</h6></div>
+    <div class="card-body"><canvas id="chart-bill-comparison" height="90"></canvas></div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Client</th><th>Carrier</th><th>Messages</th><th>Billed</th><th>Cost</th><th>Margin</th><th>Margin %</th></tr></thead>
+        <tbody>
+          {{range .BillComparison}}
+          <tr{{if lt .Margin 0}} class="table-danger"{{end}}>
+            <td>{{.ClientName}}</td><td>{{.CarrierName}}</td><td>{{.TotalMessages}}</td><td>{{printf "%.2f" .ClientBilled}}</td><td>{{printf "%.2f" .CarrierCost}}</td><td>{{printf "%.2f" .Margin}}</td><td>{{printf "%.2f" .MarginPct}}%</td>
+          </tr>
+          {{else}}<tr><td colspan="7" class="text-center text-muted py-3">No data for selected date range</td></tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0">Carrier Cost Comparison</h6></div>
+    <div class="card-body"><canvas id="chart-cost-comparison" height="90"></canvas></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  if (!window.Chart) return;
+  if (window.minismsCharts && Array.isArray(window.minismsCharts)) {
+    window.minismsCharts.forEach(function (c) { try { c.destroy(); } catch (e) {} });
+  }
+  window.minismsCharts = [];
+
+  Chart.defaults.color = "#adb5bd";
+  Chart.defaults.borderColor = "rgba(255,255,255,0.08)";
+  Chart.defaults.font.family = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+
+  var moneyFmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function fmtMoney(v) { return moneyFmt.format(Number(v)); }
+  function fmtPct(v) { return Number(v).toFixed(1) + "%"; }
+  function fmtInt(v) { return String(Math.round(Number(v))); }
+
+  function moneyAxis() {
+    return {
+      beginAtZero: true,
+      grid: { color: "rgba(255,255,255,0.06)" },
+      ticks: {
+        callback: function (value) { return fmtMoney(value); },
+        maxTicksLimit: 8
+      }
+    };
+  }
+  function pctAxis() {
+    return {
+      min: 0,
+      max: 100,
+      grid: { color: "rgba(255,255,255,0.06)" },
+      ticks: {
+        callback: function (value) { return fmtPct(value); },
+        stepSize: 10
+      }
+    };
+  }
+  function intAxis() {
+    return {
+      beginAtZero: true,
+      grid: { color: "rgba(255,255,255,0.06)" },
+      ticks: {
+        precision: 0,
+        callback: function (value) { return Number.isFinite(value) ? fmtInt(value) : ""; }
+      }
+    };
+  }
+  function tooltipMoney() {
+    return {
+      callbacks: {
+        label: function (ctx) {
+          var l = ctx.dataset.label || "";
+          return l ? l + ": " + fmtMoney(ctx.parsed.y != null ? ctx.parsed.y : ctx.parsed.x) : fmtMoney(ctx.parsed.y != null ? ctx.parsed.y : ctx.parsed.x);
+        }
+      }
+    };
+  }
+  function tooltipPct() {
+    return {
+      callbacks: {
+        label: function (ctx) {
+          var l = ctx.dataset.label || "";
+          var v = ctx.parsed.x != null ? ctx.parsed.x : ctx.parsed.y;
+          return l ? l + ": " + fmtPct(v) : fmtPct(v);
+        }
+      }
+    };
+  }
+  function tooltipInt() {
+    return {
+      callbacks: {
+        label: function (ctx) {
+          var l = ctx.dataset.label || "";
+          var v = ctx.parsed.y != null ? ctx.parsed.y : ctx.parsed.x;
+          return l ? l + ": " + fmtInt(v) : fmtInt(v);
+        }
+      }
+    };
+  }
+
+  var c1 = document.getElementById("chart-sms-by-client");
+  if (c1) window.minismsCharts.push(new Chart(c1, {
+    type: "bar",
+    data: {
+      labels: [{{range .SMSByClient}}"{{js .ClientName}}",{{end}}],
+      datasets: [{
+        label: "SMS sent",
+        data: [{{range .SMSByClient}}{{.TotalMessages}},{{end}}],
+        backgroundColor: [{{range .SMSByClient}}{{if ge .SuccessRatePct 95.0}}"rgba(25,135,84,0.75)"{{else if ge .SuccessRatePct 80.0}}"rgba(255,193,7,0.75)"{{else}}"rgba(220,53,69,0.75)"{{end}},{{end}}]
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: tooltipInt() },
+      scales: { x: { grid: { display: false } }, y: intAxis() }
+    }
+  }));
+
+  var c2 = document.getElementById("chart-sms-by-carrier");
+  if (c2) window.minismsCharts.push(new Chart(c2, {
+    type: "bar",
+    data: {
+      labels: [{{range .SMSByCarrier}}"{{js .CarrierName}}",{{end}}],
+      datasets: [
+        { label: "Primary", data: [{{range .SMSByCarrier}}{{.AsPrimary}},{{end}}], backgroundColor: "rgba(13,110,253,0.8)", stack: "usage" },
+        { label: "Failover 1", data: [{{range .SMSByCarrier}}{{.AsFailover1}},{{end}}], backgroundColor: "rgba(255,193,7,0.85)", stack: "usage" },
+        { label: "Failover 2", data: [{{range .SMSByCarrier}}{{.AsFailover2}},{{end}}], backgroundColor: "rgba(220,53,69,0.8)", stack: "usage" }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "top", labels: { boxWidth: 12 } }, tooltip: tooltipInt() },
+      scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ...intAxis() } }
+    }
+  }));
+
+  var c3 = document.getElementById("chart-success-clients");
+  if (c3) window.minismsCharts.push(new Chart(c3, {
+    type: "bar",
+    data: {
+      labels: [{{range .SuccessClients}}"{{js .ClientName}}",{{end}}],
+      datasets: [{
+        label: "Success rate",
+        data: [{{range .SuccessClients}}{{printf "%.2f" .SuccessRatePct}},{{end}}],
+        backgroundColor: [{{range .SuccessClients}}{{if ge .SuccessRatePct 95.0}}"rgba(25,135,84,0.75)"{{else if ge .SuccessRatePct 80.0}}"rgba(255,193,7,0.75)"{{else}}"rgba(220,53,69,0.75)"{{end}},{{end}}]
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: tooltipPct() },
+      scales: { x: pctAxis(), y: { grid: { display: false } } }
+    }
+  }));
+
+  var c4 = document.getElementById("chart-success-carriers");
+  if (c4) window.minismsCharts.push(new Chart(c4, {
+    type: "bar",
+    data: {
+      labels: [{{range .SuccessCarriers}}"{{js .CarrierName}}",{{end}}],
+      datasets: [{
+        label: "Success rate",
+        data: [{{range .SuccessCarriers}}{{printf "%.2f" .SuccessRatePct}},{{end}}],
+        backgroundColor: [{{range .SuccessCarriers}}{{if ge .SuccessRatePct 95.0}}"rgba(25,135,84,0.75)"{{else if ge .SuccessRatePct 80.0}}"rgba(255,193,7,0.75)"{{else}}"rgba(220,53,69,0.75)"{{end}},{{end}}]
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: tooltipPct() },
+      scales: { x: pctAxis(), y: { grid: { display: false } } }
+    }
+  }));
+
+  var c6 = document.getElementById("chart-bill-comparison");
+  if (c6) window.minismsCharts.push(new Chart(c6, {
+    type: "bar",
+    data: {
+      labels: [{{range .BillByClientChart}}"{{js .ClientName}}",{{end}}],
+      datasets: [
+        { label: "Billed to client", data: [{{range .BillByClientChart}}{{printf "%.6f" .ClientBilled}},{{end}}], backgroundColor: "rgba(13,110,253,0.8)" },
+        { label: "Carrier cost", data: [{{range .BillByClientChart}}{{printf "%.6f" .CarrierCost}},{{end}}], backgroundColor: "rgba(255,128,0,0.85)" }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "top", labels: { boxWidth: 12 } }, tooltip: tooltipMoney() },
+      scales: { x: { grid: { display: false } }, y: moneyAxis() }
+    }
+  }));
+
+  var c7 = document.getElementById("chart-cost-comparison");
+  if (c7) window.minismsCharts.push(new Chart(c7, {
+    type: "bar",
+    data: {
+      labels: [{{range .CostComparison}}"{{js .CarrierName}}",{{end}}],
+      datasets: [
+        { label: "Client revenue", data: [{{range .CostComparison}}{{printf "%.6f" .ClientRevenue}},{{end}}], backgroundColor: "rgba(13,110,253,0.8)" },
+        { label: "Carrier cost", data: [{{range .CostComparison}}{{printf "%.6f" .CarrierCost}},{{end}}], backgroundColor: "rgba(255,128,0,0.85)" }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "top", labels: { boxWidth: 12 } }, tooltip: tooltipMoney() },
+      scales: { x: { grid: { display: false } }, y: moneyAxis() }
+    }
+  }));
+})();
+</script>
+{{end}}

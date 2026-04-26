@@ -1,0 +1,65 @@
+{{define "content"}}
+<h1 class="h2 mb-3">SMS Logs</h1>
+<div class="card bg-body-tertiary border mb-3">
+	<div class="card-body">
+		<div class="row g-2">
+			<div class="col-md-2">
+				<select class="form-select form-select-sm filter-input" name="client_id">
+					<option value="">All Clients</option>
+					{{range .Clients}}<option value="{{.ClientID}}"{{if eq $.Filter.ClientID .ClientID}} selected{{end}}>{{.Name}}</option>{{end}}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<select class="form-select form-select-sm filter-input" name="carrier_id">
+					<option value="">All Carriers</option>
+					{{range .Carriers}}<option value="{{.CarrierID}}"{{if eq $.Filter.CarrierID .CarrierID}} selected{{end}}>{{.Name}}</option>{{end}}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<select class="form-select form-select-sm filter-input" name="routing_group_id">
+					<option value="">All Routing Groups</option>
+					{{range .Routing}}<option value="{{.RoutingGroupID}}"{{if eq $.Filter.RoutingGroupID .RoutingGroupID}} selected{{end}}>{{.Name}}</option>{{end}}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<select class="form-select form-select-sm filter-input" name="status">
+					<option value="">All Statuses</option>
+					<option value="pending"{{if eq .Filter.Status "pending"}} selected{{end}}>pending</option>
+					<option value="accepted"{{if eq .Filter.Status "accepted"}} selected{{end}}>accepted</option>
+					<option value="sent"{{if eq .Filter.Status "sent"}} selected{{end}}>sent</option>
+					<option value="delivered"{{if eq .Filter.Status "delivered"}} selected{{end}}>delivered</option>
+					<option value="failed"{{if eq .Filter.Status "failed"}} selected{{end}}>failed</option>
+					<option value="rejected"{{if eq .Filter.Status "rejected"}} selected{{end}}>rejected</option>
+				</select>
+			</div>
+			<div class="col-md-2">
+				<select class="form-select form-select-sm filter-input" name="failover_sequence">
+					<option value="">All</option>
+					<option value="0"{{if eq .Filter.FailoverSequence "0"}} selected{{end}}>Primary Only</option>
+					<option value="1"{{if eq .Filter.FailoverSequence "1"}} selected{{end}}>Failover 1</option>
+					<option value="2"{{if eq .Filter.FailoverSequence "2"}} selected{{end}}>Failover 2</option>
+				</select>
+			</div>
+			<div class="col-md-2"><input type="text" class="form-control form-control-sm filter-input" name="prefix_matched" placeholder="Prefix" value="{{.Filter.PrefixMatched}}"></div>
+			<div class="col-md-2"><input type="date" class="form-control form-control-sm filter-input" name="date_from" value="{{.Filter.DateFrom}}"></div>
+			<div class="col-md-2"><input type="date" class="form-control form-control-sm filter-input" name="date_to" value="{{.Filter.DateTo}}"></div>
+			<div class="col-md-2"><input type="number" min="1" max="200" class="form-control form-control-sm filter-input" name="page_size" value="{{.Filter.PageSize}}"></div>
+			<div class="col-md-2 d-flex gap-2">
+				<button class="btn btn-primary btn-sm" hx-get="/admin/sms-logs" hx-include=".filter-input" hx-target="#log-table-container" hx-push-url="true">Apply Filters</button>
+				<a class="btn btn-outline-secondary btn-sm" href="/admin/sms-logs">Reset</a>
+			</div>
+			<div class="col-md-4 d-flex gap-2">
+				<a class="btn btn-outline-success btn-sm"
+					hx-boost="false"
+					download
+					href="/admin/sms-logs/export.csv?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}">Export CSV</a>
+				<a class="btn btn-outline-danger btn-sm"
+					hx-boost="false"
+					download
+					href="/admin/sms-logs/export.pdf?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}">Export PDF</a>
+			</div>
+		</div>
+	</div>
+</div>
+<div id="log-table-container">{{template "sms_logs_table" .}}</div>
+{{end}}

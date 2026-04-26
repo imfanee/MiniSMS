@@ -1,0 +1,52 @@
+{{define "client_info_form"}}
+<div id="info-panel" x-data="{showDLRSecret:false}">
+	{{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+	<form class="row g-3" hx-put="/admin/clients/{{.Client.ClientID}}" hx-target="#info-panel" hx-swap="outerHTML">
+		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+		<div class="col-md-4"><label class="form-label">Name</label><input class="form-control {{if index .Errors "name"}}is-invalid{{end}}" name="name" value="{{.Client.Name}}" required />{{if index .Errors "name"}}<div class="invalid-feedback d-block">{{index .Errors "name"}}</div>{{end}}</div>
+		<div class="col-md-4"><label class="form-label">Email</label><input class="form-control {{if index .Errors "email"}}is-invalid{{end}}" name="email" value="{{.Client.Email}}" required />{{if index .Errors "email"}}<div class="invalid-feedback d-block">{{index .Errors "email"}}</div>{{end}}</div>
+		<div class="col-md-4"><label class="form-label">Status</label><select class="form-select" name="status"><option value="active" {{if eq .Client.Status "active"}}selected{{end}}>active</option><option value="suspended" {{if eq .Client.Status "suspended"}}selected{{end}}>suspended</option><option value="disabled" {{if eq .Client.Status "disabled"}}selected{{end}}>disabled</option></select></div>
+		<div class="col-md-2">
+			<label class="form-label">Currency</label>
+			<select class="form-select {{if index .Errors "currency"}}is-invalid{{end}}" name="currency" required>
+				{{range .Currencies}}
+				<option value="{{.Code}}" {{if eq $.Client.Currency .Code}}selected{{end}}>{{.Code}} — {{.Name}} ({{.Symbol}})</option>
+				{{end}}
+			</select>
+			{{if index .Errors "currency"}}<div class="invalid-feedback d-block">{{index .Errors "currency"}}</div>{{end}}
+		</div>
+		<div class="col-md-3">
+			<label class="form-label">Conversion Factor</label>
+			<input class="form-control {{if index .Errors "conversion_factor"}}is-invalid{{end}}" name="conversion_factor" value="{{if .ConversionFactor}}{{.ConversionFactor}}{{else}}1{{end}}" />
+			<div class="form-text">Required only when changing currency with existing balance.</div>
+			{{if index .Errors "conversion_factor"}}<div class="invalid-feedback d-block">{{index .Errors "conversion_factor"}}</div>{{end}}
+		</div>
+		<div class="col-md-5"><label class="form-label">Rate Group</label><select class="form-select" name="rate_group_id"><option value="">— None —</option>{{range .RateGroups}}<option value="{{.ID}}" {{if eq .ID $.RateGroupSel}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
+		<div class="col-md-5"><label class="form-label">Routing Group</label><select class="form-select" name="routing_group_id"><option value="">— None —</option>{{range .RoutingGroups}}<option value="{{.RoutingGroupID}}" {{if eq .RoutingGroupID $.RoutingGroupSel}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
+		<div class="col-md-4"><label class="form-label">Default Sender ID</label><input class="form-control" name="default_sender_id_value" maxlength="15" /></div>
+		<div class="col-md-4"><label class="form-label">Allow Any Sender ID</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_any_sender_id" data-bs-toggle="tooltip" title="Allow this client to submit any Sender ID."></div></div>
+		<div class="col-md-4"><label class="form-label">Allow In-Loss Delivery</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_in_loss_delivery" checked data-bs-toggle="tooltip" title="Allow routing even when carrier cost exceeds client rate."></div></div>
+		<div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="3">{{if .Client.Notes}}{{.Client.Notes}}{{end}}</textarea></div>
+		<div class="col-md-6">
+			<label class="form-label">DLR Webhook URL</label>
+			<input type="url" class="form-control {{if index .Errors "dlr_webhook_url"}}is-invalid{{end}}" name="dlr_webhook_url" value="{{if .Client.DLRWebhookURL}}{{.Client.DLRWebhookURL}}{{end}}" placeholder="https://your-app.example.com/webhooks/dlr" />
+			<div class="form-text">Default URL to receive delivery receipts. Leave blank to disable DLR for this client.</div>
+			{{if index .Errors "dlr_webhook_url"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_webhook_url"}}</div>{{end}}
+		</div>
+		<div class="col-md-6">
+			<label class="form-label">DLR Webhook Secret</label>
+			<div class="input-group">
+				<input :type="showDLRSecret ? 'text' : 'password'" class="form-control {{if index .Errors "dlr_webhook_secret"}}is-invalid{{end}}" name="dlr_webhook_secret" value="" placeholder="leave blank to keep existing/disable HMAC signing" />
+				<button type="button" class="btn btn-outline-secondary" @click="showDLRSecret = !showDLRSecret" :aria-label="showDLRSecret ? 'Hide secret' : 'Show secret'">
+					<span x-text="showDLRSecret ? 'Hide' : 'Show'"></span>
+				</button>
+			</div>
+			{{if .DLRSecretMasked}}<div class="form-text">Saved secret: {{.DLRSecretMasked}}</div>{{end}}
+			<div class="form-text">If set, each webhook POST includes X-MiniSMS-Signature (HMAC-SHA256 of request body using this secret).</div>
+			{{if index .Errors "dlr_webhook_secret"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_webhook_secret"}}</div>{{end}}
+		</div>
+		<div class="col-12"><button class="btn btn-primary" type="submit">Save</button></div>
+	</form>
+</div>
+{{end}}
+

@@ -1,0 +1,44 @@
+{{define "client_sender_ids_panel"}}
+<div id="client-sender-ids-panel" class="card bg-body-tertiary border">
+  <div class="card-body">
+    <h3 class="h6">Sender IDs</h3>
+    <p class="text-secondary small mb-2">Choose entries from the <a href="/admin/sender-ids" class="link-secondary">Sender ID library</a>. This list controls which Sender IDs this client may use when <strong>Allow any Sender ID</strong> is off.</p>
+    {{if .AllowAny}}
+      <div class="alert alert-info py-2">Client may use any Sender ID. Restriction list is optional.</div>
+    {{end}}
+    <form class="row g-2 mb-3" hx-post="/admin/clients/{{.ClientID}}/sender-ids" hx-target="#client-sender-ids-panel" hx-swap="outerHTML">
+      <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+      <div class="col-md-8">
+        <select class="form-select form-select-sm" name="sender_id" aria-label="Add sender ID from library">
+          <option value="">Select Sender ID from library…</option>
+          {{range .Available}}
+          <option value="{{.SenderID}}" title="Type: {{.SenderIDType}}">{{.Value}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="col-md-4"><button class="btn btn-sm btn-primary w-100" type="submit">Add Sender ID</button></div>
+    </form>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Value</th><th>Type</th><th>Default</th><th>Actions</th></tr></thead>
+        <tbody>
+          {{range .Rows}}
+          <tr>
+            <td>{{.SenderIDValue}}</td>
+            <td>{{.SenderIDType}}</td>
+            <td>
+              <button class="btn btn-sm {{if .IsDefault}}btn-warning{{else}}btn-outline-warning{{end}}" hx-post="/admin/clients/{{$.ClientID}}/sender-ids/{{.ClientSenderID}}/set-default" hx-target="#client-sender-ids-panel" hx-swap="outerHTML">★</button>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-outline-danger" hx-delete="/admin/clients/{{$.ClientID}}/sender-ids/{{.ClientSenderID}}" hx-target="#client-sender-ids-panel" hx-swap="outerHTML">Remove</button>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="4" class="text-secondary">No Sender IDs configured.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}

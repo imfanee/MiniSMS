@@ -1,0 +1,17 @@
+{{define "client_row"}}
+<tr id="client-row-{{.ClientID}}">
+	<td>{{.Name}}</td>
+	<td class="text-break">{{.Email}}</td>
+	<td>{{if eq .Status "active"}}<span class="badge bg-success">active</span>{{else if eq .Status "suspended"}}<span class="badge bg-warning text-dark">suspended</span>{{else}}<span class="badge bg-secondary">disabled</span>{{end}}</td>
+	<td class="text-end font-monospace">{{.Currency}} {{.Balance}}</td>
+	<td>{{if .RateGroupName}}{{.RateGroupName}}{{else}}<span class="text-secondary">—</span>{{end}}</td>
+	<td>{{if .RoutingGroupName}}{{.RoutingGroupName}}{{else}}<span class="text-secondary">—</span>{{end}}</td>
+	<td>{{if .APIKeyPrefix}}<span class="font-monospace">{{.APIKeyPrefix}}••••••••</span>{{else}}<span class="badge bg-danger">None</span>{{end}}</td>
+	<td class="d-flex gap-1 flex-wrap">
+		<a class="btn btn-sm btn-outline-light" href="/admin/clients/{{.ClientID}}">Manage</a>
+		<button type="button" class="btn btn-sm btn-outline-primary" hx-get="/admin/clients/{{.ClientID}}/edit" hx-target="closest tr" hx-swap="outerHTML">Edit</button>
+		<button type="button" class="btn btn-sm {{if eq .Status "active"}}btn-outline-warning{{else}}btn-outline-success{{end}}" hx-post="/admin/clients/{{.ClientID}}/toggle-status" hx-target="closest tr" hx-swap="outerHTML">{{if eq .Status "active"}}Suspend{{else}}Activate{{end}}</button>
+	</td>
+</tr>
+{{end}}
+

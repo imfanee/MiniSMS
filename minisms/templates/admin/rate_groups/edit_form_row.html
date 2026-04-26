@@ -1,0 +1,32 @@
+{{define "rg_edit_form_row"}}
+<tr class="table-info" id="rg-row-{{.RateGroupID}}">
+	<td colspan="6">
+		<form class="row g-2" hx-put="/admin/rate-groups/{{.RateGroupID}}" hx-target="closest tr" hx-swap="outerHTML" novalidate>
+			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+			<div class="col-md-3">
+				<label class="form-label">Name</label>
+				<input class="form-control form-control-sm {{if index .Errors "name"}}is-invalid{{end}}" name="name" value="{{.Name}}" required />
+				{{if index .Errors "name"}}<div class="invalid-feedback d-block">{{index .Errors "name"}}</div>{{end}}
+			</div>
+			<div class="col-md-2">
+				<label class="form-label">Currency</label>
+				<select class="form-select form-select-sm {{if index .Errors "currency"}}is-invalid{{end}}" name="currency" required>
+					{{range .Currencies}}
+					<option value="{{.Code}}" {{if eq $.Currency .Code}}selected{{end}}>{{.Code}} — {{.Name}} ({{.Symbol}})</option>
+					{{end}}
+				</select>
+				{{if index .Errors "currency"}}<div class="invalid-feedback d-block">{{index .Errors "currency"}}</div>{{end}}
+			</div>
+			<div class="col-md-5">
+				<label class="form-label">Description</label>
+				<input class="form-control form-control-sm" name="description" value="{{.Description}}" />
+			</div>
+			<div class="col-12 d-flex gap-2">
+				<button type="submit" class="btn btn-sm btn-primary">Save</button>
+				<button type="button" class="btn btn-sm btn-secondary" hx-get="/admin/rate-groups/{{.RateGroupID}}/row" hx-target="closest tr" hx-swap="outerHTML">Cancel</button>
+			</div>
+		</form>
+	</td>
+</tr>
+{{end}}
+

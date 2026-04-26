@@ -1,0 +1,26 @@
+{{define "setting_row"}}
+<tr x-data="{saved:false}" x-on:settingSaved.window="saved=true; setTimeout(()=>saved=false,2000)">
+	<td><code>{{.Key}}</code>{{if .Error}}<div class="text-danger small mt-1">{{.Error}}</div>{{end}}</td>
+	<td>{{if .Description}}{{.Description}}{{else}}-{{end}}</td>
+	<td>
+		<form hx-post="/admin/settings/{{.Key}}" hx-target="closest tr" hx-swap="outerHTML" class="d-flex gap-2 align-items-center">
+			{{if or (eq .Key "refund_on_carrier_failure") (eq .Key "failover_enabled")}}
+			<div class="form-check form-switch">
+				<input class="form-check-input" type="checkbox" name="value_bool" {{if eq .Value "true"}}checked{{end}}>
+			</div>
+			{{else if or (eq .Key "carrier_dispatch_timeout_s") (eq .Key "max_sms_segments") (eq .Key "admin_session_idle_minutes") (eq .Key "api_rate_limit_per_minute")}}
+			<input class="form-control form-control-sm" type="number" name="value" value="{{.Value}}">
+			{{else if or (eq .Key "low_balance_alert_threshold") (eq .Key "carrier_low_balance_alert")}}
+			<input class="form-control form-control-sm" type="number" step="0.01" name="value" value="{{.Value}}">
+			{{else}}
+			<input class="form-control form-control-sm" type="text" name="value" value="{{.Value}}">
+			{{end}}
+		</form>
+	</td>
+	<td>
+		<button class="btn btn-primary btn-sm" type="button" onclick="this.closest('tr').querySelector('form').requestSubmit()">Save</button>
+		<span class="text-success ms-2" x-show="saved" x-cloak>✓</span>
+	</td>
+	<td class="small text-secondary">{{.UpdatedAt}}</td>
+</tr>
+{{end}}

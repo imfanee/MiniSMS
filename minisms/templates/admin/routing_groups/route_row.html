@@ -1,0 +1,18 @@
+{{define "route_row"}}
+<tr id="route-row-{{.Row.RouteEntryID}}">
+	<td class="font-monospace">{{.PrefixLabel}}</td>
+	<td>
+		{{.Row.PrimaryCarrierName}}
+		<span class="badge {{.PrimaryBadge}} ms-1">{{.Row.PrimaryCarrierStatus}}</span>
+	</td>
+	<td>{{if .Row.Failover1CarrierName}}{{.Row.Failover1CarrierName}} <span class="badge {{.Failover1Badge}} ms-1">{{if .Row.Failover1CarrierStatus}}{{.Row.Failover1CarrierStatus}}{{else}}inactive{{end}}</span>{{else}}<span class="text-secondary">—</span>{{end}}</td>
+	<td>{{if .Row.Failover2CarrierName}}{{.Row.Failover2CarrierName}} <span class="badge {{.Failover2Badge}} ms-1">{{if .Row.Failover2CarrierStatus}}{{.Row.Failover2CarrierStatus}}{{else}}inactive{{end}}</span>{{else}}<span class="text-secondary">—</span>{{end}}</td>
+	<td><span data-bs-toggle="tooltip" title="Lower value = higher precedence">{{.Row.Priority}}</span></td>
+	<td>{{if eq .Row.Status "active"}}<span class="badge bg-success">Active</span>{{else}}<span class="badge bg-secondary">Inactive</span>{{end}}</td>
+	<td class="d-flex gap-1">
+		<button class="btn btn-sm btn-outline-primary" type="button" hx-get="/admin/routing-groups/{{.Row.RoutingGroupID}}/routes/{{.Row.RouteEntryID}}/edit" hx-target="closest tr" hx-swap="outerHTML">Edit</button>
+		<button class="btn btn-sm btn-outline-danger" type="button" hx-delete="/admin/routing-groups/{{.Row.RoutingGroupID}}/routes/{{.Row.RouteEntryID}}" hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Delete this route?">Delete</button>
+	</td>
+</tr>
+{{end}}
+

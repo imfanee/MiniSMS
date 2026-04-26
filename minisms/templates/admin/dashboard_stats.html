@@ -1,0 +1,42 @@
+{{define "dashboard_stats"}}
+<div id="dashboard-stats">
+	<div class="row g-3">
+		<div class="col-12 col-md-3"><div class="card bg-body-tertiary h-100"><div class="card-body"><div class="small text-secondary">Active Clients</div><div class="display-6 fs-2">{{.Stats.ActiveClients}}</div></div></div></div>
+		<div class="col-12 col-md-3">
+			<div class="card bg-body-tertiary h-100">
+				<div class="card-body">
+					<div class="small text-secondary">Active Carriers</div>
+					<div class="display-6 fs-2">{{.Stats.ActiveCarriers}}</div>
+					{{if gt .Stats.LowBalanceCarriers 0}}<span class="badge text-bg-warning">Low balance alert</span>{{end}}
+				</div>
+			</div>
+		</div>
+		<div class="col-12 col-md-3"><div class="card bg-body-tertiary h-100"><div class="card-body"><div class="small text-secondary">SMS Sent Today</div><div class="display-6 fs-2">{{.Stats.SMSToday}}</div></div></div></div>
+		<div class="col-12 col-md-3"><div class="card bg-body-tertiary h-100"><div class="card-body"><div class="small text-secondary">Total Client Funds</div><div class="display-6 fs-2">{{.Stats.TotalClientFunds}}</div></div></div></div>
+	</div>
+	<section class="mt-4">
+		<h2 class="h5 mb-3">Carrier Health</h2>
+		<div class="table-responsive">
+			<table class="table table-sm align-middle">
+				<thead><tr><th>Carrier</th><th>Status</th><th>Balance</th><th>Currency</th><th>Last Message</th><th>30d Spend</th><th>Messages (All Time)</th><th>Success Rate</th></tr></thead>
+				<tbody>
+					{{range .Carrier}}
+					<tr>
+						<td>{{.CarrierName}}</td>
+						<td>{{.Status}}</td>
+						<td>{{.CurrentBalance}}</td>
+						<td>{{.Currency}}</td>
+						<td>{{if .LastMessageAt}}{{.LastMessageAt.Format "2006-01-02 15:04:05"}}{{else}}-{{end}}</td>
+						<td>{{.SpendLast30d}}</td>
+						<td>{{.TotalMessagesSent}}</td>
+						<td>{{.SuccessRate}}%</td>
+					</tr>
+					{{else}}
+					<tr><td colspan="8" class="text-secondary">No carrier health data.</td></tr>
+					{{end}}
+				</tbody>
+			</table>
+		</div>
+	</section>
+</div>
+{{end}}

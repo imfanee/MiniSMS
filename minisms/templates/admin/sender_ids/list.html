@@ -1,0 +1,123 @@
+{{define "content"}}
+<h1 class="h2 mb-3">Sender IDs</h1>
+<p class="text-secondary mb-3">This page is the <strong>library</strong> of reusable Sender ID values. To allow a Sender ID for API sends, attach it to a <strong>client</strong> or <strong>carrier</strong> from that record's detail page (Sender IDs tab).</p>
+<div class="alert alert-info py-2 mb-4" role="note">
+	<div class="small mb-1"><strong>How to associate a Sender ID</strong></div>
+	<ul class="small mb-0 ps-3">
+		<li><strong>Clients:</strong> <a href="/admin/clients">Clients</a> → open a client → <strong>Sender IDs</strong> tab → choose a library entry and <strong>Add</strong>.</li>
+		<li><strong>Carriers:</strong> <a href="/admin/carriers">Carriers</a> → open a carrier → <strong>Sender IDs</strong> tab (when policy is <code>list</code>, the list is required) → <strong>Add</strong>.</li>
+	</ul>
+	<div class="small text-secondary mt-2 mb-0">The columns "Used by Clients" and "Used by Carriers" count how many links exist in the database for each library entry.</div>
+</div>
+
+<div class="card bg-body-tertiary border mb-3">
+  <div class="card-body">
+    <h2 class="h6 mb-3">+ Add Sender ID</h2>
+    <form class="row g-2" method="post" action="/admin/sender-ids" hx-post="/admin/sender-ids" hx-target="#sender-ids-table-body" hx-swap="afterbegin" x-data="{type: '{{.Form.SenderIDType}}'}">
+      <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+      <div class="col-md-3">
+        <label class="form-label">Value</label>
+        <input class="form-control form-control-sm {{if index .Form.Errors "value"}}is-invalid{{end}}" name="value" value="{{.Form.Value}}" required
+               @blur="
+                if (type==='alpha' && !/^[A-Za-z0-9]{1,11}$/.test($el.value)) $el.setCustomValidity('Invalid alpha value');
+                else if (type==='numeric' && !/^[0-9]{1,15}$/.test($el.value)) $el.setCustomValidity('Invalid numeric value');
+                else if (type==='e164' && !/^\+[1-9][0-9]{6,14}$/.test($el.value)) $el.setCustomValidity('Invalid E.164 value');
+                else $el.setCustomValidity('');
+               ">
+        {{if index .Form.Errors "value"}}<div class="invalid-feedback d-block">{{index .Form.Errors "value"}}</div>{{end}}
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Type</label>
+        <select class="form-select form-select-sm {{if index .Form.Errors "sender_id_type"}}is-invalid{{end}}" name="sender_id_type" x-model="type" required>
+          <option value="alpha" {{if eq .Form.SenderIDType "alpha"}}selected{{end}}>alpha</option>
+          <option value="numeric" {{if eq .Form.SenderIDType "numeric"}}selected{{end}}>numeric</option>
+          <option value="e164" {{if eq .Form.SenderIDType "e164"}}selected{{end}}>e164</option>
+        </select>
+        {{if index .Form.Errors "sender_id_type"}}<div class="invalid-feedback d-block">{{index .Form.Errors "sender_id_type"}}</div>{{end}}
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Description</label>
+        <input class="form-control form-control-sm" name="description" value="{{.Form.Description}}">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary btn-sm w-100" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr><th>Value</th><th>Type</th><th>Description</th><th>Used by Clients</th><th>Used by Carriers</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody id="sender-ids-table-body">
+      {{range .Rows}}
+        {{template "sender_id_row_view" .}}
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{define "sender_id_row_view"}}
+<tr id="sender-row-{{.Row.SenderID}}">
+  <td class="font-monospace">{{.Row.Value}}</td>
+  <td><span class="badge bg-secondary text-uppercase">{{.Row.SenderIDType}}</span></td>
+  <td>{{if .Row.Description}}{{.Row.Description}}{{else}}<span class="text-secondary">—</span>{{end}}</td>
+  <td>{{.Row.ClientCount}}</td>
+  <td>{{.Row.CarrierCount}}</td>
+  <td>{{if .Row.IsActive}}<span class="badge bg-success">Active</span>{{else}}<span class="badge bg-secondary">Inactive</span>{{end}}</td>
+  <td class="d-flex flex-wrap gap-2 align-items-center">
+    <button type="button" class="btn btn-sm btn-outline-primary"
+      hx-get="/admin/sender-ids/{{.Row.SenderID}}/edit-row"
+      hx-target="#sender-row-{{.Row.SenderID}}"
+      hx-swap="outerHTML">Edit</button>
+    <form class="d-inline" hx-post="/admin/sender-ids/{{.Row.SenderID}}/toggle" hx-target="#sender-row-{{.Row.SenderID}}" hx-swap="outerHTML">
+      <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+      <button type="submit" class="btn btn-sm btn-outline-secondary">{{if .Row.IsActive}}Deactivate{{else}}Activate{{end}}</button>
+    </form>
+  </td>
+</tr>
+{{end}}
+
+{{define "sender_id_row_edit"}}
+<tr id="sender-row-{{.Row.SenderID}}" x-data="{type: '{{.Row.SenderIDType}}'}">
+  <td>
+    <input class="form-control form-control-sm" name="value" value="{{.Row.Value}}" required
+      form="sender-save-{{.Row.SenderID}}"
+      @blur="
+        if (type==='alpha' && !/^[A-Za-z0-9]{1,11}$/.test($el.value)) $el.setCustomValidity('Invalid alpha value');
+        else if (type==='numeric' && !/^[0-9]{1,15}$/.test($el.value)) $el.setCustomValidity('Invalid numeric value');
+        else if (type==='e164' && !/^\+[1-9][0-9]{6,14}$/.test($el.value)) $el.setCustomValidity('Invalid E.164 value');
+        else $el.setCustomValidity('');
+      ">
+  </td>
+  <td>
+    <select class="form-select form-select-sm" name="sender_id_type" x-model="type" form="sender-save-{{.Row.SenderID}}" aria-label="Sender ID type">
+      <option value="alpha" {{if eq .Row.SenderIDType "alpha"}}selected{{end}}>alpha</option>
+      <option value="numeric" {{if eq .Row.SenderIDType "numeric"}}selected{{end}}>numeric</option>
+      <option value="e164" {{if eq .Row.SenderIDType "e164"}}selected{{end}}>e164</option>
+    </select>
+  </td>
+  <td>
+    <input class="form-control form-control-sm" name="description" value="{{if .Row.Description}}{{.Row.Description}}{{end}}" form="sender-save-{{.Row.SenderID}}">
+  </td>
+  <td>{{.Row.ClientCount}}</td>
+  <td>{{.Row.CarrierCount}}</td>
+  <td>{{if .Row.IsActive}}<span class="badge bg-success">Active</span>{{else}}<span class="badge bg-secondary">Inactive</span>{{end}}</td>
+  <td class="d-flex flex-wrap gap-2 align-items-center">
+    <form id="sender-save-{{.Row.SenderID}}" class="d-inline-flex flex-wrap gap-2 align-items-center"
+      hx-put="/admin/sender-ids/{{.Row.SenderID}}"
+      hx-target="#sender-row-{{.Row.SenderID}}"
+      hx-swap="outerHTML">
+      <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+      <button type="submit" class="btn btn-sm btn-primary">Save</button>
+      <button type="button" class="btn btn-sm btn-secondary"
+        hx-get="/admin/sender-ids/{{.Row.SenderID}}/row"
+        hx-target="#sender-row-{{.Row.SenderID}}"
+        hx-swap="outerHTML">Cancel</button>
+    </form>
+  </td>
+</tr>
+{{end}}

@@ -1,0 +1,43 @@
+{{define "content"}}
+<nav class="text-secondary small mb-2" aria-label="Breadcrumb">
+	<a href="/admin/rate-groups">Rate Groups</a> / <span class="text-body">{{.Group.Name}}</span>
+</nav>
+<div class="card bg-body-tertiary border mb-4">
+	<div class="card-body">
+		<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+			<div>
+				<h2 class="h2 mb-1">{{.Group.Name}}</h2>
+				<span class="badge bg-secondary">{{.Group.Currency}}</span>
+			</div>
+			<div class="text-secondary text-end">{{if .Group.Description}}{{.Group.Description}}{{else}}No description{{end}}</div>
+		</div>
+	</div>
+</div>
+<div class="d-flex justify-content-between align-items-center mb-2">
+	<h3 class="h5 mb-0">Rate Entries</h3>
+	<button class="btn btn-sm btn-primary" type="button" hx-get="/admin/rate-groups/{{.Group.RateGroupID}}/entries/new" hx-target="#entries-table-body" hx-swap="afterbegin">+ Add Entry</button>
+</div>
+<div class="table-responsive">
+	<table class="table table-dark table-sm align-middle">
+		<thead>
+			<tr>
+				<th>Prefix</th>
+				<th>Description</th>
+				<th>Rate/SMS</th>
+				<th>Effective From</th>
+				<th>Effective To</th>
+				<th>Status</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody id="entries-table-body">
+			{{range .Entries}}
+			{{template "entry_row" .}}
+			{{else}}
+			<tr><td colspan="7" class="text-secondary text-center py-4">No rate entries yet.</td></tr>
+			{{end}}
+		</tbody>
+	</table>
+</div>
+{{end}}
+

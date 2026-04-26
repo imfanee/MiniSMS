@@ -1,0 +1,16 @@
+[Unit]
+Description=MiniSMS Gateway
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=minisms
+EnvironmentFile=/etc/minisms/minisms.env
+ExecStart=/usr/local/bin/minisms
+Restart=always
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

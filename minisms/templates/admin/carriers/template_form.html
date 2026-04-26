@@ -1,0 +1,60 @@
+{{define "template_form"}}
+<div id="template-panel" x-data="{
+  body: '',
+  query: '',
+  r(s) { return (window.minismsReplaceTemplateVars || function (x) { return x || ''; })(s); }
+}" x-init="body = $refs.bin.value; query = $refs.qin.value" class="d-flex flex-column gap-3">
+	{{if .Success}}<div class="alert alert-success py-2 mb-0" role="status">{{.Success}}</div>{{end}}
+	<form
+		class="d-flex flex-column gap-3"
+		hx-post="/admin/carriers/{{.CarrierID}}/template"
+		hx-target="#template-panel"
+		hx-swap="outerHTML"
+	>
+		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}"/>
+		<div>
+			<label class="form-label" for="ctsel">Content-Type</label>
+			<select x-ref="ct" name="content_type" class="form-select" id="ctsel">
+				<option value="application/json" {{if eq .ContentType "application/json"}}selected{{end}}>application/json</option>
+				<option value="application/x-www-form-urlencoded" {{if eq .ContentType "application/x-www-form-urlencoded"}}selected{{end}}>application/x-www-form-urlencoded</option>
+				<option value="text/xml" {{if eq .ContentType "text/xml"}}selected{{end}}>text/xml</option>
+				<option value="application/xml" {{if eq .ContentType "application/xml"}}selected{{end}}>application/xml</option>
+			</select>
+			{{if index .Errors "content_type"}}<div class="invalid-feedback d-block">{{index .Errors "content_type"}}</div>{{end}}
+		</div>
+		<div>
+			<label class="form-label" for="body_t">Body template</label>
+			<textarea x-ref="bin" x-model="body" name="body_template" class="form-control font-monospace {{if index .Errors "body_template"}}is-invalid{{end}}" id="body_t" rows="20" style="min-height: 18rem">{{.Body}}</textarea>
+			{{if index .Errors "body_template"}}<div class="invalid-feedback d-block">{{index .Errors "body_template"}}</div>{{end}}
+		</div>
+		<div>
+			<label class="form-label" for="q_t">Query template</label>
+			<textarea x-ref="qin" x-model="query" name="query_template" class="form-control font-monospace" id="q_t" rows="5" style="min-height: 6rem">{{.Query}}</textarea>
+		</div>
+		{{if .Updated}}<p class="text-secondary small mb-0">Last updated (UTC): {{.Updated}}</p>{{end}}
+		<button class="btn btn-primary align-self-start" type="submit">Save</button>
+	</form>
+	<div class="alert alert-info small" role="note">
+		<strong>Variables</strong> — <code>to</code> destination, <code>from</code> origin, <code>message</code> text, <code>message_id</code>, <code>timestamp</code> ISO 8601, <code>client_id</code>,
+		<code>dlr_callback_url</code> MiniSMS callback URL for DLR registration,
+		<code>source_addr_ton</code>, <code>source_addr_npi</code>, <code>dest_addr_ton</code>, <code>dest_addr_npi</code>.
+	</div>
+	<div>
+		<p class="form-label">Live preview (sample data)</p>
+		<div class="row g-2">
+			<div class="col-12 col-lg-6">
+				<div class="border rounded p-2 bg-body-secondary h-100">
+					<p class="text-secondary small mb-1">Body (preview)</p>
+					<pre x-text="r(body)" class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; font-size:0.8rem; max-height: 20rem; overflow: auto"> </pre>
+				</div>
+			</div>
+			<div class="col-12 col-lg-6">
+				<div class="border rounded p-2 bg-body-secondary h-100">
+					<p class="text-secondary small mb-1">Query (preview)</p>
+					<pre x-text="r(query)" class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; font-size:0.8rem; max-height: 8rem; overflow: auto"> </pre>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{{end}}

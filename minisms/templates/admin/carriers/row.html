@@ -1,0 +1,20 @@
+{{define "carrier_row"}}
+<tr id="carrier-row-{{.Row.CarrierID}}">
+	<td><a href="/admin/carriers/{{.Row.CarrierID}}">{{.Row.Name}}</a></td>
+	<td class="text-break" style="max-width: 14rem;"><code class="small">{{.Row.EndpointURL}}</code></td>
+	<td>{{.Row.HTTPMethod}}</td>
+	<td>
+		{{if .Active}}<span class="badge bg-success">active</span>{{else}}<span class="badge bg-secondary">inactive</span>{{end}}
+	</td>
+	<td>{{.Row.Currency}}</td>
+	<td class="text-end font-monospace">{{.BalFmt}}</td>
+	<td>{{if .Row.RateGroupName}}{{.Row.RateGroupName}}{{else}}<span class="text-secondary">—</span>{{end}}</td>
+	<td>
+		<a class="btn btn-sm btn-outline-light" href="/admin/carriers/{{.Row.CarrierID}}">Detail</a>
+		<button type="button" class="btn btn-sm btn-outline-primary" hx-get="/admin/carriers/{{.Row.CarrierID}}/edit" hx-target="closest tr" hx-swap="outerHTML">Edit</button>
+		<button type="button" class="btn btn-sm {{if .Active}}btn-outline-warning{{else}}btn-outline-success{{end}}" hx-post="/admin/carriers/{{.Row.CarrierID}}/toggle-status" hx-target="closest tr" hx-swap="outerHTML">
+			{{if .Active}}Deactivate{{else}}Activate{{end}}
+		</button>
+	</td>
+</tr>
+{{end}}

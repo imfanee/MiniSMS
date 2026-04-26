@@ -1,0 +1,69 @@
+{{define "add_form_row"}}
+<tr class="table-warning" id="add-carrier-row">
+	<td colspan="8">
+		<form class="row g-2" hx-post="/admin/carriers" hx-target="closest tr" hx-swap="outerHTML" novalidate>
+			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+			<div class="col-md-3">
+				<label class="form-label">Name</label>
+				<input class="form-control form-control-sm {{if index .Errors "name"}}is-invalid{{end}}" name="name" value="{{.Name}}" required />
+				{{if index .Errors "name"}}<div class="invalid-feedback d-block">{{index .Errors "name"}}</div>{{end}}
+			</div>
+			<div class="col-md-3">
+				<label class="form-label">Endpoint URL</label>
+				<input class="form-control form-control-sm {{if index .Errors "endpoint_url"}}is-invalid{{end}}" name="endpoint_url" value="{{.EndpointURL}}" required />
+				{{if index .Errors "endpoint_url"}}<div class="invalid-feedback d-block">{{index .Errors "endpoint_url"}}</div>{{end}}
+			</div>
+			<div class="col-md-1">
+				<label class="form-label">Method</label>
+				<select class="form-select form-select-sm" name="http_method">
+					<option value="POST" {{if eq .HTTPMethod "POST"}}selected{{end}}>POST</option>
+					<option value="GET" {{if eq .HTTPMethod "GET"}}selected{{end}}>GET</option>
+				</select>
+			</div>
+			<div class="col-md-1">
+				<label class="form-label">Status</label>
+				<select class="form-select form-select-sm" name="status">
+					<option value="active" {{if or (eq .Status "active") (not .Status)}}selected{{end}}>active</option>
+					<option value="inactive" {{if eq .Status "inactive"}}selected{{end}}>inactive</option>
+				</select>
+			</div>
+			<div class="col-md-1">
+				<label class="form-label">CCY</label>
+				<select class="form-select form-select-sm {{if index .Errors "currency"}}is-invalid{{end}}" name="currency" required>
+					{{range .Currencies}}
+					<option value="{{.Code}}" {{if eq $.Currency .Code}}selected{{end}}>{{.Code}} — {{.Name}} ({{.Symbol}})</option>
+					{{end}}
+				</select>
+				{{if index .Errors "currency"}}<div class="invalid-feedback d-block">{{index .Errors "currency"}}</div>{{end}}
+			</div>
+			<div class="col-md-2">
+				<label class="form-label">Rate group</label>
+				<select class="form-select form-select-sm" name="rate_group_id">
+					<option value="">(none)</option>
+					{{range .RateGroups}}
+					<option value="{{.ID}}">{{.Name}}</option>
+					{{end}}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<label class="form-label">Sender ID Policy</label>
+				<select class="form-select form-select-sm" name="sender_id_policy">
+					<option value="any">any</option>
+					<option value="numeric">numeric</option>
+					<option value="e164">e164</option>
+					<option value="list">list</option>
+					<option value="none">none</option>
+				</select>
+			</div>
+			<div class="col-md-2">
+				<label class="form-label">Default Sender ID</label>
+				<input class="form-control form-control-sm" name="default_sender_id_value" maxlength="15" />
+			</div>
+			<div class="col-12 d-flex gap-2">
+				<button class="btn btn-sm btn-primary" type="submit">Save</button>
+				<button class="btn btn-sm btn-secondary" type="button" hx-on:click="this.closest('tr').remove()">Cancel</button>
+			</div>
+		</form>
+	</td>
+</tr>
+{{end}}

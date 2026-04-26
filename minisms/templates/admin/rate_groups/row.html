@@ -1,0 +1,24 @@
+{{define "rg_row"}}
+<tr id="rg-row-{{.RateGroupID}}">
+	<td>{{.Name}}</td>
+	<td><span class="badge bg-secondary">{{.Currency}}</span></td>
+	<td>{{.EntryCount}}</td>
+	<td>{{.CarrierCount}}</td>
+	<td>{{.ClientCount}}</td>
+	<td class="d-flex gap-1 flex-wrap">
+		<a class="btn btn-sm btn-outline-light" href="/admin/rate-groups/{{.RateGroupID}}">Manage</a>
+		<button type="button" class="btn btn-sm btn-outline-primary" hx-get="/admin/rate-groups/{{.RateGroupID}}/edit" hx-target="closest tr" hx-swap="outerHTML">Edit</button>
+		<button
+			type="button"
+			class="btn btn-sm btn-outline-danger"
+			hx-delete="/admin/rate-groups/{{.RateGroupID}}"
+			hx-target="#rg-del-msg-{{.RateGroupID}}"
+			hx-swap="innerHTML"
+			hx-confirm="Delete this rate group?"
+			hx-on:htmx:after-request="if(event.detail.xhr.status===200){ this.closest('tr').remove(); }"
+		>Delete</button>
+		<div id="rg-del-msg-{{.RateGroupID}}" class="w-100"></div>
+	</td>
+</tr>
+{{end}}
+

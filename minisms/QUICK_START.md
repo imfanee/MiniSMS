@@ -2,9 +2,9 @@
 
 This runbook takes a fresh Ubuntu 24.04 server to a live MiniSMS service.
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 0: Before You Begin
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Prerequisites:
 
@@ -22,9 +22,9 @@ usermod -aG sudo deploy
 su - deploy
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 1: System Update and Dependencies
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Step 1.1 — Update the system and base tools:
 
@@ -74,9 +74,9 @@ sudo apt install -y certbot python3-certbot-nginx
 go version && psql --version && nginx -v
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 2: PostgreSQL Database Setup
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Step 2.1 — Create the database role and database:
 
@@ -98,15 +98,15 @@ SQL
 sudo -u postgres psql -d minisms -c "SELECT current_database(), current_user;"
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 3: Clone the Repository and Build
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Step 3.1 — Clone the repository:
 
 ```bash
 cd ~
-git clone https://github.com/YOUR_ORG/minisms.git
+git clone https://github.com/imfanee/MiniSMS.git
 cd minisms/minisms
 ```
 
@@ -146,9 +146,9 @@ sudo install -m 755 bin/minisms /usr/local/bin/minisms
 ls -lh /usr/local/bin/minisms
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 4: Import the Database Schema
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Step 4.1 — Import the complete schema:
 
@@ -176,9 +176,9 @@ psql "postgres://minisms:CHANGE_THIS_PASSWORD@localhost:5432/minisms" -c "SELECT
 
 ✅ Checkpoint: currencies count must be `20`.
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 5: Configuration
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Step 5.1 — Create the configuration directory:
 
@@ -229,9 +229,10 @@ sudo chmod 600 /etc/minisms/minisms.env
 sudo ls -la /etc/minisms/minisms.env
 ```
 
-────────────────────────────────────────────────────────────────────
-SECTION 6: Create the Service User and Set Up PostgreSQL Access
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
+SECTION 6: Create the Service User and Set Up 
+PostgreSQL Access
+────────────────────────────────────────────────────
 
 Step 6.1 — Create the minisms system user:
 
@@ -252,9 +253,9 @@ Step 6.3 — Verify PostgreSQL accepts connections from the service user:
 sudo -u minisms psql "postgres://minisms:CHANGE_THIS_PASSWORD@localhost:5432/minisms" -c "SELECT 1 AS connection_test;"
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 7: Install and Start the systemd Service
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Step 7.1 — Install the unit file:
 
@@ -299,9 +300,9 @@ curl -s http://localhost:8080/healthz
 sudo systemctl is-active minisms
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 8: Configure nginx Reverse Proxy with TLS
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 ℹ️ Replace `YOUR_DOMAIN` with your real domain in this section.
 
@@ -372,9 +373,9 @@ sudo certbot renew --dry-run
 curl -sI https://YOUR_DOMAIN/healthz
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 9: Final System Verification
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Step 9.1 — Service health:
 
@@ -419,9 +420,9 @@ sudo ufw status
 
 ✅ Checkpoint 9: system live and verified.
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 10: First Configuration Steps After Go-Live
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 1. Open `https://YOUR_DOMAIN/admin/login`.
 2. Review `Settings`.
@@ -436,9 +437,9 @@ Test SMS:
 curl -X POST https://YOUR_DOMAIN/api/v1/sms/send -H "Authorization: Bearer YOUR_CLIENT_API_KEY" -H "Content-Type: application/json" -d '{"to":"+447700900123","message":"MiniSMS is live. Test message.","dlr":"YES"}'
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 11: Ongoing Operations Reference
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 Service management:
 
@@ -486,9 +487,9 @@ sudo nano /etc/minisms/minisms.env
 sudo systemctl restart minisms
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 SECTION 12: Troubleshooting Quick Reference
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 | Symptom | Check | Fix |
 |---|---|---|
@@ -501,9 +502,9 @@ SECTION 12: Troubleshooting Quick Reference
 
 For full operations detail, use `doc/MiniSMS_DevOps_Guide.md`.
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 Appendix A: Makefile Reference
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 ```bash
 cd ~/minisms/minisms
@@ -519,9 +520,9 @@ make clean
 make docker-build
 ```
 
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 Appendix B: Repository Structure
-────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────
 
 ```text
 cmd/minisms/

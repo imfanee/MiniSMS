@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -9,6 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/minisms/minisms/internal/pathutil"
 )
 
 type SettingRow struct {
@@ -20,6 +23,7 @@ type SettingRow struct {
 }
 
 type SettingsPage struct {
+	AdminView
 	Title       string
 	CurrentPath string
 	CSRFToken   string
@@ -41,7 +45,7 @@ func (h *Handlers) ShowSettings() http.HandlerFunc {
 			Flash:       GetFlash(w, r, "/", h.Config.SecretKey, h.Config.IsProduction()),
 			Rows:        rows,
 		}
-		if err := execT(w, h.SettingsT, "base", p); err != nil {
+		if err := execT(w, h.SettingsT, "base", p, r); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
 	}
@@ -83,6 +87,7 @@ func (h *Handlers) UpdateSetting() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
+		h.recordAudit(r, "setting.update", "system_setting", nil, &key, map[string]string{"value": value})
 		row, err = h.getSettingRow(r, key)
 		if err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
@@ -126,6 +131,13 @@ func validateSettingValue(key, value string) string {
 		if !alphaNum.MatchString(value) {
 			return "must be 1-11 alphanumeric characters"
 		}
+	case "sender_id_any_allowed_pattern":
+		if _, err := regexp.Compile(value); err != nil {
+			return "must be a valid regular expression"
+		}
+		if len(value) > 500 {
+			return "pattern must be at most 500 characters"
+		}
 	case "carrier_dispatch_timeout_s":
 		if !inIntRange(value, 1, 60) {
 			return "must be integer 1-60"
@@ -149,6 +161,10 @@ func validateSettingValue(key, value string) string {
 	case "api_rate_limit_per_minute":
 		if !inIntRange(value, 1, 1000) {
 			return "must be integer 1-1000"
+		}
+	case "invoice_header_image":
+		if err := pathutil.ValidateRelativeDataPath(value, "assets"); err != nil {
+			return "must be a relative path under assets/ (no ..)"
 		}
 	default:
 		return "unknown setting key"

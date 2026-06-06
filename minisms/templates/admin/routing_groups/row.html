@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "rog_row"}}
 <tr id="rog-row-{{.RoutingGroupID}}">
 	<td>{{.Name}}</td>
@@ -7,7 +8,7 @@
 	<td>{{if gt .HasFailoverCount 0}}Yes{{else}}No{{end}}</td>
 	<td>{{.AssignedClientCount}}</td>
 	<td class="d-flex gap-1 flex-wrap">
-		<a class="btn btn-sm btn-outline-light" href="/admin/routing-groups/{{.RoutingGroupID}}">Manage</a>
+		<a class="btn btn-sm btn-outline-light" href="/admin/routing-groups/{{.RoutingGroupID}}">Routing Rules</a>
 		<button type="button" class="btn btn-sm btn-outline-primary" hx-get="/admin/routing-groups/{{.RoutingGroupID}}/edit" hx-target="closest tr" hx-swap="outerHTML">Edit</button>
 		<button type="button" class="btn btn-sm {{if eq .Status "active"}}btn-outline-warning{{else}}btn-outline-success{{end}}" hx-post="/admin/routing-groups/{{.RoutingGroupID}}/toggle-status" hx-target="closest tr" hx-swap="outerHTML">{{if eq .Status "active"}}Deactivate{{else}}Activate{{end}}</button>
 	</td>

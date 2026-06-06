@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -25,6 +26,7 @@ var (
 )
 
 type RGListPage struct {
+	AdminView
 	Title, CurrentPath, CSRFToken string
 	Flash                         *Flash
 	Rows                          []db.RateGroupListRow
@@ -136,7 +138,7 @@ func (h *Handlers) ListRateGroups() http.HandlerFunc {
 			Title: "Rate Groups", CurrentPath: "/admin/rate-groups", CSRFToken: csrf.Token(r),
 			Flash: f, Rows: rows, HasRows: len(rows) > 0,
 		}
-		_ = execT(w, h.RGListT, "base", p)
+		_ = execT(w, h.RGListT, "base", p, r)
 	}
 }
 
@@ -349,6 +351,7 @@ func (h *Handlers) GetRateGroupDetail() http.HandlerFunc {
 			ev = append(ev, mapRGEntry(e, g.Currency))
 		}
 		_ = execT(w, h.RGDetT, "base", struct {
+			AdminView
 			Title, CurrentPath, CSRFToken string
 			Flash                         *Flash
 			Group                         *db.RateGroup
@@ -356,7 +359,7 @@ func (h *Handlers) GetRateGroupDetail() http.HandlerFunc {
 		}{
 			Title: "Rate Group", CurrentPath: "/admin/rate-groups", CSRFToken: csrf.Token(r),
 			Flash: GetFlash(w, r, "/", h.Config.SecretKey, h.Config.IsProduction()), Group: g, Entries: ev,
-		})
+		}, r)
 	}
 }
 

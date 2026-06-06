@@ -1,0 +1,23 @@
+# Environment and secrets (never commit live credentials)
+.env
+.env.*
+!.env.example
+!**/.env.example
+!**/*.env.example
+
+# TLS private keys and local dev certificates
+*.pem
+*.key
+
+# Build artifacts and runtime
+minisms/bin/
+minisms/hashpassword
+*.pid
+*.out
+coverage.out
+coverage_all.out
+
+# Editor / local
+.cursor/
+*.swp
+*~

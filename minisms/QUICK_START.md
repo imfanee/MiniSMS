@@ -1,3 +1,5 @@
+<!-- Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. -->
+
 # MiniSMS Quick Start (Ubuntu 24.04 LTS)
 
 This runbook takes a fresh Ubuntu 24.04 server to a live MiniSMS service.
@@ -424,9 +426,9 @@ sudo ufw status
 SECTION 10: First Configuration Steps After Go-Live
 ────────────────────────────────────────────────────
 
-1. Open `https://YOUR_DOMAIN/admin/login`.
-2. Review `Settings`.
-3. Add one `Carrier`.
+1. Open `https://YOUR_DOMAIN/admin/login` (first login uses bootstrap credentials from `/etc/minisms/minisms.env`).
+2. As super admin: review **Settings**; optionally add operators under **Admin users**.
+3. Add one `Carrier` → set **Interconnect** (HTTP or SMPP) → configure endpoint/template or SMPP bind.
 4. Add one `Rate Group` and prefix rates.
 5. Add one `Routing Group` and route entries.
 6. Add one `Client`, assign groups, add balance, generate API key.
@@ -468,14 +470,19 @@ Backup database:
 pg_dump -h localhost -U minisms -d minisms -F c -f /backup/minisms_$(date +%Y%m%d_%H%M%S).dump
 ```
 
-Changing admin password:
+Changing an admin password:
+
+- **Existing DB user:** Super admin → **Admin users** → edit user → set new password → Save (no restart).
+- **Bootstrap / env-only (empty `admin_users`):** Regenerate hash, update `ADMIN_PASSWORD_HASH` in `/etc/minisms/minisms.env`, restart service:
 
 ```bash
 cd ~/minisms/minisms
-./bin/hashpassword
+make hash-password
 sudo nano /etc/minisms/minisms.env
 sudo systemctl restart minisms
 ```
+
+After multi-admin is in use, prefer changing passwords in **Admin users** rather than only env.
 
 Rotating secret keys:
 
@@ -495,12 +502,14 @@ SECTION 12: Troubleshooting Quick Reference
 |---|---|---|
 | Service fails to start | `sudo journalctl -u minisms -n 50` | Fix env values in `/etc/minisms/minisms.env` |
 | 502 from nginx | `curl -s http://localhost:8080/healthz` | Restart `minisms` service |
-| Admin login fails | Verify `ADMIN_PASSWORD_HASH` | Regenerate hash with `bin/hashpassword` |
+| Admin login fails | Account active? Bootstrap env vs DB user | Fix in **Admin users** or regenerate `ADMIN_PASSWORD_HASH` for fresh DB |
+| Sidebar missing menu items | User permissions | Super admin edits user permissions; user signs out/in |
+| CSRF error on staging port | `CSRF_TRUSTED_ORIGINS` | Add full admin URL origin to `/etc/minisms/minisms.env` |
 | DB auth errors | Verify `DATABASE_URL` password | Reset DB role password and env value |
 | TLS issues | `sudo certbot renew --dry-run` | Re-issue certificate |
 | Port conflict | `sudo ss -ltnp | rg ':8080'` | Free port or change `PORT` |
 
-For full operations detail, use `doc/MiniSMS_DevOps_Guide.md`.
+For full operations detail, use `doc/MiniSMS_DevOps_Guide.md`. Full doc index: `doc/README.md`.
 
 ────────────────────────────────────────────────────
 Appendix A: Makefile Reference
@@ -511,10 +520,10 @@ cd ~/minisms/minisms
 make build
 make run
 make test
-make migrate
+make schema DB_URL=postgres://minisms:CHANGE_THIS_PASSWORD@localhost:5432/minisms
 make hash-password
 make build-tools
-make schema DB_URL=postgres://minisms:password@localhost/minisms
+make schema DB_URL=postgres://minisms:CHANGE_THIS_PASSWORD@localhost/minisms
 make vet
 make clean
 make docker-build
@@ -529,7 +538,7 @@ cmd/minisms/
 internal/
 templates/
 static/
-migrations/
+deploy/minisms_db.sql
 deploy/
 tools/
 doc/

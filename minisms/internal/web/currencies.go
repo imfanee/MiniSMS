@@ -1,8 +1,8 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
 	"errors"
-	"html/template"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -10,11 +10,11 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/jackc/pgx/v5"
-	"github.com/minisms/minisms"
 	"github.com/minisms/minisms/internal/db"
 )
 
 type currenciesPage struct {
+	AdminView
 	Title       string
 	CurrentPath string
 	CSRFToken   string
@@ -51,17 +51,7 @@ func (h *Handlers) ListCurrencies() http.HandlerFunc {
 				Errors:        map[string]string{},
 			},
 		}
-		t, err := template.ParseFS(minisms.TemplateFS,
-			"templates/layout/base.html",
-			"templates/layout/partials/navbar.html",
-			"templates/layout/partials/flash.html",
-			"templates/admin/currencies/list.html",
-		)
-		if err != nil {
-			ServerError(w, r, err, h.Log, h.T500)
-			return
-		}
-		if err := t.ExecuteTemplate(w, "base", p); err != nil {
+		if err := execT(w, h.CurrenciesT, "base", &p, r); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
 	}
@@ -178,27 +168,14 @@ func (h *Handlers) renderCurrenciesWithForm(w http.ResponseWriter, r *http.Reque
 		Rows:        rows,
 		Form:        f,
 	}
-	t, err := template.ParseFS(minisms.TemplateFS,
-		"templates/layout/base.html",
-		"templates/layout/partials/navbar.html",
-		"templates/layout/partials/flash.html",
-		"templates/admin/currencies/list.html",
-	)
-	if err != nil {
-		ServerError(w, r, err, h.Log, h.T500)
-		return
-	}
 	w.WriteHeader(status)
-	_ = t.ExecuteTemplate(w, "base", p)
+	if err := execT(w, h.CurrenciesT, "base", p, r); err != nil {
+		ServerError(w, r, err, h.Log, h.T500)
+	}
 }
 
 func (h *Handlers) renderCurrencyRow(w http.ResponseWriter, r *http.Request, row *db.Currency) {
-	t, err := template.ParseFS(minisms.TemplateFS, "templates/admin/currencies/list.html")
-	if err != nil {
-		ServerError(w, r, err, h.Log, h.T500)
-		return
-	}
-	if err := t.ExecuteTemplate(w, "currency_row", row); err != nil {
+	if err := h.CurrenciesT.ExecuteTemplate(w, "currency_row", row); err != nil {
 		ServerError(w, r, err, h.Log, h.T500)
 	}
 }

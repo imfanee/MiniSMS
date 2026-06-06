@@ -1,0 +1,120 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "invoices_panel"}}
+<div id="invoices-panel" class="d-flex flex-column gap-3">
+	<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+		<h2 class="h5 mb-0">Invoices — {{.EntityName}}</h2>
+		<button class="btn btn-sm btn-primary" type="button"
+			hx-get="{{.BasePath}}?new=1"
+			hx-target="#invoices-panel"
+			hx-swap="outerHTML">New Invoice</button>
+	</div>
+
+	<div class="row g-3">
+		<div class="col-md-4">
+			<div class="card bg-body border h-100">
+				<div class="card-body">
+					<div class="text-secondary small">Total Invoices</div>
+					<div class="h4 mb-0 font-monospace">{{.Total}}</div>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-4">
+			<div class="card bg-body border h-100">
+				<div class="card-body">
+					<div class="text-secondary small">Pending</div>
+					<div class="h4 mb-0 font-monospace">{{.PendingCount}}</div>
+					<div class="form-text">Unpaid and Partially Paid</div>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-4">
+			<div class="card bg-body border h-100">
+				<div class="card-body">
+					<div class="text-secondary small">Unpaid Amount</div>
+					<div class="h4 mb-0 font-monospace">{{.UnpaidAmountFmt}}</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	{{if .ShowNewForm}}
+	<div class="card bg-body border">
+		<div class="card-body">
+			<h3 class="h6">New Invoice</h3>
+			<form class="row g-3 align-items-end" id="invoice-new-form" method="post">
+				<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+				<div class="col-md-3">
+					<label class="form-label">From Date</label>
+					<input type="date" class="form-control {{if index .Errors "from_date"}}is-invalid{{end}}" name="from_date" value="{{.FromDate}}" required />
+					{{if index .Errors "from_date"}}<div class="invalid-feedback d-block">{{index .Errors "from_date"}}</div>{{end}}
+				</div>
+				<div class="col-md-3">
+					<label class="form-label">To Date</label>
+					<input type="date" class="form-control {{if index .Errors "to_date"}}is-invalid{{end}}" name="to_date" value="{{.ToDate}}" required />
+					{{if index .Errors "to_date"}}<div class="invalid-feedback d-block">{{index .Errors "to_date"}}</div>{{end}}
+				</div>
+				<div class="col-md-6 d-flex gap-2 flex-wrap">
+					<button class="btn btn-outline-secondary" type="submit" formaction="{{.BasePath}}/preview" formtarget="_blank">Preview</button>
+					<button class="btn btn-primary" type="submit" formaction="{{.BasePath}}/generate"
+						hx-post="{{.BasePath}}/generate"
+						hx-include="#invoice-new-form"
+						hx-target="#invoices-panel"
+						hx-swap="outerHTML">Generate Invoice</button>
+					<button class="btn btn-link" type="button" hx-get="{{.BasePath}}" hx-target="#invoices-panel" hx-swap="outerHTML">Cancel</button>
+				</div>
+			</form>
+			<div class="form-text">Default period is last calendar week (Mon–Sun). Preview downloads PDF without saving.</div>
+		</div>
+	</div>
+	{{end}}
+
+	<div class="table-responsive">
+		<table class="table table-sm table-dark align-middle">
+			<thead>
+				<tr>
+					<th>Invoice Number</th>
+					<th>Invoice Date</th>
+					<th>From Date</th>
+					<th>To Date</th>
+					<th class="text-end">Total Amount</th>
+					<th class="text-end">Pending Amount</th>
+					<th>Status</th>
+					<th class="text-center">PDF</th>
+				</tr>
+			</thead>
+			<tbody>
+				{{range .Rows}}
+				<tr>
+					<td class="font-monospace">{{.InvoiceNumber}}</td>
+					<td>{{.InvoiceDate}}</td>
+					<td>{{.FromDate}}</td>
+					<td>{{.ToDate}}</td>
+					<td class="text-end font-monospace">{{.TotalAmount}} {{.Currency}}</td>
+					<td class="text-end font-monospace">{{.PendingAmount}} {{.Currency}}</td>
+					<td>
+						{{if eq .Status "paid"}}<span class="badge bg-success">{{.StatusLabel}}</span>
+						{{else if eq .Status "partially_paid"}}<span class="badge bg-warning text-dark">{{.StatusLabel}}</span>
+						{{else}}<span class="badge bg-secondary">{{.StatusLabel}}</span>{{end}}
+					</td>
+					<td class="text-center">
+						<a class="btn btn-sm btn-outline-light" href="{{.PDFURL}}" title="Download PDF" aria-label="Download PDF">⬇</a>
+					</td>
+				</tr>
+				{{else}}
+				<tr><td colspan="8" class="text-center text-secondary py-4">No invoices yet.</td></tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+
+	{{if gt .PageCount 1}}
+	<nav class="d-flex justify-content-between align-items-center">
+		<span class="text-secondary small">Page {{.Page}} of {{.PageCount}} ({{.Total}} invoices)</span>
+		<div class="btn-group btn-group-sm">
+			<a class="btn btn-outline-secondary {{if eq .Page 1}}disabled{{end}}" href="{{.BasePath}}?page={{.PrevPage}}">Previous</a>
+			<a class="btn btn-outline-secondary {{if eq .Page .PageCount}}disabled{{end}}" href="{{.BasePath}}?page={{.NextPage}}">Next</a>
+		</div>
+	</nav>
+	{{end}}
+</div>
+{{end}}

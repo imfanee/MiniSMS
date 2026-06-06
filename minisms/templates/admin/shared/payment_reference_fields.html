@@ -1,0 +1,29 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "payment_reference_fields"}}
+<div x-data="{ refType: '{{.RefType}}' }">
+	<div class="mb-2">
+		<label class="form-label" for="{{.FieldPrefix}}-ref-type">Payment reference</label>
+		<select id="{{.FieldPrefix}}-ref-type" name="reference_type" class="form-select {{if index .Errors "reference_type"}}is-invalid{{end}}" x-model="refType" required>
+			<option value="other" {{if eq .RefType "other"}}selected{{end}}>Other</option>
+			<option value="invoice" {{if eq .RefType "invoice"}}selected{{end}}>Invoice</option>
+		</select>
+		{{if index .Errors "reference_type"}}<div class="invalid-feedback d-block">{{index .Errors "reference_type"}}</div>{{end}}
+	</div>
+	<div class="mb-2" x-show="refType === 'other'" x-cloak>
+		<label class="form-label" for="{{.FieldPrefix}}-ref-detail">Reference details</label>
+		<input id="{{.FieldPrefix}}-ref-detail" name="payment_reference" class="form-control {{if index .Errors "payment_reference"}}is-invalid{{end}}" value="{{.OtherReference}}" />
+		{{if index .Errors "payment_reference"}}<div class="invalid-feedback d-block">{{index .Errors "payment_reference"}}</div>{{end}}
+	</div>
+	<div class="mb-2" x-show="refType === 'invoice'" x-cloak>
+		<label class="form-label" for="{{.FieldPrefix}}-invoice">Invoice</label>
+		<select id="{{.FieldPrefix}}-invoice" name="invoice_id" class="form-select {{if index .Errors "invoice_id"}}is-invalid{{end}}">
+			<option value="">— Select invoice —</option>
+			{{range .OpenInvoices}}
+			<option value="{{.InvoiceID}}" {{if eq $.SelectedInvoiceID .InvoiceID}}selected{{end}}>{{.InvoiceNumber}} — pending {{.PendingAmount}} ({{.InvoiceDate}})</option>
+			{{end}}
+		</select>
+		{{if index .Errors "invoice_id"}}<div class="invalid-feedback d-block">{{index .Errors "invoice_id"}}</div>{{end}}
+		{{if not .OpenInvoices}}<div class="form-text">No open invoices with outstanding balance.</div>{{end}}
+	</div>
+</div>
+{{end}}

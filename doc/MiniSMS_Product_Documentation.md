@@ -1,8 +1,11 @@
+<!-- Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. -->
+
 # MiniSMS Product Documentation
 
 MiniSMS is a production Go SMS middleware gateway that sits between client applications and downstream SMS carriers. It exposes a northbound REST API for clients and a server-rendered Admin UI for operations teams. It handles routing, pricing, sender ID policy enforcement, balance control, delivery receipt (DLR) forwarding, and financial/audit traceability.
 
-> This document describes the current implemented state (v1.2 + DLR) in present tense.
+> This document describes the current implemented state (v1.3 + DLR + multi-admin RBAC + carrier interconnect) in present tense.  
+> **Doc index:** [README.md](./README.md)
 
 ## 1. Overview
 
@@ -92,18 +95,28 @@ Client-level allowlists are enforced before dispatch.
 
 ### 3.3 Carriers
 
-Each carrier stores:
+Each carrier has an **interconnect type**:
 
-- Endpoint URL and method
-- Auth headers
-- Request template (body/query/content type)
+- **HTTP** — REST-style dispatch via configurable endpoint, method, auth headers, and request template (JSON, form, XML, or GET query).
+- **SMPP** — Outbound `submit_sm` using per-carrier bind settings on the SMPP tab.
+
+Shared carrier data:
+
 - Sender ID policy/default sender
 - Optional carrier rate group
 - In-loss protection controls
 - DLR callback settings and status map
-- SMPP TON/NPI behavior (static or dynamic)
+- SMPP TON/NPI behavior (static or dynamic) for templates and DLR JSON
 
 Carrier financial ledger is append-only (`payment`, `charge`, `adjustment`, `refund`) and carrier usage counters are updated on successful dispatch.
+
+### 3.3.1 Admin authentication and RBAC
+
+- **Bootstrap:** On startup, if `admin_users` is empty, MiniSMS inserts one super admin using `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH` from the environment.
+- **Accounts:** Additional operators live in `admin_users` (bcrypt password hash, JSON array of permission keys, `is_super_admin`, `is_active`).
+- **Sessions:** Cookie sessions in `admin_sessions` reference `admin_user_id`.
+- **Authorization:** Route handlers and sidebar entries check permission keys (for example `carriers_view`). Super admins bypass checks and access Settings, Audit log, and Admin users.
+- **Audit:** Selected admin actions write append-only rows to `audit_log` with optional `admin_user_id` for display name in the UI.
 
 ### 3.4 Request Templates and Variable Injection
 
@@ -512,7 +525,7 @@ Health response shape:
 | `low_balance_alert_threshold` | decimal | `1.00` | Client low balance alert threshold |
 | `refund_on_carrier_failure` | bool | `true` | Auto-refund client on carrier network failure |
 | `max_sms_segments` | int | `4` | Max allowed concatenated segments |
-| `admin_session_idle_minutes` | int | `240` | Admin session idle timeout |
+| `admin_session_idle_minutes` | int | `240` | Admin session idle timeout (read at runtime by admin middleware; `SESSION_IDLE_MINUTES` env is fallback when unset/invalid) |
 | `api_rate_limit_per_minute` | int | `60` | Default API limit per client/minute |
 | `failover_enabled` | bool | `true` | Enables carrier failover flow |
 | `carrier_low_balance_alert` | decimal | `10.00` | Carrier low balance alert threshold |

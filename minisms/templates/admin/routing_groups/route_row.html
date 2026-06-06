@@ -1,6 +1,8 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "route_row"}}
 <tr id="route-row-{{.Row.RouteEntryID}}">
 	<td class="font-monospace">{{.PrefixLabel}}</td>
+	<td>{{if .Row.Description}}{{.Row.Description}}{{else}}<span class="text-secondary">—</span>{{end}}</td>
 	<td>
 		{{.Row.PrimaryCarrierName}}
 		<span class="badge {{.PrimaryBadge}} ms-1">{{.Row.PrimaryCarrierStatus}}</span>

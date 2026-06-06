@@ -1,3 +1,4 @@
+# Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 FROM golang:1.22-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./

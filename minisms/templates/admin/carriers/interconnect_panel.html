@@ -1,0 +1,40 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "interconnect_panel"}}
+<div id="carrier-interconnect-panel" x-data="{ ic: '{{.Interconnect}}', httpTab: 'endpoint' }">
+  {{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+  <form class="mb-4" hx-post="/admin/carriers/{{.CarrierID}}/interconnect" hx-target="#carrier-interconnect-panel" hx-swap="outerHTML">
+    <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+    <label class="form-label d-block">Interconnect type</label>
+    <div class="btn-group mb-2" role="group">
+      <input type="radio" class="btn-check" name="interconnect" id="ic-http" value="http" x-model="ic" {{if eq .Interconnect "http"}}checked{{end}} />
+      <label class="btn btn-outline-primary" for="ic-http">HTTP</label>
+      <input type="radio" class="btn-check" name="interconnect" id="ic-smpp" value="smpp" x-model="ic" {{if eq .Interconnect "smpp"}}checked{{end}} />
+      <label class="btn btn-outline-primary" for="ic-smpp">SMPP</label>
+    </div>
+    {{if index .Errors "interconnect"}}<div class="text-danger small mb-2">{{index .Errors "interconnect"}}</div>{{end}}
+    <button type="submit" class="btn btn-sm btn-primary">Save interconnect type</button>
+  </form>
+
+  <div x-show="ic === 'http'" x-cloak>
+    <div class="card border mb-3">
+      <div class="card-header">HTTP interconnect</div>
+      <div class="card-body p-0">
+        <ul class="nav nav-tabs px-3 pt-2">
+          <li class="nav-item"><button type="button" class="nav-link" :class="{ active: httpTab === 'endpoint' }" @click="httpTab='endpoint'" hx-get="/admin/carriers/{{.CarrierID}}/interconnect/http" hx-target="#http-interconnect-body" hx-swap="innerHTML">Endpoint</button></li>
+          <li class="nav-item"><button type="button" class="nav-link" :class="{ active: httpTab === 'headers' }" @click="httpTab='headers'" hx-get="/admin/carriers/{{.CarrierID}}/auth-headers" hx-target="#http-interconnect-body" hx-swap="innerHTML">Auth Headers</button></li>
+          <li class="nav-item"><button type="button" class="nav-link" :class="{ active: httpTab === 'template' }" @click="httpTab='template'" hx-get="/admin/carriers/{{.CarrierID}}/template" hx-target="#http-interconnect-body" hx-swap="innerHTML">Request Template</button></li>
+          <li class="nav-item"><button type="button" class="nav-link" :class="{ active: httpTab === 'dlr' }" @click="httpTab='dlr'" hx-get="/admin/carriers/{{.CarrierID}}/dlr-settings" hx-target="#http-interconnect-body" hx-swap="innerHTML">DLR Settings</button></li>
+        </ul>
+        <div class="p-3" id="http-interconnect-body" hx-get="/admin/carriers/{{.CarrierID}}/interconnect/http" hx-trigger="load" hx-target="this" hx-swap="innerHTML"></div>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="ic === 'smpp'" x-cloak>
+    <div class="card border mb-3">
+      <div class="card-header">SMPP interconnect</div>
+      <div class="card-body p-3" id="smpp-interconnect-body" hx-get="/admin/carriers/{{.CarrierID}}/smpp-settings" hx-trigger="load" hx-target="this" hx-swap="innerHTML"></div>
+    </div>
+  </div>
+</div>
+{{end}}

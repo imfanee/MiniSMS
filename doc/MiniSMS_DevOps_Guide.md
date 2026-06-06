@@ -1,6 +1,10 @@
+<!-- Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. -->
+
 # MiniSMS DevOps and Operations Guide
 
-This guide is prescriptive and command-driven for operating MiniSMS (v1.2 + DLR) on Ubuntu 24.04 LTS.
+This guide is prescriptive and command-driven for operating MiniSMS (v1.3 + DLR + RBAC) on Ubuntu 24.04 LTS.
+
+**See also:** [doc/README.md](./README.md) (documentation index).
 
 > Runtime model: single Go binary (`minisms`) + PostgreSQL 15+.
 
@@ -29,19 +33,7 @@ source /etc/profile.d/go.sh
 go version
 ```
 
-### 1.3 Install golang-migrate CLI
-
-```bash
-MIGRATE_VERSION="v4.18.1"
-ARCH="linux-amd64"   # use linux-arm64 on ARM64 hosts
-cd /tmp
-curl -fLO "https://github.com/golang-migrate/migrate/releases/download/${MIGRATE_VERSION}/migrate.${ARCH}.tar.gz"
-tar -xzf "migrate.${ARCH}.tar.gz"
-sudo install -m 0755 migrate /usr/local/bin/migrate
-migrate -version
-```
-
-### 1.4 Optional: install Caddy (instead of nginx)
+### 1.3 Optional: install Caddy (instead of nginx)
 
 ```bash
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
@@ -114,48 +106,26 @@ Test:
 psql "postgres://minisms:change_me_now@localhost:5432/minisms?sslmode=disable" -c "SELECT now();"
 ```
 
-### 3.2 Run migrations
+### 3.2 Apply database schema
 
-MiniSMS currently uses these migration files:
-
-- `001_initial_schema.up.sql`
-- `002_v1.2_currencies_senderids.up.sql`
-- `003_dlr_support.up.sql`
-- `003_dlr_support.down.sql`
-
-Apply:
+Schema is a **single file:** `deploy/minisms_db.sql` (consolidated; includes invoices, SMPP, multi-admin, ledger immutability, client DLR templates).
 
 ```bash
-cd /opt/minisms/minisms
-export DATABASE_URL='postgres://minisms:change_me_now@localhost:5432/minisms?sslmode=disable'
-migrate -path migrations -database "$DATABASE_URL" up
+cd /usr/src/MiniSMS/minisms
+make schema DB_URL='postgres://minisms:change_me_now@localhost:5432/minisms?sslmode=disable'
 ```
 
-Check version:
+The application **does not** auto-apply schema on startup. Apply explicitly when provisioning a database or after schema changes. Deploy runbook: [agent/OPERATIONS.md](./agent/OPERATIONS.md).
 
-```bash
-migrate -path migrations -database "$DATABASE_URL" version
-```
-
-Rollback one step (when down exists):
-
-```bash
-migrate -path migrations -database "$DATABASE_URL" down 1
-```
-
-Force version (recovery operation only):
-
-```bash
-migrate -path migrations -database "$DATABASE_URL" force 3
-```
+**Note:** `audit_log` is immutable; do not run UPDATE backfills against it. Historical audit rows may have NULL `admin_user_id`.
 
 ### 3.3 Schema reference
 
 Current schema objects:
 
-- **20 tables** (base + currencies/sender IDs additions)
+- **22+ tables** (includes `admin_users`, `invoices`, `smpp_bind_events`, interconnect columns; see `deploy/minisms_db.sql`)
 - **9 SQL functions**
-- **7 SQL views**
+- **11 SQL views** (7 base + 4 from v1.2: `v_client_sender_ids`, `v_carrier_sender_ids`, `v_carrier_prefix_success`, `v_client_bill_vs_carrier_cost`)
 
 Immutability-protected update prevention exists for:
 
@@ -165,7 +135,7 @@ Immutability-protected update prevention exists for:
 
 ### 3.4 DLR and SMPP columns
 
-From `003_dlr_support.up.sql`:
+Key columns in `deploy/minisms_db.sql`:
 
 - `clients`
   - `dlr_webhook_url TEXT`
@@ -219,10 +189,15 @@ MiniSMS reads environment using `godotenv` (`.env` for local/dev).
 |---|---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL DSN | `postgres://minisms:pass@localhost:5432/minisms?sslmode=disable` |
 | `SECRET_KEY` | Yes | 64 hex chars (32 bytes) | `openssl rand -hex 32` |
-| `ADMIN_USERNAME` | Yes | string | `admin` |
-| `ADMIN_PASSWORD_HASH` | Yes | bcrypt hash | `htpasswd -bnBC 12 "" 'StrongPass!' \| tr -d ':\n'` |
+| `ADMIN_USERNAME` | Yes | string | Bootstrap super admin username when `admin_users` is empty; required at every startup |
+| `ADMIN_PASSWORD_HASH` | Yes | bcrypt hash | Bootstrap super admin password hash; wrap in single quotes in `.env` if `$` present |
 | `CSRF_AUTH_KEY` | Yes | 64 hex chars (32 bytes) | `openssl rand -hex 32` |
 | `PORT` | No | integer string | `8080` |
+| `HTTP_LISTEN_ADDR` | No | host:port | `127.0.0.1:18081` (staging sidecar) |
+| `HTTP_CARRIER_INSECURE_TLS` | No | bool | `false` (lab only) |
+| `CSRF_TRUSTED_ORIGINS` | No | comma-separated URLs | Required if admin UI is served on a non-default origin (e.g. `:18080`) |
+| `SMPP_SERVER_ENABLED` | No | bool | `false` |
+| `SMPP_LISTEN_ADDR` | No | address | `:2775` |
 | `TLS_ENABLED` | No | bool (`true/false`) | `false` |
 | `TLS_CERT_FILE` | Cond. | path (required if TLS enabled) | `certs/dev-cert.pem` |
 | `TLS_KEY_FILE` | Cond. | path (required if TLS enabled) | `certs/dev-key.pem` |
@@ -254,7 +229,16 @@ LOG_LEVEL=info
 APP_ENV=production
 SESSION_IDLE_MINUTES=240
 CARRIER_DISPATCH_TIMEOUT_S=10
+# CSRF_TRUSTED_ORIGINS=https://sms.example.com:18080
+# HTTP_LISTEN_ADDR=127.0.0.1:18081
 ```
+
+### 4.4 Admin bootstrap and RBAC
+
+1. First process start with an empty `admin_users` table creates one **super admin** from `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH`.
+2. Sign in at `/admin/login`, then use **Admin users** to create operators with granular permissions.
+3. Env credentials remain required for config validation even after DB users exist; rotate bootstrap password in DB if env is rotated.
+4. **Audit log** and **Settings** require super admin. See [MiniSMS_Admin_Guide.md](./MiniSMS_Admin_Guide.md) §1.5 and §10.
 
 ## 5. Running the Application
 
@@ -359,7 +343,7 @@ WORKDIR /app
 COPY --from=build /out/minisms /app/minisms
 COPY --from=build /src/templates /app/templates
 COPY --from=build /src/static /app/static
-COPY --from=build /src/migrations /app/migrations
+COPY --from=build /src/deploy/minisms_db.sql /app/deploy/minisms_db.sql
 EXPOSE 8080
 ENTRYPOINT ["/app/minisms"]
 ```
@@ -512,7 +496,7 @@ https://sms.example.com/api/v1/dlr/{{message_id}}
 Zero/near-zero downtime sequence:
 
 1. Build new binary.
-2. Run DB migrations.
+2. Apply schema changes if any (`make schema` or manual `ALTER` from diff against `deploy/minisms_db.sql`).
 3. Swap binary.
 4. Restart service.
 5. Verify health and DLR path.
@@ -520,30 +504,17 @@ Zero/near-zero downtime sequence:
 Commands:
 
 ```bash
-cd /opt/minisms/minisms
+cd /usr/src/MiniSMS/minisms
 git fetch --all
 git checkout <release-tag-or-commit>
 go mod download
 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/minisms ./cmd/minisms
-export DATABASE_URL='postgres://minisms:change_me_now@localhost:5432/minisms?sslmode=disable'
-migrate -path migrations -database "$DATABASE_URL" up
 sudo install -m 0755 bin/minisms /usr/local/bin/minisms
 sudo systemctl restart minisms
 curl -f http://127.0.0.1:8080/healthz
 ```
 
-Rollback:
-
-```bash
-sudo install -m 0755 /opt/minisms/releases/<previous>/minisms /usr/local/bin/minisms
-sudo systemctl restart minisms
-```
-
-If rollback requires schema rollback and a down file exists for current version:
-
-```bash
-migrate -path migrations -database "$DATABASE_URL" down 1
-```
+Rollback (binary only): see [agent/OPERATIONS.md](./agent/OPERATIONS.md).
 
 ## 9. Database Operations
 
@@ -714,11 +685,11 @@ Format: symptom -> cause -> diagnostic -> fix.
 - Diagnostic: login returns HTTP 429 with temporary lock message
 - Fix: wait for block window to expire, then retry with correct credentials
 
-### 11.11 Migration failure on deploy
+### 11.11 Schema apply failure on deploy
 
-- Cause: dirty version or mismatched migration state
-- Diagnostic: `migrate ... version`
-- Fix: use `force` only after confirming actual DB state, then rerun `up`
+- Cause: `psql -f deploy/minisms_db.sql` error (object already exists, permission denied)
+- Diagnostic: read `psql` stderr; compare live schema with `pg_dump --schema-only`
+- Fix: apply only missing `ALTER`/`CREATE IF NOT EXISTS` sections, or restore from backup on maintenance window
 
 ## 12. Security Hardening Checklist
 

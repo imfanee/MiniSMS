@@ -1,3 +1,4 @@
+# Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 [Unit]
 Description=MiniSMS SMS Middleware Gateway
 Documentation=https://github.com/YOUR_ORG/minisms
@@ -19,6 +20,9 @@ ExecStart=/usr/local/bin/minisms
 
 # Graceful reload (sends SIGHUP — Go handles via signal.NotifyContext)
 ExecReload=/bin/kill -HUP $MAINPID
+
+# SMPP binds and carrier egress can open many TCP sockets
+LimitNOFILE=65535
 
 # Restart policy
 Restart=on-failure
@@ -44,7 +48,8 @@ RestrictRealtime=true
 RestrictNamespaces=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 LockPersonality=true
-ReadWritePaths=/tmp
+ReadWritePaths=/opt/minisms
+ReadOnlyPaths=/etc/minisms
 SystemCallFilter=@system-service
 CapabilityBoundingSet=
 

@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package api
 
 import (
@@ -14,7 +15,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
+	"github.com/minisms/minisms/internal/dlr"
 )
+
+func testHandlers(pool *pgxpool.Pool, key []byte) *Handlers {
+	cfg := &config.Config{SecretKey: key}
+	return &Handlers{
+		Pool:   pool,
+		Config: cfg,
+		DLR:    &dlr.Processor{Pool: pool, SecretKey: key},
+	}
+}
 
 func testPoolOrSkip(t *testing.T) *pgxpool.Pool {
 	t.Helper()
@@ -104,7 +115,7 @@ func performDLRRequest(h *Handlers, messageID, query string, body string, header
 func TestHandleDLR_MessageNotFound(t *testing.T) {
 	pool := testPoolOrSkip(t)
 	key := []byte("0123456789abcdef0123456789abcdef")
-	h := &Handlers{Pool: pool, Config: &config.Config{SecretKey: key}}
+	h := testHandlers(pool, key)
 	rr := performDLRRequest(h, uuid.NewString(), "", `{"status":"DELIVRD"}`, "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
@@ -114,7 +125,7 @@ func TestHandleDLR_MessageNotFound(t *testing.T) {
 func TestHandleDLR_NoWebhookURL(t *testing.T) {
 	pool := testPoolOrSkip(t)
 	key := []byte("0123456789abcdef0123456789abcdef")
-	h := &Handlers{Pool: pool, Config: &config.Config{SecretKey: key}}
+	h := testHandlers(pool, key)
 	fx := insertDLRFixture(t, pool, key, true, nil, nil, nil)
 	rr := performDLRRequest(h, fx.messageID, "", `{"status":"DELIVRD"}`, "")
 	if rr.Code != http.StatusOK {
@@ -143,7 +154,7 @@ func TestHandleDLR_SuccessfulForward(t *testing.T) {
 		t.Fatalf("encrypt secret: %v", err)
 	}
 	fx := insertDLRFixture(t, pool, key, true, strPtr(webhook.URL), nil, &secretEnc)
-	h := &Handlers{Pool: pool, Config: &config.Config{SecretKey: key}}
+	h := testHandlers(pool, key)
 	rr := performDLRRequest(h, fx.messageID, "", `{"status":"DELIVRD"}`, "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
@@ -169,7 +180,7 @@ func TestHandleDLR_WebhookForwardFails(t *testing.T) {
 	}))
 	defer webhook.Close()
 	fx := insertDLRFixture(t, pool, key, true, strPtr(webhook.URL), nil, nil)
-	h := &Handlers{Pool: pool, Config: &config.Config{SecretKey: key}}
+	h := testHandlers(pool, key)
 	rr := performDLRRequest(h, fx.messageID, "", `{"status":"UNDELIV"}`, "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
@@ -191,7 +202,7 @@ func TestHandleDLR_InboundSecretVerification(t *testing.T) {
 		t.Fatalf("encrypt inbound secret: %v", err)
 	}
 	fx := insertDLRFixture(t, pool, key, true, nil, &inboundEnc, nil)
-	h := &Handlers{Pool: pool, Config: &config.Config{SecretKey: key}}
+	h := testHandlers(pool, key)
 	rrBad := performDLRRequest(h, fx.messageID, "", `{"status":"DELIVRD"}`, "wrong")
 	if rrBad.Code != http.StatusForbidden {
 		t.Fatalf("expected 403 for wrong secret, got %d", rrBad.Code)

@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "navbar"}}
 <aside id="ms-sidebar" class="ms-sidebar">
 	<div class="ms-sidebar-brand">
@@ -17,6 +18,7 @@
 			<span class="ms-sidebar-label">Dashboard</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Dashboard</span>
 		</a>
+		{{if hasPerm .Perms "carriers_view"}}
 		<a href="/admin/carriers" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/carriers"}} active{{end}}" aria-label="Carriers">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -28,6 +30,8 @@
 			<span class="ms-sidebar-label">Carriers</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Carriers</span>
 		</a>
+		{{end}}
+		{{if hasPerm .Perms "rate_groups_view"}}
 		<a href="/admin/rate-groups" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/rate-groups"}} active{{end}}" aria-label="Rate Groups">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -38,6 +42,8 @@
 			<span class="ms-sidebar-label">Rate Groups</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Rate Groups</span>
 		</a>
+		{{end}}
+		{{if hasPerm .Perms "routing_groups_view"}}
 		<a href="/admin/routing-groups" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/routing-groups"}} active{{end}}" aria-label="Routing Groups">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -50,6 +56,8 @@
 			<span class="ms-sidebar-label">Routing Groups</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Routing Groups</span>
 		</a>
+		{{end}}
+		{{if hasPerm .Perms "clients_view"}}
 		<a href="/admin/clients" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/clients"}} active{{end}}" aria-label="Clients">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -62,7 +70,8 @@
 			<span class="ms-sidebar-label">Clients</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Clients</span>
 		</a>
-		<!-- Currencies icon choice: Feather "dollar-sign" -->
+		{{end}}
+		{{if hasPerm .Perms "currencies_view"}}
 		<a href="/admin/currencies" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/currencies"}} active{{end}}" aria-label="Currencies">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -73,7 +82,8 @@
 			<span class="ms-sidebar-label">Currencies</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Currencies</span>
 		</a>
-		<!-- Sender IDs icon choice: Feather "tag" -->
+		{{end}}
+		{{if hasPerm .Perms "sender_ids_view"}}
 		<a href="/admin/sender-ids" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/sender-ids"}} active{{end}}" aria-label="Sender IDs">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -84,6 +94,8 @@
 			<span class="ms-sidebar-label">Sender IDs</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Sender IDs</span>
 		</a>
+		{{end}}
+		{{if hasPerm .Perms "sms_logs_view"}}
 		<a href="/admin/sms-logs" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/sms-logs"}} active{{end}}" aria-label="SMS Logs">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -93,19 +105,54 @@
 			<span class="ms-sidebar-label">SMS Logs</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">SMS Logs</span>
 		</a>
-		<!-- Simulate icon choice: Feather "play-circle" -->
-		<a href="/admin/simulate" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/simulate"}} active{{end}}" aria-label="Simulate">
-			<span class="ms-nav-icon" aria-hidden="true">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-					<circle cx="12" cy="12" r="10"/>
-					<polygon points="10 8 16 12 10 16 10 8"/>
-				</svg>
-			</span>
-			<span class="ms-sidebar-label">Simulate</span>
-			<span class="ms-nav-tooltip" aria-hidden="true">Simulate</span>
-		</a>
+		{{end}}
+		{{if hasPerm .Perms "simulate"}}
+		<div class="ms-nav-group{{if eq .CurrentPath "/admin/diagnoses/simulate"}} ms-nav-group-active{{end}}">
+			<div class="ms-nav-group-label">
+				<span class="ms-nav-icon" aria-hidden="true">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+					</svg>
+				</span>
+				<span class="ms-sidebar-label">Diagnoses</span>
+			</div>
+			<a href="/admin/diagnoses/simulate" hx-boost="false" class="ms-nav-item ms-nav-subitem{{if eq .CurrentPath "/admin/diagnoses/simulate"}} active{{end}}" aria-label="Simulate routing">
+				<span class="ms-nav-icon" aria-hidden="true">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10"/>
+						<polygon points="10 8 16 12 10 16 10 8"/>
+					</svg>
+				</span>
+				<span class="ms-sidebar-label">Simulate</span>
+				<span class="ms-nav-tooltip" aria-hidden="true">Simulate</span>
+			</a>
+		</div>
+		{{end}}
 		<div class="ms-sidebar-spacer"></div>
 		<hr class="ms-sidebar-divider" />
+		{{if .IsSuperAdmin}}
+		<a href="/admin/audit-log" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/audit-log"}} active{{end}}" aria-label="Audit log">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+					<polyline points="14 2 14 8 20 8"/>
+					<line x1="16" y1="13" x2="8" y2="13"/>
+					<line x1="16" y1="17" x2="8" y2="17"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Audit log</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Audit log</span>
+		</a>
+		<a href="/admin/admin-users" hx-boost="false" class="ms-nav-item{{if hasPrefix .CurrentPath "/admin/admin-users"}} active{{end}}" aria-label="Admin users">
+			<span class="ms-nav-icon" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+					<circle cx="12" cy="7" r="4"/>
+				</svg>
+			</span>
+			<span class="ms-sidebar-label">Admin users</span>
+			<span class="ms-nav-tooltip" aria-hidden="true">Admin users</span>
+		</a>
 		<a href="/admin/settings" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/settings"}} active{{end}}" aria-label="Settings">
 			<span class="ms-nav-icon" aria-hidden="true">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -125,6 +172,29 @@
 			<span class="ms-sidebar-label">Settings</span>
 			<span class="ms-nav-tooltip" aria-hidden="true">Settings</span>
 		</a>
+		{{end}}
+		{{if .AdminUsername}}
+		<div class="ms-sidebar-spacer"></div>
+		<hr class="ms-sidebar-divider" />
+		<div class="ms-sidebar-user px-2 pb-1">
+			<div class="ms-sidebar-user-name text-truncate" title="{{.AdminDisplayName}}">{{.AdminDisplayName}}</div>
+			<div class="ms-sidebar-user-meta text-truncate">{{.AdminUsername}}</div>
+		</div>
+		<form method="post" action="/admin/logout" class="m-0">
+			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+			<button type="submit" class="ms-nav-item ms-nav-logout border-0 bg-transparent w-100 text-start" aria-label="Sign out">
+				<span class="ms-nav-icon" aria-hidden="true">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+						<polyline points="16 17 21 12 16 7"/>
+						<line x1="21" y1="12" x2="9" y2="12"/>
+					</svg>
+				</span>
+				<span class="ms-sidebar-label">Logout</span>
+				<span class="ms-nav-tooltip" aria-hidden="true">Logout</span>
+			</button>
+		</form>
+		{{end}}
 	</nav>
 	<button class="ms-sidebar-toggle" id="ms-sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">
 		<svg class="ms-toggle-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

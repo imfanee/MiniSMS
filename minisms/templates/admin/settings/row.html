@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "setting_row"}}
 <tr x-data="{saved:false}" x-on:settingSaved.window="saved=true; setTimeout(()=>saved=false,2000)">
 	<td><code>{{.Key}}</code>{{if .Error}}<div class="text-danger small mt-1">{{.Error}}</div>{{end}}</td>

@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package models
 
 import "time"
@@ -6,6 +7,7 @@ import "time"
 type AdminSession struct {
 	SessionID     string
 	SessionToken  string
+	AdminUserID   *string
 	CreatedAt     time.Time
 	ExpiresAt     time.Time
 	LastActiveAt  time.Time

@@ -1,0 +1,75 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "content"}}
+<div class="d-flex justify-content-between align-items-center mb-3">
+	<h1 class="h4 mb-0">{{.Title}}</h1>
+	<a href="/admin/admin-users" class="btn btn-outline-secondary btn-sm">Back to list</a>
+</div>
+
+{{if index .Errors "_form"}}
+<div class="alert alert-danger">{{index .Errors "_form"}}</div>
+{{end}}
+
+<form method="post" action="{{if .IsNew}}/admin/admin-users{{else}}/admin/admin-users/{{.UserID}}{{end}}" class="card border-0 shadow-sm">
+	<div class="card-body">
+		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+
+		<div class="row g-3 mb-4">
+			<div class="col-md-4">
+				<label class="form-label">Username</label>
+				<input type="text" name="username" class="form-control{{if index .Errors "username"}} is-invalid{{end}}" value="{{.Username}}" required autocomplete="username" />
+				{{if index .Errors "username"}}<div class="invalid-feedback">{{index .Errors "username"}}</div>{{end}}
+			</div>
+			<div class="col-md-4">
+				<label class="form-label">Display name</label>
+				<input type="text" name="display_name" class="form-control" value="{{.DisplayName}}" />
+			</div>
+			<div class="col-md-4">
+				<label class="form-label">Password{{if not .IsNew}} <span class="text-secondary fw-normal">(leave blank to keep)</span>{{end}}</label>
+				<input type="password" name="password" class="form-control{{if index .Errors "password"}} is-invalid{{end}}" autocomplete="new-password" {{if .IsNew}}required{{end}} />
+				{{if index .Errors "password"}}<div class="invalid-feedback">{{index .Errors "password"}}</div>{{end}}
+			</div>
+			<div class="col-md-4">
+				<label class="form-label">Email</label>
+				<input type="email" name="email" class="form-control" value="{{.Email}}" />
+			</div>
+			<div class="col-md-4">
+				<label class="form-label">Phone</label>
+				<input type="text" name="phone" class="form-control" value="{{.Phone}}" />
+			</div>
+			<div class="col-md-4 d-flex align-items-end gap-4">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="is_active" id="is_active" value="1" {{if .IsActive}}checked{{end}} />
+					<label class="form-check-label" for="is_active">Active</label>
+				</div>
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="is_super_admin" id="is_super_admin" value="1" {{if .IsSuperAdmin}}checked{{end}} onchange="document.getElementById('perm-panel').classList.toggle('d-none', this.checked)" />
+					<label class="form-check-label" for="is_super_admin">Super admin</label>
+				</div>
+			</div>
+		</div>
+
+		<div id="perm-panel" class="{{if .IsSuperAdmin}}d-none{{end}}">
+			<h2 class="h6 text-secondary mb-3">Permissions</h2>
+			<div class="row g-3">
+				{{range .PermissionGroups}}
+				<div class="col-md-6">
+					<div class="border rounded p-3 h-100">
+						<div class="fw-semibold small text-uppercase text-secondary mb-2">{{.Group}}</div>
+						{{range .Items}}
+						<div class="form-check mb-1">
+							<input class="form-check-input" type="checkbox" name="permissions" value="{{.Key}}" id="perm_{{.Key}}" {{if index $.SelectedPerms .Key}}checked{{end}} />
+							<label class="form-check-label small" for="perm_{{.Key}}">{{.Label}}</label>
+						</div>
+						{{end}}
+					</div>
+				</div>
+				{{end}}
+			</div>
+		</div>
+	</div>
+	<div class="card-footer d-flex justify-content-end gap-2">
+		<a href="/admin/admin-users" class="btn btn-outline-secondary">Cancel</a>
+		<button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+	</div>
+</form>
+{{end}}

@@ -1,49 +1,90 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "sms_log_detail_modal"}}
 <div class="modal fade show" style="display:block;background:rgba(0,0,0,.6)" tabindex="-1">
-	<div class="modal-dialog modal-lg modal-dialog-scrollable">
+	<div class="modal-dialog modal-xl modal-dialog-scrollable">
 		<div class="modal-content border border-2 border-primary">
 			<div class="modal-header">
 				<h5 class="modal-title">SMS Log Detail</h5>
 				<button type="button" class="btn-close" onclick="document.getElementById('modal-container').innerHTML=''"></button>
 			</div>
 			<div class="modal-body">
-				<dl class="row mb-0">
-					<dt class="col-sm-4">Message ID</dt><dd class="col-sm-8">{{.MessageID}}</dd>
-					<dt class="col-sm-4">Client</dt><dd class="col-sm-8">{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</dd>
+				<div class="row g-3 mb-4">
+					<div class="col-md-4">
+						<div class="small text-secondary">Message ID</div>
+						<div class="font-monospace">{{.MessageID}}</div>
+					</div>
+					<div class="col-md-4">
+						<div class="small text-secondary">Client</div>
+						<div>{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</div>
+					</div>
+					<div class="col-md-4">
+						<div class="small text-secondary">Status</div>
+						<div><span class="badge bg-secondary">{{.Status}}</span></div>
+					</div>
+					<div class="col-md-3">
+						<div class="small text-secondary">To</div>
+						<div>{{.ToNumber}}</div>
+					</div>
+					<div class="col-md-3">
+						<div class="small text-secondary">From</div>
+						<div>{{if .FromNumber}}{{.FromNumber}}{{else}}-{{end}}</div>
+					</div>
+					<div class="col-md-3">
+						<div class="small text-secondary">Carrier</div>
+						<div>{{if .CarrierName}}{{.CarrierName}}{{else}}-{{end}}{{if gt .FailoverSequence 0}} <span class="badge bg-warning text-dark">Failover {{.FailoverSequence}}</span>{{end}}</div>
+					</div>
+					<div class="col-md-3">
+						<div class="small text-secondary">Charged</div>
+						<div>{{.TotalCharged}} {{.Currency}}</div>
+					</div>
+				</div>
+
+				<h6 class="border-bottom border-secondary pb-2 mb-3">Message timeline</h6>
+				{{if .Timeline}}
+				<div class="list-group list-group-flush mb-4">
+					{{range .Timeline}}
+					<div class="list-group-item bg-transparent border-secondary px-0 py-3">
+						<div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+							<div>
+								<span class="badge bg-{{.Badge}} me-2">{{.Kind}}</span>
+								<strong>{{.Title}}</strong>
+							</div>
+							<span class="text-secondary small text-nowrap">{{.AtDisplay}}</span>
+						</div>
+						{{if .Detail}}<pre class="small mt-2 mb-0 text-break" style="white-space:pre-wrap">{{.Detail}}</pre>{{end}}
+						{{if .MetaJSON}}<pre class="small mt-2 mb-0 text-secondary">{{.MetaJSON}}</pre>{{end}}
+					</div>
+					{{end}}
+				</div>
+				{{else}}
+				<p class="text-secondary">No timeline events recorded.</p>
+				{{end}}
+
+				<h6 class="border-bottom border-secondary pb-2 mb-3">Technical details</h6>
+				<dl class="row mb-0 small">
 					<dt class="col-sm-4">Client Ref</dt><dd class="col-sm-8">{{if .ClientRef}}{{.ClientRef}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">To</dt><dd class="col-sm-8">{{.ToNumber}}</dd>
-					<dt class="col-sm-4">From</dt><dd class="col-sm-8">{{if .FromNumber}}{{.FromNumber}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Segments</dt><dd class="col-sm-8">{{.Segments}}</dd>
-					<dt class="col-sm-4">Encoding</dt><dd class="col-sm-8">{{.Encoding}}</dd>
+					<dt class="col-sm-4">Ingress</dt><dd class="col-sm-8">{{if .IngressTransport}}{{.IngressTransport}}{{else}}http{{end}}</dd>
+					<dt class="col-sm-4">Segments / Encoding</dt><dd class="col-sm-8">{{.Segments}} / {{.Encoding}}</dd>
 					<dt class="col-sm-4">Rate Group</dt><dd class="col-sm-8">{{if .RateGroupID}}{{.RateGroupID}}{{else}}-{{end}}</dd>
 					<dt class="col-sm-4">Prefix Matched</dt><dd class="col-sm-8">{{if .PrefixMatched}}{{.PrefixMatched}}{{else}}-{{end}}</dd>
 					<dt class="col-sm-4">Rate Applied</dt><dd class="col-sm-8">{{.RateApplied}}</dd>
-					<dt class="col-sm-4">Total Charged</dt><dd class="col-sm-8">{{.TotalCharged}}</dd>
 					<dt class="col-sm-4">Routing Group</dt><dd class="col-sm-8">{{if .RoutingGroupName}}{{.RoutingGroupName}}{{else}}-{{end}}</dd>
 					<dt class="col-sm-4">Route Entry</dt><dd class="col-sm-8">{{if .RouteEntryID}}{{.RouteEntryID}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Failover Sequence</dt><dd class="col-sm-8">{{.FailoverSequence}}</dd>
-					<dt class="col-sm-4">Carrier</dt><dd class="col-sm-8">{{if .CarrierName}}{{.CarrierName}}{{else}}-{{end}}</dd>
 					<dt class="col-sm-4">Carrier Message ID</dt><dd class="col-sm-8">{{if .CarrierMessageID}}{{.CarrierMessageID}}{{else}}-{{end}}</dd>
 					<dt class="col-sm-4">Carrier Response Code</dt><dd class="col-sm-8">{{if .CarrierResponseCode}}{{.CarrierResponseCode}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Carrier Response Body</dt><dd class="col-sm-8"><pre class="mb-0">{{if .CarrierResponseBody}}{{.CarrierResponseBody}}{{else}}-{{end}}</pre></dd>
-					<dt class="col-sm-12 mt-3 mb-1">DLR Information</dt><dd class="col-sm-12"></dd>
-					<dt class="col-sm-4">DLR Requested</dt><dd class="col-sm-8">{{if .DLRRequested}}<span class="badge bg-success">Yes</span>{{else}}<span class="badge bg-secondary">No</span>{{end}}</dd>
+					<dt class="col-sm-4">Received At</dt><dd class="col-sm-8">{{.ReceivedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}</dd>
+					<dt class="col-sm-4">Dispatched At</dt><dd class="col-sm-8">{{if .DispatchedAt}}{{.DispatchedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">Delivered At</dt><dd class="col-sm-8">{{if .DeliveredAt}}{{.DeliveredAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">Failed At</dt><dd class="col-sm-8">{{if .FailedAt}}{{.FailedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">DLR Requested</dt><dd class="col-sm-8">{{if .DLRRequested}}Yes{{else}}No{{end}}</dd>
 					<dt class="col-sm-4">DLR Webhook URL</dt><dd class="col-sm-8">{{if .DLRWebhookURL}}{{.DLRWebhookURL}}{{else}}None{{end}}</dd>
-					<dt class="col-sm-4">DLR Status</dt><dd class="col-sm-8">{{if .DLRStatus}}{{if eq .DLRStatus "delivered"}}<span class="badge bg-success">{{.DLRStatus}}</span>{{else if eq .DLRStatus "undelivered"}}<span class="badge bg-danger">{{.DLRStatus}}</span>{{else if eq .DLRStatus "rejected"}}<span class="badge bg-warning text-dark">{{.DLRStatus}}</span>{{else}}<span class="badge bg-secondary">{{.DLRStatus}}</span>{{end}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">DLR Received At</dt><dd class="col-sm-8">{{if .DLRReceivedAt}}{{.DLRReceivedAt}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">DLR Forwarded At</dt><dd class="col-sm-8">{{if .DLRForwardedAt}}{{.DLRForwardedAt}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">DLR Forward Status</dt><dd class="col-sm-8">{{if .DLRForwardStatus}}{{if eq .DLRForwardStatus "success"}}<span class="badge bg-success">{{.DLRForwardStatus}}</span>{{else if eq .DLRForwardStatus "failed"}}<span class="badge bg-danger">{{.DLRForwardStatus}}</span>{{else if eq .DLRForwardStatus "no_url"}}<span class="badge bg-secondary">{{.DLRForwardStatus}}</span>{{else}}<span class="badge bg-secondary">{{.DLRForwardStatus}}</span>{{end}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">DLR Status</dt><dd class="col-sm-8">{{if .DLRStatus}}{{.DLRStatus}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">DLR Received At</dt><dd class="col-sm-8">{{if .DLRReceivedAt}}{{.DLRReceivedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">DLR Forward Status</dt><dd class="col-sm-8">{{if .DLRForwardStatus}}{{.DLRForwardStatus}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">DLR Forwarded At</dt><dd class="col-sm-8">{{if .DLRForwardedAt}}{{.DLRForwardedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</dd>
 					<dt class="col-sm-4">DLR Forward Attempts</dt><dd class="col-sm-8">{{.DLRForwardAttempts}}</dd>
-					<dt class="col-sm-4">Source Addr TON</dt><dd class="col-sm-8">{{if .SourceAddrTON}}{{.SourceAddrTON}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Source Addr NPI</dt><dd class="col-sm-8">{{if .SourceAddrNPI}}{{.SourceAddrNPI}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Dest Addr TON</dt><dd class="col-sm-8">{{if .DestAddrTON}}{{.DestAddrTON}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Dest Addr NPI</dt><dd class="col-sm-8">{{if .DestAddrNPI}}{{.DestAddrNPI}}{{else}}-{{end}}</dd>
 					<dt class="col-sm-4">Carrier Skip Reason</dt><dd class="col-sm-8"><pre class="mb-0">{{if .CarrierSkipReason}}{{.CarrierSkipReason}}{{else}}-{{end}}</pre></dd>
-					<dt class="col-sm-4">Status</dt><dd class="col-sm-8">{{.Status}}</dd>
-					<dt class="col-sm-4">Received At</dt><dd class="col-sm-8">{{.ReceivedAt}}</dd>
-					<dt class="col-sm-4">Dispatched At</dt><dd class="col-sm-8">{{if .DispatchedAt}}{{.DispatchedAt}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Delivered At</dt><dd class="col-sm-8">{{if .DeliveredAt}}{{.DeliveredAt}}{{else}}-{{end}}</dd>
-					<dt class="col-sm-4">Failed At</dt><dd class="col-sm-8">{{if .FailedAt}}{{.FailedAt}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">Message Body</dt><dd class="col-sm-8"><pre class="mb-0">{{.MessageBody}}</pre></dd>
 				</dl>
 			</div>
 		</div>

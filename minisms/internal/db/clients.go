@@ -1,8 +1,10 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package db
 
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -29,34 +31,55 @@ type ClientListRow struct {
 }
 
 type Client struct {
-	ClientID          string
-	Name              string
-	Email             string
-	Status            string
-	Balance           string
-	Currency          string
-	RateGroupID       *string
-	RateGroupName     *string
-	RateGroupCurrency *string
-	RoutingGroupID    *string
-	RoutingGroupName  *string
-	APIKeyPrefix      *string
-	Notes             *string
-	DLRWebhookURL     *string
-	DLRWebhookSecret  *string
-	UpdatedAt         *string
+	ClientID              string
+	Name                  string
+	Email                 string
+	Status                string
+	Balance               string
+	Currency              string
+	RateGroupID           *string
+	RateGroupName         *string
+	RateGroupCurrency     *string
+	RoutingGroupID        *string
+	RoutingGroupName      *string
+	APIKeyPrefix          *string
+	Notes                 *string
+	DefaultSenderIDValue  *string
+	AllowedSenderIDsMode  string
+	AllowInLossDelivery   bool
+	DLRWebhookURL            *string
+	DLRWebhookSecret         *string
+	DLRWebhookMethod         string
+	DLRWebhookQueryTemplate  *string
+	DLRWebhookBodyTemplate   *string
+	SMPPIngressEnabled       bool
+	SMPPSystemID         *string
+	SMPPPasswordEnc      *string
+	SMPPAllowedCIDRs     *string
+	SMPPMaxBinds         int
+	SMPPDefaultSrcTON    *int16
+	SMPPDefaultSrcNPI    *int16
+	SMPPThroughputPerS   int
+	DLRDeliveryMode      string
+	UpdatedAt            *string
 }
 
 type UpsertClientParams struct {
-	Name             string
-	Email            string
-	Status           string
-	RateGroupID      *string
-	Currency         string
-	RoutingGroupID   *string
-	Notes            *string
-	DLRWebhookURL    *string
-	DLRWebhookSecret *string
+	Name                 string
+	Email                string
+	Status               string
+	RateGroupID          *string
+	Currency             string
+	RoutingGroupID       *string
+	Notes                *string
+	DefaultSenderIDValue *string
+	AllowedSenderIDsMode string
+	AllowInLossDelivery  bool
+	DLRWebhookURL           *string
+	DLRWebhookSecret        *string
+	DLRWebhookMethod        string
+	DLRWebhookQueryTemplate *string
+	DLRWebhookBodyTemplate  *string
 }
 
 var (
@@ -107,7 +130,13 @@ func GetClient(ctx context.Context, pool *pgxpool.Pool, id string) (*Client, err
 		SELECT c.client_id::text, c.name, c.email::text, c.status, c.balance::text, c.currency::text,
 			c.rate_group_id::text, rg.name, rg.currency::text,
 			c.routing_group_id::text, rog.name,
-			ak.key_prefix::text, c.notes, c.dlr_webhook_url, c.dlr_webhook_secret, c.updated_at
+			ak.key_prefix::text, c.notes,
+			c.default_sender_id_value, c.allowed_sender_ids_mode, c.allow_in_loss_delivery,
+			c.dlr_webhook_url, c.dlr_webhook_secret,
+			COALESCE(c.dlr_webhook_method, 'POST'), c.dlr_webhook_query_template, c.dlr_webhook_body_template,
+			c.smpp_ingress_enabled, c.smpp_system_id, c.smpp_password_enc, c.smpp_allowed_cidrs,
+			c.smpp_max_binds, c.smpp_default_src_ton, c.smpp_default_src_npi, c.smpp_throughput_per_s,
+			c.dlr_delivery_mode, c.updated_at
 		FROM clients c
 		LEFT JOIN rate_groups rg ON rg.rate_group_id = c.rate_group_id
 		LEFT JOIN routing_groups rog ON rog.routing_group_id = c.routing_group_id
@@ -123,7 +152,13 @@ func GetClient(ctx context.Context, pool *pgxpool.Pool, id string) (*Client, err
 		&x.ClientID, &x.Name, &x.Email, &x.Status, &x.Balance, &x.Currency,
 		&x.RateGroupID, &x.RateGroupName, &x.RateGroupCurrency,
 		&x.RoutingGroupID, &x.RoutingGroupName,
-		&x.APIKeyPrefix, &x.Notes, &x.DLRWebhookURL, &x.DLRWebhookSecret, &up,
+		&x.APIKeyPrefix, &x.Notes,
+		&x.DefaultSenderIDValue, &x.AllowedSenderIDsMode, &x.AllowInLossDelivery,
+		&x.DLRWebhookURL, &x.DLRWebhookSecret,
+		&x.DLRWebhookMethod, &x.DLRWebhookQueryTemplate, &x.DLRWebhookBodyTemplate,
+		&x.SMPPIngressEnabled, &x.SMPPSystemID, &x.SMPPPasswordEnc, &x.SMPPAllowedCIDRs,
+		&x.SMPPMaxBinds, &x.SMPPDefaultSrcTON, &x.SMPPDefaultSrcNPI, &x.SMPPThroughputPerS,
+		&x.DLRDeliveryMode, &up,
 	)
 	if err != nil {
 		return nil, err
@@ -138,10 +173,15 @@ func GetClient(ctx context.Context, pool *pgxpool.Pool, id string) (*Client, err
 func CreateClient(ctx context.Context, pool *pgxpool.Pool, p UpsertClientParams) (string, error) {
 	var id string
 	err := pool.QueryRow(ctx, `
-		INSERT INTO clients (name, email, status, rate_group_id, balance, currency, routing_group_id, notes, dlr_webhook_url, dlr_webhook_secret)
-		VALUES ($1, $2, $3, $4::uuid, 0, $5, $6::uuid, $7, $8, $9)
+		INSERT INTO clients (name, email, status, rate_group_id, balance, currency, routing_group_id, notes,
+			default_sender_id_value, allowed_sender_ids_mode, allow_in_loss_delivery,
+			dlr_webhook_url, dlr_webhook_secret, dlr_webhook_method, dlr_webhook_query_template, dlr_webhook_body_template)
+		VALUES ($1, $2, $3, $4::uuid, 0, $5, $6::uuid, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING client_id::text`,
-		p.Name, p.Email, p.Status, p.RateGroupID, p.Currency, p.RoutingGroupID, p.Notes, p.DLRWebhookURL, p.DLRWebhookSecret,
+		p.Name, p.Email, p.Status, p.RateGroupID, p.Currency, p.RoutingGroupID, p.Notes,
+		p.DefaultSenderIDValue, p.AllowedSenderIDsMode, p.AllowInLossDelivery,
+		p.DLRWebhookURL, p.DLRWebhookSecret, normalizeDLRWebhookMethod(p.DLRWebhookMethod),
+		p.DLRWebhookQueryTemplate, p.DLRWebhookBodyTemplate,
 	).Scan(&id)
 	if err == nil {
 		return id, nil
@@ -157,9 +197,15 @@ func UpdateClient(ctx context.Context, pool *pgxpool.Pool, id string, p UpsertCl
 	ct, err := pool.Exec(ctx, `
 		UPDATE clients
 		SET name = $1, email = $2, status = $3, rate_group_id = $4::uuid, currency = $5, routing_group_id = $6::uuid, notes = $7,
-			dlr_webhook_url = $8, dlr_webhook_secret = $9, updated_at = now()
-		WHERE client_id = $10::uuid`,
-		p.Name, p.Email, p.Status, p.RateGroupID, p.Currency, p.RoutingGroupID, p.Notes, p.DLRWebhookURL, p.DLRWebhookSecret, id,
+			default_sender_id_value = $8, allowed_sender_ids_mode = $9, allow_in_loss_delivery = $10,
+			dlr_webhook_url = $11, dlr_webhook_secret = $12,
+			dlr_webhook_method = $13, dlr_webhook_query_template = $14, dlr_webhook_body_template = $15,
+			updated_at = now()
+		WHERE client_id = $16::uuid`,
+		p.Name, p.Email, p.Status, p.RateGroupID, p.Currency, p.RoutingGroupID, p.Notes,
+		p.DefaultSenderIDValue, p.AllowedSenderIDsMode, p.AllowInLossDelivery,
+		p.DLRWebhookURL, p.DLRWebhookSecret, normalizeDLRWebhookMethod(p.DLRWebhookMethod),
+		p.DLRWebhookQueryTemplate, p.DLRWebhookBodyTemplate, id,
 	)
 	if err != nil {
 		var pe *pgconn.PgError
@@ -172,6 +218,15 @@ func UpdateClient(ctx context.Context, pool *pgxpool.Pool, id string, p UpsertCl
 		return pgx.ErrNoRows
 	}
 	return nil
+}
+
+func normalizeDLRWebhookMethod(method string) string {
+	switch strings.ToUpper(strings.TrimSpace(method)) {
+	case "GET":
+		return "GET"
+	default:
+		return "POST"
+	}
 }
 
 func ToggleClientStatus(ctx context.Context, pool *pgxpool.Pool, id string) (string, error) {

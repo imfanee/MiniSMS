@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package carrier
 
 import (
@@ -32,8 +33,8 @@ func TestResolveSenderID_IntegrationAllowlist(t *testing.T) {
 
 	var clientID string
 	err := pool.QueryRow(ctx, `
-		INSERT INTO clients (name, email, status, currency, allow_any_sender_id, allow_in_loss_delivery)
-		VALUES ($1, $2, 'active', 'GBP', FALSE, TRUE)
+		INSERT INTO clients (name, email, status, currency, allowed_sender_ids_mode, allow_in_loss_delivery)
+		VALUES ($1, $2, 'active', 'GBP', 'list', TRUE)
 		RETURNING client_id::text`,
 		"it-client-"+sfx, "it-client-"+sfx+"@example.test",
 	).Scan(&clientID)
@@ -76,7 +77,23 @@ func TestResolveSenderID_IntegrationAllowlist(t *testing.T) {
 		t.Fatalf("expected ErrSenderNotAllowed, got %v", err)
 	}
 
-	_, err = pool.Exec(ctx, `UPDATE clients SET default_sender_id_value = 'DEFSID' WHERE client_id = $1::uuid`, clientID)
+	defValue := "DEF" + sfx[len(sfx)-6:]
+	var defSenderID string
+	err = pool.QueryRow(ctx, `
+		INSERT INTO sender_ids (value, sender_id_type, is_active)
+		VALUES ($1, 'alpha', TRUE)
+		RETURNING sender_id::text`, defValue).Scan(&defSenderID)
+	if err != nil {
+		t.Fatalf("insert DEFSID sender_id: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM sender_ids WHERE sender_id = $1::uuid`, defSenderID)
+	})
+	_, err = pool.Exec(ctx, `INSERT INTO client_sender_ids (client_id, sender_id, is_default) VALUES ($1::uuid, $2::uuid, TRUE)`, clientID, defSenderID)
+	if err != nil {
+		t.Fatalf("allowlist DEFSID: %v", err)
+	}
+	_, err = pool.Exec(ctx, `UPDATE clients SET default_sender_id_value = $2 WHERE client_id = $1::uuid`, clientID, defValue)
 	if err != nil {
 		t.Fatalf("set client default sid: %v", err)
 	}
@@ -84,7 +101,7 @@ func TestResolveSenderID_IntegrationAllowlist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve empty with client default failed: %v", err)
 	}
-	if got.Source != "client_default" || got.Value != "DEFSID" {
+	if got.Source != "client_default" || got.Value != defValue {
 		t.Fatalf("unexpected client default result: %+v", got)
 	}
 }
@@ -114,8 +131,8 @@ func TestCheckCarrierEligibility_IntegrationListAndInLoss(t *testing.T) {
 
 	var clientID string
 	err = pool.QueryRow(ctx, `
-		INSERT INTO clients (name, email, status, currency, allow_any_sender_id, allow_in_loss_delivery)
-		VALUES ($1, $2, 'active', 'GBP', FALSE, FALSE)
+		INSERT INTO clients (name, email, status, currency, allowed_sender_ids_mode, allow_in_loss_delivery)
+		VALUES ($1, $2, 'active', 'GBP', 'list', FALSE)
 		RETURNING client_id::text`,
 		"it-client2-"+sfx, "it-client2-"+sfx+"@example.test",
 	).Scan(&clientID)

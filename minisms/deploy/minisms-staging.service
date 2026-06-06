@@ -1,0 +1,35 @@
+# Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
+[Unit]
+Description=MiniSMS staging (minisms_test on :18080, nginx :18080 TLS)
+Documentation=file:///usr/src/MiniSMS/doc/agent/STAGING_SMPP_DEPLOY_WALKTHROUGH.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=minisms
+Group=minisms
+WorkingDirectory=/opt/minisms-staging
+
+EnvironmentFile=/etc/minisms/minisms.env
+EnvironmentFile=/etc/minisms/minisms-staging.env
+
+ExecStart=/opt/minisms/bin/minisms-staging
+
+Restart=on-failure
+RestartSec=5s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=minisms-staging
+
+NoNewPrivileges=true
+PrivateTmp=true
+LimitNOFILE=65535
+ReadOnlyPaths=/etc/minisms
+ProtectSystem=strict
+ReadWritePaths=/opt/minisms-staging
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -17,6 +18,7 @@ import (
 var reRoutePrefix = regexp.MustCompile(`^(\*|[0-9]{1,15})$`)
 
 type RoutingListPage struct {
+	AdminView
 	Title, CurrentPath, CSRFToken string
 	Flash                         *Flash
 	Rows                          []db.RoutingGroupListRow
@@ -86,7 +88,7 @@ func (h *Handlers) ListRoutingGroups() http.HandlerFunc {
 			Title: "Routing Groups", CurrentPath: "/admin/routing-groups", CSRFToken: csrf.Token(r),
 			Flash: GetFlash(w, r, "/", h.Config.SecretKey, h.Config.IsProduction()),
 			Rows:  rows, HasRows: len(rows) > 0,
-		})
+		}, r)
 	}
 }
 
@@ -293,6 +295,7 @@ func (h *Handlers) ShowRoutingGroupDetail() http.HandlerFunc {
 			return
 		}
 		_ = execT(w, h.ROGDetT, "base", struct {
+			AdminView
 			Title, CurrentPath, CSRFToken string
 			Flash                         *Flash
 			Group                         *db.RoutingGroup
@@ -301,7 +304,7 @@ func (h *Handlers) ShowRoutingGroupDetail() http.HandlerFunc {
 			Title: "Routing Group", CurrentPath: "/admin/routing-groups", CSRFToken: csrf.Token(r),
 			Flash: GetFlash(w, r, "/", h.Config.SecretKey, h.Config.IsProduction()),
 			Group: g, Carriers: carriers,
-		})
+		}, r)
 	}
 }
 
@@ -442,6 +445,7 @@ func (h *Handlers) CreateRouteEntry() http.HandlerFunc {
 			ServerError(w, r, e2, h.Log, h.T500)
 			return
 		}
+		h.reloadRouteCache(r.Context())
 		_ = execT(w, h.ROGFragT, "route_row", mapRouteRow(*detail))
 	}
 }
@@ -556,6 +560,7 @@ func (h *Handlers) UpdateRouteEntry() http.HandlerFunc {
 			ServerError(w, r, e2, h.Log, h.T500)
 			return
 		}
+		h.reloadRouteCache(r.Context())
 		_ = execT(w, h.ROGFragT, "route_row", mapRouteRow(*row))
 	}
 }
@@ -569,6 +574,7 @@ func (h *Handlers) DeleteRouteEntry() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
+		h.reloadRouteCache(r.Context())
 		w.WriteHeader(http.StatusOK)
 	}
 }

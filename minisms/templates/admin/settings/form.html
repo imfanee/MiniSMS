@@ -1,5 +1,23 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "content"}}
 <h1 class="h2 mb-3">System Settings</h1>
+
+<div class="card bg-body-tertiary border mb-4">
+	<div class="card-body">
+		<h2 class="h6">Invoice header image</h2>
+		<p class="text-secondary small mb-3">Upload a header image (PNG or JPEG). It is rendered <strong>210mm wide</strong> at the top of page 1 on generated invoices.</p>
+		<form method="post" action="/admin/settings/invoice-header" enctype="multipart/form-data" class="row g-2 align-items-end">
+			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+			<div class="col-md-8">
+				<input type="file" class="form-control" name="header_image" accept="image/png,image/jpeg" required />
+			</div>
+			<div class="col-md-4">
+				<button type="submit" class="btn btn-primary">Upload header</button>
+			</div>
+		</form>
+	</div>
+</div>
+
 <div class="table-responsive">
 	<table class="table align-middle">
 		<thead><tr><th>Setting Key</th><th>Description</th><th>Current Value</th><th>Save</th><th>Updated</th></tr></thead>

@@ -1,6 +1,85 @@
+/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */
 /* MiniSMS — minimal app overrides; Bootstrap is primary. */
 [x-cloak] {
 	display: none !important;
+}
+
+/* Stored template text for JS hydrate (must not be &lt;script&gt; — stripped on HTMX innerHTML swap) */
+.minisms-template-data {
+	display: none !important;
+	white-space: pre-wrap;
+	margin: 0;
+}
+
+/* Off-screen fields HTMX submits (CodeMirror display editors are nameless) */
+.minisms-template-submit-field {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+/* Carrier request template editors */
+.minisms-template-panel {
+	width: 100%;
+	max-width: 100%;
+}
+.minisms-template-panel .minisms-cm-wrap {
+	width: 100%;
+	display: block;
+}
+.minisms-template-panel .minisms-cm-wrap .CodeMirror {
+	width: 100% !important;
+	font-size: 0.85rem;
+}
+.minisms-template-panel .minisms-body-cm .CodeMirror {
+	min-height: 280px;
+	height: 280px;
+}
+.minisms-template-panel .minisms-query-cm .CodeMirror {
+	min-height: 160px;
+	height: 160px;
+}
+/* Keep textarea visible until CodeMirror is ready (fixes “can’t type” when CM fails) */
+.minisms-template-panel .minisms-cm-wrap:not(.cm-ready) textarea {
+	display: block;
+	min-height: 160px;
+	width: 100%;
+}
+.minisms-template-panel .minisms-cm-wrap.cm-ready textarea {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
+}
+.minisms-template-panel .cm-template-variable,
+.minisms-template-panel .cm-overlay-template-vars {
+	color: #fbbf24 !important;
+	font-weight: 600;
+}
+.minisms-template-panel .cm-s-dracula .cm-attribute {
+	color: #7dd3fc;
+}
+.minisms-template-panel .cm-s-dracula .CodeMirror-lint-marker-error {
+	background-image: none;
+}
+.minisms-template-panel .CodeMirror-lint-marker-error::after {
+	content: "●";
+	color: #f87171;
+	font-size: 12px;
+}
+.minisms-template-panel #query-editor-wrap,
+.minisms-template-panel #body-editor-wrap {
+	width: 100%;
+	max-width: 100%;
+}
+#http-interconnect-body .minisms-template-panel {
+	width: 100%;
 }
 body {
 	min-height: 100vh;
@@ -305,6 +384,64 @@ body {
   border: none;
   border-top: 0.5px solid rgba(255, 255, 255, 0.08);
   margin: 0 4px 4px;
+}
+
+.ms-sidebar-user {
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ms-sidebar-user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  padding: 0 10px 2px;
+}
+
+.ms-sidebar-user-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+  padding: 0 10px 6px;
+}
+
+.ms-nav-logout:hover .ms-nav-icon {
+  color: #f87171;
+}
+
+.ms-nav-logout:hover .ms-sidebar-label {
+  color: #fca5a5;
+}
+
+.ms-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ms-nav-group-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.ms-nav-group-active .ms-nav-group-label {
+  color: rgba(34, 211, 238, 0.75);
+}
+
+.ms-nav-subitem {
+  margin-left: 8px;
+  padding-left: 8px;
+}
+
+.ms-sidebar.ms-collapsed .ms-nav-group-label .ms-sidebar-label {
+  opacity: 0;
+  max-width: 0;
 }
 
 /* ── Tooltip (shown only when collapsed) ── */

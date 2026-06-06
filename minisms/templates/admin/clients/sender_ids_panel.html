@@ -1,10 +1,15 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "client_sender_ids_panel"}}
 <div id="client-sender-ids-panel" class="card bg-body-tertiary border">
   <div class="card-body">
     <h3 class="h6">Sender IDs</h3>
-    <p class="text-secondary small mb-2">Choose entries from the <a href="/admin/sender-ids" class="link-secondary">Sender ID library</a>. This list controls which Sender IDs this client may use when <strong>Allow any Sender ID</strong> is off.</p>
-    {{if .AllowAny}}
-      <div class="alert alert-info py-2">Client may use any Sender ID. Restriction list is optional.</div>
+    <p class="text-secondary small mb-2">Choose entries from the <a href="/admin/sender-ids" class="link-secondary">Sender ID library</a>. Required when policy is <strong>From Sender ID List</strong>.</p>
+    {{if eq .AllowedSenderIDsMode "any"}}
+      <div class="alert alert-info py-2">Client may use any sender ID matching the global character rules (see System Settings).</div>
+    {{else if eq .AllowedSenderIDsMode "phone"}}
+      <div class="alert alert-info py-2">Client may use any valid phone number as sender ID (numeric or E.164).</div>
+    {{else}}
+      <div class="alert alert-secondary py-2">Only sender IDs in this list are allowed for this client.</div>
     {{end}}
     <form class="row g-2 mb-3" hx-post="/admin/clients/{{.ClientID}}/sender-ids" hx-target="#client-sender-ids-panel" hx-swap="outerHTML">
       <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />

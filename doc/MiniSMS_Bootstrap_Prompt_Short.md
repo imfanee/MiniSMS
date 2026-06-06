@@ -1,3 +1,5 @@
+<!-- Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. -->
+
 # MiniSMS Bootstrap Prompt (Short)
 
 Use this compact prompt to onboard a fresh AI quickly.
@@ -36,7 +38,7 @@ Single Go binary SMS middleware:
 8. `minisms/internal/db/api_keys.go`
 9. `minisms/internal/db/crypto.go`
 10. `minisms/internal/db/sms_logs.go`
-11. `minisms/migrations/*.sql`
+11. `minisms/deploy/minisms_db.sql`
 12. `minisms/deploy/minisms_db.sql`
 13. `minisms/templates/layout/base.html`
 14. `minisms/templates/layout/partials/navbar.html`
@@ -122,7 +124,7 @@ Useful project commands:
 make build
 make run
 make test
-make migrate
+make schema DB_URL="$DATABASE_URL"
 make hash-password
 ```
 
@@ -169,7 +171,7 @@ Scan these first (in order):
 8. minisms/internal/db/api_keys.go
 9. minisms/internal/db/crypto.go
 10. minisms/internal/db/sms_logs.go
-11. minisms/migrations/*.sql
+11. minisms/deploy/minisms_db.sql
 12. minisms/deploy/minisms_db.sql
 13. minisms/templates/layout/base.html
 14. minisms/templates/layout/partials/navbar.html

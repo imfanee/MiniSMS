@@ -1,3 +1,5 @@
+<!-- Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. -->
+
 # MiniSMS Bootstrap Prompt
 
 Use this prompt to onboard a fresh AI agent to the **current implemented state** of MiniSMS.
@@ -155,8 +157,9 @@ Admin (session-authenticated):
   - `GET /admin/sms-logs/export.csv`
   - `GET /admin/sms-logs/export.pdf`
   - `GET /admin/sms-logs/{id}`
-- Other:
+- Other (super-admin only unless noted):
   - `GET /admin/audit-log`
+  - `GET/POST /admin/admin-users`, `GET/PUT /admin/admin-users/{id}` (RBAC CRUD)
   - `GET /admin/settings`
   - `POST /admin/settings/{key}`
   - currencies: `GET/POST /admin/currencies`, `PUT /admin/currencies/{code}`, `POST /admin/currencies/{code}/toggle`
@@ -178,12 +181,12 @@ Client API:
 
 Primary schema source:
 
-- migrations: `minisms/migrations/001_initial_schema.up.sql`, `minisms/migrations/002_v1.2_currencies_senderids.up.sql`, `minisms/migrations/003_dlr_support.up.sql`
+- schema: `minisms/deploy/minisms_db.sql` (single consolidated file; see `doc/README.md`)
 - consolidated deploy schema: `minisms/deploy/minisms_db.sql`
 
 Core tables:
 
-- Auth/session: `admin_sessions`
+- Auth/session: `admin_users`, `admin_sessions` (`admin_user_id`)
 - Catalog/config: `currencies`, `system_settings`, `sender_ids`
 - Carriers: `carriers`, `carrier_auth_headers`, `carrier_request_templates`, `carrier_usage_totals`, `carrier_balance_entries`, `carrier_sender_ids`
 - Routing/rating: `rate_groups`, `rate_entries`, `routing_groups`, `route_entries`
@@ -212,7 +215,7 @@ Required env vars:
 
 - `DATABASE_URL`
 - `SECRET_KEY` (32-byte hex)
-- `ADMIN_USERNAME`
+- `ADMIN_USERNAME` (bootstrap super admin when `admin_users` empty; still required at startup)
 - `ADMIN_PASSWORD_HASH` (valid bcrypt hash)
 - `CSRF_AUTH_KEY` (32-byte hex)
 
@@ -226,6 +229,8 @@ Optional env vars:
 - `APP_ENV` (`development` default)
 - `SESSION_IDLE_MINUTES` (default `240`)
 - `CARRIER_DISPATCH_TIMEOUT_S` (default `10`)
+- `HTTP_LISTEN_ADDR`, `HTTP_CARRIER_INSECURE_TLS`, `CSRF_TRUSTED_ORIGINS`
+- `SMPP_SERVER_ENABLED`, `SMPP_LISTEN_ADDR`, …
 
 TLS modes:
 
@@ -271,7 +276,7 @@ DLR integrity/authenticity:
 
 Build/test:
 
-- `make build`, `make run`, `make test`, `make vet`, `make migrate` (`minisms/Makefile`)
+- `make build`, `make run`, `make test`, `make vet`, `make schema` (`minisms/Makefile`)
 - utility tool: `make hash-password` (`minisms/tools/hashpassword/main.go`)
 - full checks:
   - `go build ./...`
@@ -279,8 +284,8 @@ Build/test:
 
 Migrations:
 
-- app auto-runs migrations at startup (`main.go`, `findMigrationsDir`, `m.Up()`)
-- manual migration path still available with `make migrate`
+- schema applied via `make schema` or `psql -f deploy/minisms_db.sql` before first start
+- schema applied with `make schema DB_URL=...` or `psql -f deploy/minisms_db.sql`
 - fresh install consolidated schema: `minisms/deploy/minisms_db.sql`
 
 Deploy artifacts:
@@ -447,8 +452,8 @@ Whenever behavior changes:
    - `minisms/internal/api/dlr.go`
    - `minisms/internal/web/auth.go`
    - `minisms/internal/web/middleware.go`
-2. Read migrations and deploy schema:
-   - `minisms/migrations/*.sql`
+2. Read and apply consolidated schema:
+   - `minisms/deploy/minisms_db.sql`
    - `minisms/deploy/minisms_db.sql`
 3. Read UI shell:
    - `minisms/templates/layout/base.html`

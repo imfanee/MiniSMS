@@ -1,11 +1,8 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "header_row"}}
 <tr id="auth-hdr-{{.HeaderID}}">
 	<td class="font-monospace text-break" style="max-width: 12rem;">{{.Name}}</td>
-	<td x-data="{ vis: false }" class="text-break" style="max-width: 28rem;">
-		<span x-show="!vis" class="text-secondary font-monospace">{{.Masked}}</span>
-		<span x-show="vis" x-text="vis ? window.utf8FromB64('{{.B64}}') : ''" class="font-monospace d-inline-block" style="max-width: 100%"></span>
-		<button type="button" class="btn btn-link btn-sm p-0 align-baseline" @click.prevent="vis = !vis" title="Show or hide value" aria-label="Show or hide value">&#128065;</button>
-	</td>
+	<td class="text-break font-monospace small" style="max-width: 28rem;">{{.Value}}</td>
 	<td class="text-nowrap text-end">
 		<button type="button" class="btn btn-sm btn-outline-danger" hx-delete="/admin/carriers/{{.CarrierID}}/auth-headers/{{.HeaderID}}" hx-confirm="Delete this header?" hx-target="closest tr" hx-swap="outerHTML">Delete</button>
 	</td>

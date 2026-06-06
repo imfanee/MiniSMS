@@ -1,18 +1,18 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
-	"html/template"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/minisms/minisms"
 	"github.com/minisms/minisms/internal/db"
 )
 
 type senderIDsPage struct {
+	AdminView
 	Title       string
 	CurrentPath string
 	CSRFToken   string
@@ -65,17 +65,7 @@ func (h *Handlers) ListSenderIDs() http.HandlerFunc {
 				Errors:       map[string]string{},
 			},
 		}
-		t, err := template.ParseFS(minisms.TemplateFS,
-			"templates/layout/base.html",
-			"templates/layout/partials/navbar.html",
-			"templates/layout/partials/flash.html",
-			"templates/admin/sender_ids/list.html",
-		)
-		if err != nil {
-			ServerError(w, r, err, h.Log, h.T500)
-			return
-		}
-		if err := t.ExecuteTemplate(w, "base", p); err != nil {
+		if err := execT(w, h.SenderIDsT, "base", &p, r); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
 	}
@@ -183,28 +173,15 @@ func (h *Handlers) renderSenderIDsWithForm(w http.ResponseWriter, r *http.Reques
 		Rows:        vms,
 		Form:        f,
 	}
-	t, err := template.ParseFS(minisms.TemplateFS,
-		"templates/layout/base.html",
-		"templates/layout/partials/navbar.html",
-		"templates/layout/partials/flash.html",
-		"templates/admin/sender_ids/list.html",
-	)
-	if err != nil {
-		ServerError(w, r, err, h.Log, h.T500)
-		return
-	}
 	w.WriteHeader(status)
-	_ = t.ExecuteTemplate(w, "base", p)
+	if err := execT(w, h.SenderIDsT, "base", p, r); err != nil {
+		ServerError(w, r, err, h.Log, h.T500)
+	}
 }
 
 func (h *Handlers) renderSenderIDRowView(w http.ResponseWriter, r *http.Request, row *db.SenderID) {
-	t, err := template.ParseFS(minisms.TemplateFS, "templates/admin/sender_ids/list.html")
-	if err != nil {
-		ServerError(w, r, err, h.Log, h.T500)
-		return
-	}
 	vm := senderIDRowVM{Row: *row, CSRFToken: csrf.Token(r)}
-	if err := t.ExecuteTemplate(w, "sender_id_row_view", vm); err != nil {
+	if err := h.SenderIDsT.ExecuteTemplate(w, "sender_id_row_view", vm); err != nil {
 		ServerError(w, r, err, h.Log, h.T500)
 	}
 }
@@ -231,13 +208,8 @@ func (h *Handlers) GetSenderIDRowEdit() http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
-		t, err := template.ParseFS(minisms.TemplateFS, "templates/admin/sender_ids/list.html")
-		if err != nil {
-			ServerError(w, r, err, h.Log, h.T500)
-			return
-		}
 		vm := senderIDRowVM{Row: *row, CSRFToken: csrf.Token(r)}
-		if err := t.ExecuteTemplate(w, "sender_id_row_edit", vm); err != nil {
+		if err := h.SenderIDsT.ExecuteTemplate(w, "sender_id_row_edit", vm); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
 	}

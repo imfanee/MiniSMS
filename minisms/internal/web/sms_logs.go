@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -16,6 +17,7 @@ import (
 	"github.com/phpdave11/gofpdf"
 
 	"github.com/minisms/minisms/internal/db"
+	"github.com/minisms/minisms/internal/smslog"
 )
 
 type SMSLogFilter struct {
@@ -46,6 +48,7 @@ type SMSLogRow struct {
 }
 
 type SMSLogListPage struct {
+	AdminView
 	Title       string
 	CurrentPath string
 	CSRFToken   string
@@ -105,7 +108,7 @@ func (h *Handlers) ListSMSLogs() http.HandlerFunc {
 			p.Clients, _ = db.ListClients(r.Context(), h.Pool)
 			p.Carriers, _ = db.ListCarriers(r.Context(), h.Pool)
 			p.Routing, _ = db.ListRoutingGroups(r.Context(), h.Pool)
-			if err := execT(w, h.SMSLogT, "base", p); err != nil {
+			if err := execT(w, h.SMSLogT, "base", p, r); err != nil {
 				ServerError(w, r, err, h.Log, h.T500)
 			}
 			return
@@ -129,25 +132,26 @@ func min(a, b int) int {
 	return b
 }
 
+type SMSLogDetailPage struct {
+	MessageID, ClientID, ToNumber, MessageBody, Encoding, RateApplied, TotalCharged, Currency, Status string
+	ClientRef, FromNumber, PrefixMatched, CarrierMessageID, CarrierResponseBody, IngressTransport       *string
+	RateGroupID, RoutingGroupID, RouteEntryID, CarrierID, DLRWebhookURL, DLRStatus, DLRForwardStatus    *string
+	Segments, FailoverSequence, DLRForwardAttempts                                                      int
+	DLRRequested                                                                                        bool
+	DLRReceivedAt, DLRForwardedAt, DispatchedAt, DeliveredAt, FailedAt                                    *time.Time
+	SourceAddrTON, SourceAddrNPI, DestAddrTON, DestAddrNPI                                              *int16
+	CarrierSkipReason                                                                                     *string
+	CarrierResponseCode                                                                                   *int
+	ReceivedAt                                                                                            time.Time
+	ClientName, CarrierName, RoutingGroupName                                                             *string
+	Timeline                                                                                              []smslog.TimelineEventView
+}
+
 func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		var d struct {
-			MessageID, ClientID, ToNumber, MessageBody, Encoding, RateApplied, TotalCharged, Currency, Status string
-			ClientRef, FromNumber, PrefixMatched, CarrierMessageID, CarrierResponseBody                       *string
-			RateGroupID, RoutingGroupID, RouteEntryID, CarrierID                                              *string
-			Segments, FailoverSequence                                                                        int
-			DLRRequested                                                                                      bool
-			DLRWebhookURL, DLRStatus, DLRForwardStatus                                                        *string
-			DLRForwardAttempts                                                                                int
-			DLRReceivedAt, DLRForwardedAt                                                                     *time.Time
-			SourceAddrTON, SourceAddrNPI, DestAddrTON, DestAddrNPI                                            *int16
-			CarrierSkipReason                                                                                 *string
-			CarrierResponseCode                                                                               *int
-			ReceivedAt                                                                                        time.Time
-			DispatchedAt, DeliveredAt, FailedAt                                                               *time.Time
-			ClientName, CarrierName, RoutingGroupName                                                         *string
-		}
+		var d SMSLogDetailPage
+		var timelineRaw []byte
 		err := h.Pool.QueryRow(r.Context(), `
 			SELECT sl.message_id::text, sl.client_id::text, sl.client_ref, sl.to_number, sl.from_number, sl.message_body,
 				sl.segments, sl.encoding, sl.rate_group_id::text, sl.prefix_matched, sl.rate_applied::text, sl.total_charged::text, sl.currency::text,
@@ -155,6 +159,7 @@ func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
 				sl.carrier_response_code, sl.carrier_response_body, sl.status, sl.received_at, sl.dispatched_at, sl.delivered_at, sl.failed_at,
 				sl.dlr_requested, sl.dlr_webhook_url, sl.dlr_status, sl.dlr_received_at, sl.dlr_forwarded_at, sl.dlr_forward_status, sl.dlr_forward_attempts,
 				sl.source_addr_ton, sl.source_addr_npi, sl.dest_addr_ton, sl.dest_addr_npi, sl.carrier_skip_reason::text,
+				sl.ingress_transport, sl.event_timeline,
 				c.name, ca.name, rg.name
 			FROM sms_logs sl
 			LEFT JOIN clients c ON c.client_id = sl.client_id
@@ -168,6 +173,7 @@ func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
 				&d.CarrierResponseCode, &d.CarrierResponseBody, &d.Status, &d.ReceivedAt, &d.DispatchedAt, &d.DeliveredAt, &d.FailedAt,
 				&d.DLRRequested, &d.DLRWebhookURL, &d.DLRStatus, &d.DLRReceivedAt, &d.DLRForwardedAt, &d.DLRForwardStatus, &d.DLRForwardAttempts,
 				&d.SourceAddrTON, &d.SourceAddrNPI, &d.DestAddrTON, &d.DestAddrNPI, &d.CarrierSkipReason,
+				&d.IngressTransport, &timelineRaw,
 				&d.ClientName, &d.CarrierName, &d.RoutingGroupName,
 			)
 		if err != nil {
@@ -178,6 +184,23 @@ func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
+		events := smslog.ParseTimeline(timelineRaw)
+		if len(events) == 0 {
+			ingress := "http"
+			if d.IngressTransport != nil {
+				ingress = *d.IngressTransport
+			}
+			events = smslog.SynthesizeTimeline(smslog.LegacyDetail{
+				ReceivedAt: d.ReceivedAt, DispatchedAt: d.DispatchedAt, DeliveredAt: d.DeliveredAt, FailedAt: d.FailedAt,
+				IngressTransport: ingress, CarrierName: d.CarrierName, FailoverSequence: d.FailoverSequence,
+				CarrierResponseCode: d.CarrierResponseCode, CarrierResponseBody: d.CarrierResponseBody,
+				CarrierMessageID: d.CarrierMessageID, CarrierSkipReason: d.CarrierSkipReason, Status: d.Status,
+				DLRRequested: d.DLRRequested, DLRWebhookURL: d.DLRWebhookURL, DLRStatus: d.DLRStatus,
+				DLRReceivedAt: d.DLRReceivedAt, DLRForwardedAt: d.DLRForwardedAt, DLRForwardStatus: d.DLRForwardStatus,
+				DLRForwardAttempts: d.DLRForwardAttempts,
+			})
+		}
+		d.Timeline = smslog.FormatViews(events)
 		if err := execT(w, h.SMSLogFragT, "sms_log_detail_modal", d); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}

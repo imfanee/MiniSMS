@@ -1,0 +1,41 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "smpp_addressing_panel"}}
+<div id="carrier-smpp-addressing-panel">
+  {{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+  <p class="text-secondary small">TON/NPI used when building HTTP request templates and SMPP submits for this carrier.</p>
+  <form class="row g-3" hx-post="/admin/carriers/{{.CarrierID}}/smpp-addressing" hx-target="#carrier-smpp-addressing-panel" hx-swap="outerHTML">
+    <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+    <div class="col-md-3">
+      <label class="form-label">Source Addr TON</label>
+      <select class="form-select {{if index .Errors "smpp_source_addr_ton"}}is-invalid{{end}}" name="smpp_source_addr_ton">
+        {{template "ton_options" .Carrier.SMPPSourceAddrTON}}
+      </select>
+      {{if index .Errors "smpp_source_addr_ton"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_source_addr_ton"}}</div>{{end}}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Source Addr NPI</label>
+      <select class="form-select {{if index .Errors "smpp_source_addr_npi"}}is-invalid{{end}}" name="smpp_source_addr_npi">
+        {{template "npi_options" .Carrier.SMPPSourceAddrNPI}}
+      </select>
+      {{if index .Errors "smpp_source_addr_npi"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_source_addr_npi"}}</div>{{end}}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Dest Addr TON</label>
+      <select class="form-select {{if index .Errors "smpp_dest_addr_ton"}}is-invalid{{end}}" name="smpp_dest_addr_ton">
+        {{template "ton_options" .Carrier.SMPPDestAddrTON}}
+      </select>
+      {{if index .Errors "smpp_dest_addr_ton"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_dest_addr_ton"}}</div>{{end}}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Dest Addr NPI</label>
+      <select class="form-select {{if index .Errors "smpp_dest_addr_npi"}}is-invalid{{end}}" name="smpp_dest_addr_npi">
+        {{template "npi_options" .Carrier.SMPPDestAddrNPI}}
+      </select>
+      {{if index .Errors "smpp_dest_addr_npi"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_dest_addr_npi"}}</div>{{end}}
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Save SMPP parameters</button>
+    </div>
+  </form>
+</div>
+{{end}}

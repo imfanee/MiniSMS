@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package carrier
 
 import (
@@ -6,6 +7,10 @@ import (
 	"testing"
 	"time"
 )
+
+func init() {
+	SetDispatchEndpointValidatorForTest(func(string) error { return nil })
+}
 
 func TestDispatchToCarrierSuccess(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

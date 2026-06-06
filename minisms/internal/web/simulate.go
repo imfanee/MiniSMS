@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -17,6 +18,7 @@ import (
 var simulateE164Re = regexp.MustCompile(`^\+[1-9]\d{6,14}$`)
 
 type simulatePage struct {
+	AdminView
 	Title       string
 	CurrentPath string
 	CSRFToken   string
@@ -24,12 +26,14 @@ type simulatePage struct {
 	Clients     []db.ClientListRow
 	Form        simulateForm
 	Result      *simulateResult
+	SendStatus  diagnoseSendStatusView
 }
 
 type simulateForm struct {
 	ClientID    string
 	Destination string
 	SenderID    string
+	Message     string
 	Errors      map[string]string
 }
 
@@ -68,14 +72,14 @@ func (h *Handlers) ShowSimulate() http.HandlerFunc {
 			return
 		}
 		p := simulatePage{
-			Title:       "Simulate",
-			CurrentPath: "/admin/simulate",
+			Title:       "Simulate Routing",
+			CurrentPath: "/admin/diagnoses/simulate",
 			CSRFToken:   csrf.Token(r),
 			Flash:       GetFlash(w, r, "/", h.Config.SecretKey, h.Config.IsProduction()),
 			Clients:     clients,
 			Form:        simulateForm{Errors: map[string]string{}},
 		}
-		if err := execT(w, h.SimulateT, "base", p); err != nil {
+		if err := execT(w, h.SimulateT, "base", p, r); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
 	}
@@ -92,20 +96,10 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
-		form := simulateForm{
-			ClientID:    strings.TrimSpace(r.FormValue("client_id")),
-			Destination: strings.TrimSpace(r.FormValue("destination")),
-			SenderID:    strings.TrimSpace(r.FormValue("sender_id")),
-			Errors:      map[string]string{},
-		}
-		if form.ClientID == "" {
-			form.Errors["client_id"] = "Client is required"
-		}
-		if !simulateE164Re.MatchString(form.Destination) {
-			form.Errors["destination"] = "Destination must be E.164 format (example: +447700900123)"
-		}
+		form := parseDiagnoseForm(r)
+		validateDiagnoseCommon(&form)
 		if len(form.Errors) > 0 {
-			h.renderSimulatePage(w, r, clients, form, nil)
+			h.renderSimulatePage(w, r, clients, form, nil, diagnoseSendStatusView{})
 			return
 		}
 
@@ -113,7 +107,7 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				form.Errors["client_id"] = "Client not found"
-				h.renderSimulatePage(w, r, clients, form, nil)
+				h.renderSimulatePage(w, r, clients, form, nil, diagnoseSendStatusView{})
 				return
 			}
 			ServerError(w, r, err, h.Log, h.T500)
@@ -125,7 +119,7 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 			h.renderSimulatePage(w, r, clients, form, &simulateResult{
 				SenderCheck:   "Failed: sender ID is not allowed for this client",
 				FinalDecision: "Message will not be routed",
-			})
+			}, diagnoseSendStatusView{})
 			return
 		}
 		if cl.RateGroupID == nil || *cl.RateGroupID == "" {
@@ -133,7 +127,7 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 				SenderCheck:      "Passed",
 				ResolvedSenderID: sidResolution.Value,
 				FinalDecision:    "Message will not be routed: client has no rate group",
-			})
+			}, diagnoseSendStatusView{})
 			return
 		}
 		rateEntry, err := billing.LookupRate(r.Context(), h.Pool, *cl.RateGroupID, form.Destination)
@@ -142,7 +136,7 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 				SenderCheck:      "Passed",
 				ResolvedSenderID: sidResolution.Value,
 				FinalDecision:    "Message will not be routed: no matching client rate",
-			})
+			}, diagnoseSendStatusView{})
 			return
 		}
 		routeEntry, err := h.simulationLookupRouteEntry(r, cl, form.Destination)
@@ -153,7 +147,7 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 				SelectedRate:     rateEntry.RatePerSMS,
 				SelectedPrefix:   rateEntry.Prefix,
 				FinalDecision:    "Message will not be routed: no matching route",
-			})
+			}, diagnoseSendStatusView{})
 			return
 		}
 		res := &simulateResult{
@@ -228,13 +222,13 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 
 		if selectedCarrierID == "" {
 			res.FinalDecision = "Message will not be routed: no eligible carrier in primary/failover chain"
-			h.renderSimulatePage(w, r, clients, form, res)
+			h.renderSimulatePage(w, r, clients, form, res, diagnoseSendStatusView{})
 			return
 		}
 		carrierRate, err := billing.LookupCarrierCost(r.Context(), h.Pool, selectedCarrierID, form.Destination, rateEntry.RatePerSMS)
 		if err != nil {
 			res.FinalDecision = "Message route selected but carrier rate lookup failed"
-			h.renderSimulatePage(w, r, clients, form, res)
+			h.renderSimulatePage(w, r, clients, form, res, diagnoseSendStatusView{})
 			return
 		}
 		res.Carrier = selectedCarrierName
@@ -243,19 +237,20 @@ func (h *Handlers) RunSimulation() http.HandlerFunc {
 			res.ResolvedSenderID = selectedSender
 		}
 		res.FinalDecision = "Message will be routed (simulation only). No SMS was sent and no SMS log was created."
-		h.renderSimulatePage(w, r, clients, form, res)
+		h.renderSimulatePage(w, r, clients, form, res, diagnoseSendStatusView{})
 	}
 }
 
-func (h *Handlers) renderSimulatePage(w http.ResponseWriter, r *http.Request, clients []db.ClientListRow, form simulateForm, result *simulateResult) {
+func (h *Handlers) renderSimulatePage(w http.ResponseWriter, r *http.Request, clients []db.ClientListRow, form simulateForm, result *simulateResult, sendStatus diagnoseSendStatusView) {
 	p := simulatePage{
-		Title:       "Simulate",
-		CurrentPath: "/admin/simulate",
+		Title:       "Simulate Routing",
+		CurrentPath: "/admin/diagnoses/simulate",
 		CSRFToken:   csrf.Token(r),
 		Flash:       GetFlash(w, r, "/", h.Config.SecretKey, h.Config.IsProduction()),
 		Clients:     clients,
 		Form:        form,
 		Result:      result,
+		SendStatus:  sendStatus,
 	}
 	if isHTMX(r) && r.Header.Get("HX-Target") == "simulate-result" {
 		if err := execT(w, h.SimulateT, "simulate_result", p); err != nil {
@@ -263,7 +258,13 @@ func (h *Handlers) renderSimulatePage(w http.ResponseWriter, r *http.Request, cl
 		}
 		return
 	}
-	if err := execT(w, h.SimulateT, "base", p); err != nil {
+	if isHTMX(r) && (r.Header.Get("HX-Target") == "send-status-panel" || strings.Contains(r.Header.Get("HX-Target"), "send-status")) {
+		if err := execT(w, h.SimulateT, "diagnose_send_status", sendStatus); err != nil {
+			ServerError(w, r, err, h.Log, h.T500)
+		}
+		return
+	}
+	if err := execT(w, h.SimulateT, "base", p, r); err != nil {
 		ServerError(w, r, err, h.Log, h.T500)
 	}
 }

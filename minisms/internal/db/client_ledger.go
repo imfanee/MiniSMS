@@ -1,8 +1,10 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package db
 
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -42,9 +44,13 @@ func ListClientLedger(ctx context.Context, pool *pgxpool.Pool, clientID string) 
 	return out, rows.Err()
 }
 
-func CreditClientBalance(ctx context.Context, pool *pgxpool.Pool, clientID, amount, currency, reference string, notes *string) (string, error) {
+type creditRecorder interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func CreditClientBalance(ctx context.Context, q creditRecorder, clientID, amount, currency, reference string, notes *string) (string, error) {
 	var out string
-	err := pool.QueryRow(ctx, `SELECT credit_client_balance($1::uuid,$2::numeric(18,6),$3::char(3),$4,$5)::text`,
+	err := q.QueryRow(ctx, `SELECT credit_client_balance($1::uuid,$2::numeric(18,6),$3::char(3),$4,$5)::text`,
 		clientID, amount, currency, reference, notes,
 	).Scan(&out)
 	return out, err

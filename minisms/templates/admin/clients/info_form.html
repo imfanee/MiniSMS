@@ -1,6 +1,8 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "client_info_form"}}
-<div id="info-panel" x-data="{showDLRSecret:false}">
+<div id="info-panel" x-data="{showDLRSecret:false, dlrMethod:'{{if eq .Client.DLRWebhookMethod "GET"}}GET{{else}}POST{{end}}'}">
 	{{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+	{{if index .Errors "default_sender_id_value"}}<div class="alert alert-danger py-2">{{index .Errors "default_sender_id_value"}}</div>{{end}}
 	<form class="row g-3" hx-put="/admin/clients/{{.Client.ClientID}}" hx-target="#info-panel" hx-swap="outerHTML">
 		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
 		<div class="col-md-4"><label class="form-label">Name</label><input class="form-control {{if index .Errors "name"}}is-invalid{{end}}" name="name" value="{{.Client.Name}}" required />{{if index .Errors "name"}}<div class="invalid-feedback d-block">{{index .Errors "name"}}</div>{{end}}</div>
@@ -23,15 +25,45 @@
 		</div>
 		<div class="col-md-5"><label class="form-label">Rate Group</label><select class="form-select" name="rate_group_id"><option value="">— None —</option>{{range .RateGroups}}<option value="{{.ID}}" {{if eq .ID $.RateGroupSel}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
 		<div class="col-md-5"><label class="form-label">Routing Group</label><select class="form-select" name="routing_group_id"><option value="">— None —</option>{{range .RoutingGroups}}<option value="{{.RoutingGroupID}}" {{if eq .RoutingGroupID $.RoutingGroupSel}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
-		<div class="col-md-4"><label class="form-label">Default Sender ID</label><input class="form-control" name="default_sender_id_value" maxlength="15" /></div>
-		<div class="col-md-4"><label class="form-label">Allow Any Sender ID</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_any_sender_id" data-bs-toggle="tooltip" title="Allow this client to submit any Sender ID."></div></div>
-		<div class="col-md-4"><label class="form-label">Allow In-Loss Delivery</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_in_loss_delivery" checked data-bs-toggle="tooltip" title="Allow routing even when carrier cost exceeds client rate."></div></div>
+		<div class="col-md-4"><label class="form-label">Default Sender ID</label><input class="form-control {{if index .Errors "default_sender_id_value"}}is-invalid{{end}}" name="default_sender_id_value" value="{{if .Client.DefaultSenderIDValue}}{{.Client.DefaultSenderIDValue}}{{end}}" maxlength="15" />{{if index .Errors "default_sender_id_value"}}<div class="invalid-feedback d-block">{{index .Errors "default_sender_id_value"}}</div>{{end}}</div>
+		<div class="col-md-4">
+			<label class="form-label">Allowed Sender IDs</label>
+			<select class="form-select {{if index .Errors "allowed_sender_ids_mode"}}is-invalid{{end}}" name="allowed_sender_ids_mode">
+				<option value="list" {{if eq .Client.AllowedSenderIDsMode "list"}}selected{{end}}>From Sender ID List</option>
+				<option value="phone" {{if eq .Client.AllowedSenderIDsMode "phone"}}selected{{end}}>Any Valid Phone Number</option>
+				<option value="any" {{if eq .Client.AllowedSenderIDsMode "any"}}selected{{end}}>Any (pattern)</option>
+			</select>
+			<div class="form-text">Controls which sender IDs this client may use when sending. <strong>Any</strong> still enforces the global character pattern (System Settings → <code>sender_id_any_allowed_pattern</code>), not unrestricted text.</div>
+			{{if index .Errors "allowed_sender_ids_mode"}}<div class="invalid-feedback d-block">{{index .Errors "allowed_sender_ids_mode"}}</div>{{end}}
+		</div>
+		<div class="col-md-4"><label class="form-label">Allow In-Loss Delivery</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_in_loss_delivery" {{if .Client.AllowInLossDelivery}}checked{{end}} data-bs-toggle="tooltip" title="Allow routing even when carrier cost exceeds client rate."></div></div>
 		<div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="3">{{if .Client.Notes}}{{.Client.Notes}}{{end}}</textarea></div>
 		<div class="col-md-6">
 			<label class="form-label">DLR Webhook URL</label>
 			<input type="url" class="form-control {{if index .Errors "dlr_webhook_url"}}is-invalid{{end}}" name="dlr_webhook_url" value="{{if .Client.DLRWebhookURL}}{{.Client.DLRWebhookURL}}{{end}}" placeholder="https://your-app.example.com/webhooks/dlr" />
 			<div class="form-text">Default URL to receive delivery receipts. Leave blank to disable DLR for this client.</div>
 			{{if index .Errors "dlr_webhook_url"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_webhook_url"}}</div>{{end}}
+		</div>
+		<div class="col-md-6">
+			<label class="form-label">DLR callback method</label>
+			<select class="form-select {{if index .Errors "dlr_webhook_method"}}is-invalid{{end}}" name="dlr_webhook_method" x-model="dlrMethod">
+				<option value="POST" {{if ne .Client.DLRWebhookMethod "GET"}}selected{{end}}>POST (default)</option>
+				<option value="GET" {{if eq .Client.DLRWebhookMethod "GET"}}selected{{end}}>GET</option>
+			</select>
+			<div class="form-text">How MiniSMS calls your DLR webhook URL when a delivery receipt arrives.</div>
+			{{if index .Errors "dlr_webhook_method"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_webhook_method"}}</div>{{end}}
+		</div>
+		<div class="col-12" x-show="dlrMethod === 'GET'" x-cloak>
+			<label class="form-label">DLR query template (GET)</label>
+			<textarea class="form-control font-monospace small {{if index .Errors "dlr_webhook_query_template"}}is-invalid{{end}}" name="dlr_webhook_query_template" rows="3" placeholder="{{.DefaultDLRQueryTmpl}}">{{if .Client.DLRWebhookQueryTemplate}}{{.Client.DLRWebhookQueryTemplate}}{{end}}</textarea>
+			<div class="form-text">Query string appended to the webhook URL. Leave blank to use the default. Variables: <code>{{"{{message_id}}"}}</code>, <code>{{"{{client_ref}}"}}</code>, <code>{{"{{to}}"}}</code>, <code>{{"{{from}}"}}</code>, <code>{{"{{dlr_status}}"}}</code>, <code>{{"{{carrier}}"}}</code>, <code>{{"{{failover_sequence}}"}}</code>, <code>{{"{{received_at}}"}}</code>, <code>{{"{{dlr_received_at}}"}}</code>, <code>{{"{{segments}}"}}</code>, <code>{{"{{charged}}"}}</code>, TON/NPI fields.</div>
+			{{if index .Errors "dlr_webhook_query_template"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_webhook_query_template"}}</div>{{end}}
+		</div>
+		<div class="col-12" x-show="dlrMethod === 'POST'" x-cloak>
+			<label class="form-label">DLR body template (POST)</label>
+			<textarea class="form-control font-monospace small {{if index .Errors "dlr_webhook_body_template"}}is-invalid{{end}}" name="dlr_webhook_body_template" rows="5" placeholder="{{.DefaultDLRBodyTmpl}}">{{if .Client.DLRWebhookBodyTemplate}}{{.Client.DLRWebhookBodyTemplate}}{{end}}</textarea>
+			<div class="form-text">Request body sent to the webhook URL. Leave blank to use the default JSON payload (same as before). Use the same <code>{{"{{variable}}"}}</code> placeholders as the GET template.</div>
+			{{if index .Errors "dlr_webhook_body_template"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_webhook_body_template"}}</div>{{end}}
 		</div>
 		<div class="col-md-6">
 			<label class="form-label">DLR Webhook Secret</label>
@@ -42,11 +74,10 @@
 				</button>
 			</div>
 			{{if .DLRSecretMasked}}<div class="form-text">Saved secret: {{.DLRSecretMasked}}</div>{{end}}
-			<div class="form-text">If set, each webhook POST includes X-MiniSMS-Signature (HMAC-SHA256 of request body using this secret).</div>
+			<div class="form-text">If set, each webhook includes <code>X-MiniSMS-Signature</code> (HMAC-SHA256 of POST body or GET query string).</div>
 			{{if index .Errors "dlr_webhook_secret"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_webhook_secret"}}</div>{{end}}
 		</div>
 		<div class="col-12"><button class="btn btn-primary" type="submit">Save</button></div>
 	</form>
 </div>
 {{end}}
-

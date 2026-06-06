@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package carrier
 
 import "testing"
@@ -10,7 +11,8 @@ func TestInjectVariables(t *testing.T) {
 		"message_id":       "m-1",
 		"timestamp":        "2026-01-01T00:00:00Z",
 		"client_id":        "c-1",
-		"dlr_callback_url": "https://example.com/api/v1/dlr/m-1",
+		"dlr_callback_url":           "https://example.com/api/v1/dlr/m-1",
+		"dlr_callback_url_encoded":   "https%3A%2F%2Fexample.com%2Fapi%2Fv1%2Fdlr%2Fm-1",
 		"source_addr_ton":  "5",
 		"source_addr_npi":  "0",
 		"dest_addr_ton":    "1",

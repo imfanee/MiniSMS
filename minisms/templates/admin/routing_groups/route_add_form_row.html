@@ -1,6 +1,7 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "route_add_form_row"}}
 <tr class="table-warning" x-data="{primary:'{{.PrimaryCarrierID}}', f1:'{{.Failover1CarrierID}}', f2:'{{.Failover2CarrierID}}', primarySet: '{{.PrimaryCarrierID}}' !== '', failover1Set: '{{.Failover1CarrierID}}' !== ''}">
-	<td colspan="7">
+	<td colspan="8">
 		<form class="row g-2" hx-post="/admin/routing-groups/{{.RoutingGroupID}}/routes" hx-target="closest tr" hx-swap="outerHTML">
 			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
 			<div class="col-md-2"><label class="form-label">Prefix</label><input class="form-control form-control-sm {{if index .Errors "prefix"}}is-invalid{{end}}" name="prefix" value="{{.Prefix}}" pattern="^(\*|[0-9]+)$" required />{{if index .Errors "prefix"}}<div class="invalid-feedback d-block">{{index .Errors "prefix"}}</div>{{end}}</div>

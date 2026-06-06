@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "dashboard_reports"}}
 <div id="reports-container">
   <div class="card mb-4" x-data="{fromDate: '{{.DefaultFrom}}', toDate: '{{.DefaultTo}}'}">
@@ -84,7 +85,7 @@
         <thead class="table-light"><tr><th>Client</th><th>Carrier</th><th>Messages</th><th>Billed</th><th>Cost</th><th>Margin</th><th>Margin %</th></tr></thead>
         <tbody>
           {{range .BillComparison}}
-          <tr{{if lt .Margin 0}} class="table-danger"{{end}}>
+          <tr{{if lt .Margin 0.0}} class="table-danger"{{end}}>
             <td>{{.ClientName}}</td><td>{{.CarrierName}}</td><td>{{.TotalMessages}}</td><td>{{printf "%.2f" .ClientBilled}}</td><td>{{printf "%.2f" .CarrierCost}}</td><td>{{printf "%.2f" .Margin}}</td><td>{{printf "%.2f" .MarginPct}}%</td>
           </tr>
           {{else}}<tr><td colspan="7" class="text-center text-muted py-3">No data for selected date range</td></tr>{{end}}

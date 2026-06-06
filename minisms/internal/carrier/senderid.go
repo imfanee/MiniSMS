@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package carrier
 
 import (
@@ -35,31 +36,31 @@ func ResolveSenderID(
 		return SenderIDResolution{Value: systemDefault, Source: "client_default"}, nil
 	}
 	if req != "" {
-		var allowAny bool
-		var n int
-		_ = pool.QueryRow(ctx, `SELECT allow_any_sender_id FROM clients WHERE client_id=$1::uuid`, client.ClientID).Scan(&allowAny)
-		if allowAny {
-			return SenderIDResolution{Value: req, Source: "client_provided"}, nil
+		var mode string
+		if err := pool.QueryRow(ctx, `SELECT allowed_sender_ids_mode FROM clients WHERE client_id=$1::uuid`, client.ClientID).Scan(&mode); err != nil {
+			return SenderIDResolution{}, err
 		}
-		err := pool.QueryRow(ctx, `
-			SELECT 1
-			FROM client_sender_ids csi
-			JOIN sender_ids si ON si.sender_id = csi.sender_id
-			WHERE csi.client_id = $1::uuid AND si.value = $2 AND si.is_active = TRUE
-			LIMIT 1`, client.ClientID, req).Scan(&n)
-		if err == nil {
-			return SenderIDResolution{Value: req, Source: "client_provided"}, nil
-		}
-		if err == pgx.ErrNoRows {
+		if !ClientAllowsSenderID(ctx, pool, client.ClientID, mode, req) {
 			return SenderIDResolution{}, ErrSenderNotAllowed
 		}
-		return SenderIDResolution{}, err
+		return SenderIDResolution{Value: req, Source: "client_provided"}, nil
 	}
 
+	mode := strings.TrimSpace(client.AllowedSenderIDsMode)
+	if mode == "" {
+		_ = pool.QueryRow(ctx, `SELECT allowed_sender_ids_mode FROM clients WHERE client_id=$1::uuid`, client.ClientID).Scan(&mode)
+	}
 	var clientDefault *string
-	_ = pool.QueryRow(ctx, `SELECT default_sender_id_value FROM clients WHERE client_id=$1::uuid`, client.ClientID).Scan(&clientDefault)
+	if client.DefaultSenderIDValue != nil && strings.TrimSpace(*client.DefaultSenderIDValue) != "" {
+		clientDefault = client.DefaultSenderIDValue
+	} else {
+		_ = pool.QueryRow(ctx, `SELECT default_sender_id_value FROM clients WHERE client_id=$1::uuid`, client.ClientID).Scan(&clientDefault)
+	}
 	if clientDefault != nil && strings.TrimSpace(*clientDefault) != "" {
-		return SenderIDResolution{Value: strings.TrimSpace(*clientDefault), Source: "client_default"}, nil
+		val := strings.TrimSpace(*clientDefault)
+		if ClientAllowsSenderID(ctx, pool, client.ClientID, mode, val) {
+			return SenderIDResolution{Value: val, Source: "client_default"}, nil
+		}
 	}
 	var sid string
 	err := pool.QueryRow(ctx, `

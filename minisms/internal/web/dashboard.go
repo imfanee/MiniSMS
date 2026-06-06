@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -59,6 +60,7 @@ type ThroughputRow struct {
 }
 
 type DashboardPage struct {
+	AdminView
 	Title       string
 	CurrentPath string
 	CSRFToken   string
@@ -81,7 +83,7 @@ func (h *Handlers) ShowDashboard() http.HandlerFunc {
 		page.CurrentPath = "/admin/dashboard"
 		page.CSRFToken = csrf.Token(r)
 		page.Flash = GetFlash(w, r, "/", h.Config.SecretKey, h.Config.IsProduction())
-		if err := execT(w, h.DashT, "base", page); err != nil {
+		if err := execT(w, h.DashT, "base", page, r); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
 	}

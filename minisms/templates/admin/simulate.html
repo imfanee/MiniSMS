@@ -1,13 +1,19 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "content"}}
+<nav class="text-secondary small mb-2" aria-label="Breadcrumb">
+  <a href="/admin/diagnoses/simulate">Diagnoses</a> / <span class="text-body">Simulate</span>
+</nav>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0">Simulate Routing</h1>
 </div>
 
 <div class="card shadow-sm border-0 mb-4">
   <div class="card-body">
-    <p class="text-secondary mb-3">This runs routing decisions only. It does not dispatch to carriers and does not create SMS logs.</p>
-    <form method="post" action="/admin/simulate" class="row g-3"
-      hx-post="/admin/simulate" hx-target="#simulate-result" hx-swap="innerHTML">
+    <p class="text-secondary mb-3">
+      <strong>Simulate</strong> runs routing decisions only (no carrier dispatch, no SMS log).
+      <strong>Send Message</strong> uses the live routing engine and creates an SMS log; status refreshes until a DLR arrives or you leave this page.
+    </p>
+    <form id="diagnose-form" class="row g-3" novalidate>
       <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}">
       <div class="col-md-4">
         <label class="form-label">Client</label>
@@ -29,14 +35,32 @@
         <input type="text" class="form-control" name="sender_id" value="{{.Form.SenderID}}" placeholder="MiniSMS or 441234567890">
       </div>
       <div class="col-12">
-        <button type="submit" class="btn btn-primary">Simulate</button>
+        <label class="form-label">SMS Text</label>
+        <textarea class="form-control{{if index .Form.Errors "message"}} is-invalid{{end}}" name="message" rows="3" maxlength="1600" placeholder="Test message body">{{.Form.Message}}</textarea>
+        {{with index .Form.Errors "message"}}<div class="invalid-feedback d-block">{{.}}</div>{{end}}
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-primary"
+          hx-post="/admin/diagnoses/simulate"
+          hx-include="#diagnose-form"
+          hx-target="#simulate-result"
+          hx-swap="innerHTML">Simulate</button>
+        <button type="button" class="btn btn-success"
+          hx-post="/admin/diagnoses/send"
+          hx-include="#diagnose-form"
+          hx-target="#send-status-panel"
+          hx-swap="outerHTML">Send Message</button>
       </div>
     </form>
   </div>
 </div>
 
-<div id="simulate-result">
+<div id="simulate-result" class="mb-4">
   {{template "simulate_result" .}}
+</div>
+
+<div id="send-status-panel">
+  {{template "diagnose_send_status" .SendStatus}}
 </div>
 {{end}}
 
@@ -85,4 +109,58 @@
   </div>
 </div>
 {{end}}
+{{end}}
+
+{{define "diagnose_send_status"}}
+<div id="send-status-panel" class="card shadow-sm border-0 border-success border-opacity-25"
+  {{if .KeepPolling}}
+  hx-get="/admin/diagnoses/send-status/{{.MessageID}}"
+  hx-trigger="load, every 2s"
+  hx-swap="outerHTML"
+  {{end}}>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Send Status</span>
+    {{if .WaitingForDLR}}
+    <span class="badge bg-warning text-dark">Waiting for DLR…</span>
+    {{else if .DLRReceivedAt}}
+    <span class="badge bg-success">DLR received</span>
+    {{else if eq .Status "accepted"}}
+    <span class="badge bg-info text-dark">Dispatched</span>
+    {{else if eq .Status "failed"}}
+    <span class="badge bg-danger">Failed</span>
+    {{end}}
+  </div>
+  <div class="card-body">
+    {{if .ErrorSummary}}
+    <div class="alert alert-danger mb-0">{{.ErrorSummary}}</div>
+    {{else}}
+    <div class="row g-2 small">
+      {{if .MessageID}}
+      <div class="col-md-6"><strong>Message ID:</strong> <code class="user-select-all">{{.MessageID}}</code></div>
+      {{end}}
+      <div class="col-md-6"><strong>Status:</strong> {{if .Status}}{{.Status}}{{else}}—{{end}}</div>
+      {{if .CarrierName}}<div class="col-md-6"><strong>Carrier:</strong> {{.CarrierName}}</div>{{end}}
+      {{if .MessageID}}<div class="col-md-6"><strong>Failover sequence:</strong> {{.FailoverSequence}}</div>{{end}}
+      {{if .Segments}}<div class="col-md-6"><strong>Segments:</strong> {{.Segments}}</div>{{end}}
+      {{if .Charged}}<div class="col-md-6"><strong>Charged:</strong> {{.Charged}}</div>{{end}}
+      {{if .DispatchedAt}}<div class="col-md-6"><strong>Dispatched:</strong> {{.DispatchedAt}}</div>{{end}}
+      {{if .FailedAt}}<div class="col-md-6"><strong>Failed at:</strong> {{.FailedAt}}</div>{{end}}
+      {{if .DLRRequested}}<div class="col-md-6"><strong>DLR requested:</strong> yes</div>{{end}}
+      {{if .DLRStatus}}
+      <div class="col-12">
+        <hr class="my-2">
+        <strong>DLR status:</strong> <span class="badge bg-primary">{{.DLRStatus}}</span>
+        {{if .DLRReceivedAt}}<span class="text-secondary ms-2">at {{.DLRReceivedAt}}</span>{{end}}
+      </div>
+      {{end}}
+      {{if .CarrierResponse}}
+      <div class="col-12"><strong>Carrier response:</strong> <pre class="small mb-0 text-break">{{.CarrierResponse}}</pre></div>
+      {{end}}
+    </div>
+    {{if .WaitingForDLR}}
+    <p class="text-secondary small mb-0 mt-3">Refreshing every 2 seconds until DLR is received or you navigate away.</p>
+    {{end}}
+    {{end}}
+  </div>
+</div>
 {{end}}

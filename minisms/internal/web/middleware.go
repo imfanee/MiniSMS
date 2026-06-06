@@ -1,10 +1,14 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +32,32 @@ func CSRF(cfg *config.Config) func(http.Handler) http.Handler {
 		csrf.Path("/"),
 		csrf.RequestHeader("X-CSRF-Token"),
 	}
+	var extra []string
+	if !cfg.IsProduction() {
+		extra = append(extra,
+			fmt.Sprintf("127.0.0.1:%s", cfg.Port),
+			fmt.Sprintf("localhost:%s", cfg.Port),
+			fmt.Sprintf("[::1]:%s", cfg.Port),
+			"sms.telecotech.net:18080",
+		)
+	}
+	if hosts := csrfTrustedHosts(cfg.CSRFTrustedOrigins, extra...); len(hosts) > 0 {
+		opts = append(opts, csrf.TrustedOrigins(hosts))
+	}
 	return csrf.Protect(cfg.CSRFSigningKey, opts...)
+}
+
+// sessionIdle returns admin session idle timeout: system_settings.admin_session_idle_minutes when valid, else cfg default.
+func sessionIdle(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) time.Duration {
+	v := db.Setting(ctx, pool, "admin_session_idle_minutes", "")
+	if v == "" {
+		return cfg.SessionIdle
+	}
+	mins, err := strconv.Atoi(v)
+	if err != nil || mins < 1 {
+		return cfg.SessionIdle
+	}
+	return time.Duration(mins) * time.Minute
 }
 
 // SessionAuth validates the session cookie and populates request context, or redirects to login.
@@ -36,6 +65,7 @@ func SessionAuth(pool *pgxpool.Pool, cfg *config.Config) func(http.Handler) http
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			now := time.Now()
+			idle := sessionIdle(r.Context(), pool, cfg)
 			raw, err := readSessionCookie(r)
 			if err != nil {
 				redirectToLogin(w, r)
@@ -55,11 +85,11 @@ func SessionAuth(pool *pgxpool.Pool, cfg *config.Config) func(http.Handler) http
 				redirectToLogin(w, r)
 				return
 			}
-			if now.Sub(sess.LastActiveAt) > cfg.SessionIdle {
+			if now.Sub(sess.LastActiveAt) > idle {
 				redirectToLogin(w, r)
 				return
 			}
-			if err := db.UpdateSessionLastActive(r.Context(), pool, sess.SessionID, cfg.SessionIdle); err != nil {
+			if err := db.UpdateSessionLastActive(r.Context(), pool, sess.SessionID, idle); err != nil {
 				if err == pgx.ErrNoRows {
 					redirectToLogin(w, r)
 					return
@@ -99,6 +129,7 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 func AdminEntryRedirect(pool *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
+		idle := sessionIdle(r.Context(), pool, cfg)
 		raw, err := readSessionCookie(r)
 		if err != nil {
 			http.Redirect(w, r, "/admin/login", http.StatusFound)
@@ -110,7 +141,7 @@ func AdminEntryRedirect(pool *pgxpool.Pool, cfg *config.Config) http.HandlerFunc
 			http.Redirect(w, r, "/admin/login", http.StatusFound)
 			return
 		}
-		if sess.ExpiresAt.Before(now) || now.Sub(sess.LastActiveAt) > cfg.SessionIdle {
+		if sess.ExpiresAt.Before(now) || now.Sub(sess.LastActiveAt) > idle {
 			http.Redirect(w, r, "/admin/login", http.StatusFound)
 			return
 		}

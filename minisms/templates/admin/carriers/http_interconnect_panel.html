@@ -1,0 +1,25 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "http_interconnect_panel"}}
+<div id="http-endpoint-panel">
+  {{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+  <form class="row g-3" hx-post="/admin/carriers/{{.CarrierID}}/interconnect/http" hx-target="#http-endpoint-panel" hx-swap="outerHTML">
+    <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+    <div class="col-md-8">
+      <label class="form-label">Endpoint URL</label>
+      <input class="form-control {{if index .Errors "endpoint_url"}}is-invalid{{end}}" name="endpoint_url" value="{{.Carrier.EndpointURL}}" placeholder="https://smsc.example.com/send" required />
+      {{if index .Errors "endpoint_url"}}<div class="invalid-feedback d-block">{{index .Errors "endpoint_url"}}</div>{{end}}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Method</label>
+      <select class="form-select {{if index .Errors "http_method"}}is-invalid{{end}}" name="http_method">
+        <option value="POST" {{if eq .Carrier.HTTPMethod "POST"}}selected{{end}}>POST</option>
+        <option value="GET" {{if eq .Carrier.HTTPMethod "GET"}}selected{{end}}>GET</option>
+      </select>
+      {{if index .Errors "http_method"}}<div class="invalid-feedback d-block">{{index .Errors "http_method"}}</div>{{end}}
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Save endpoint</button>
+    </div>
+  </form>
+</div>
+{{end}}

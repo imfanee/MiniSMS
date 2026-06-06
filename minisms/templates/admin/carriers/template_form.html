@@ -1,58 +1,113 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "template_form"}}
-<div id="template-panel" x-data="{
-  body: '',
-  query: '',
-  r(s) { return (window.minismsReplaceTemplateVars || function (x) { return x || ''; })(s); }
-}" x-init="body = $refs.bin.value; query = $refs.qin.value" class="d-flex flex-column gap-3">
+<div id="template-panel" class="minisms-template-panel w-100" data-http-method="{{.HTTPMethod}}" data-carrier-id="{{.CarrierID}}" data-body-b64="{{.BodyB64}}" data-query-b64="{{.QueryB64}}" hx-on:htmx:after-settle="window.minismsInitTemplateEditor && minismsInitTemplateEditor(this)">
 	{{if .Success}}<div class="alert alert-success py-2 mb-0" role="status">{{.Success}}</div>{{end}}
-	<form
-		class="d-flex flex-column gap-3"
-		hx-post="/admin/carriers/{{.CarrierID}}/template"
-		hx-target="#template-panel"
-		hx-swap="outerHTML"
-	>
+	{{if .Errors}}
+	<div class="alert alert-danger py-2 mb-0 w-100" role="alert">
+		<strong class="d-block mb-1">Could not save — fix the following</strong>
+		<ul class="mb-0 small ps-3">
+			{{if index .Errors "content_type"}}<li><strong>Content-Type:</strong> {{index .Errors "content_type"}}</li>{{end}}
+			{{if index .Errors "body_template"}}<li><strong>Body template:</strong> {{index .Errors "body_template"}}</li>{{end}}
+			{{if index .Errors "query_template"}}<li><strong>Query template:</strong> {{index .Errors "query_template"}}</li>{{end}}
+		</ul>
+	</div>
+	{{end}}
+	<pre id="body-data" class="minisms-template-data" aria-hidden="true">{{.Body}}</pre>
+	<pre id="query-data" class="minisms-template-data" aria-hidden="true">{{.Query}}</pre>
+	<form class="d-flex flex-column gap-3 w-100" hx-post="/admin/carriers/{{.CarrierID}}/template" hx-target="#template-panel" hx-swap="outerHTML">
 		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}"/>
-		<div>
+
+		<div class="w-100">
 			<label class="form-label" for="ctsel">Content-Type</label>
-			<select x-ref="ct" name="content_type" class="form-select" id="ctsel">
+			<select name="content_type" class="form-select w-100" id="ctsel">
 				<option value="application/json" {{if eq .ContentType "application/json"}}selected{{end}}>application/json</option>
-				<option value="application/x-www-form-urlencoded" {{if eq .ContentType "application/x-www-form-urlencoded"}}selected{{end}}>application/x-www-form-urlencoded</option>
+				<option value="application/x-www-form-urlencoded" {{if eq .ContentType "application/x-www-form-urlencoded"}}selected{{end}}>application/x-www-form-urlencoded (form fields)</option>
 				<option value="text/xml" {{if eq .ContentType "text/xml"}}selected{{end}}>text/xml</option>
 				<option value="application/xml" {{if eq .ContentType "application/xml"}}selected{{end}}>application/xml</option>
 			</select>
 			{{if index .Errors "content_type"}}<div class="invalid-feedback d-block">{{index .Errors "content_type"}}</div>{{end}}
 		</div>
-		<div>
+
+		<div class="w-100 d-flex flex-wrap align-items-end gap-2 p-2 rounded border bg-body-secondary">
+			<div class="flex-grow-1" style="min-width: 12rem;">
+				<label class="form-label small mb-1" for="var-insert-select">Insert variable</label>
+				<select id="var-insert-select" class="form-select form-select-sm w-100" aria-label="Variable to insert">
+					<option value="to">{{`{{to}}`}} — destination E.164</option>
+					<option value="from">{{`{{from}}`}} — originator</option>
+					<option value="message">{{`{{message}}`}} — SMS text</option>
+					<option value="message_id">{{`{{message_id}}`}} — MiniSMS message id</option>
+					<option value="timestamp">{{`{{timestamp}}`}} — ISO timestamp</option>
+					<option value="client_id">{{`{{client_id}}`}} — client id</option>
+					<option value="dlr_callback_url">{{`{{dlr_callback_url}}`}} — DLR callback URL</option>
+					<option value="dlr_callback_url_encoded">{{`{{dlr_callback_url_encoded}}`}} — DLR URL (encoded)</option>
+					<option value="source_addr_ton">{{`{{source_addr_ton}}`}} — source TON</option>
+					<option value="source_addr_npi">{{`{{source_addr_npi}}`}} — source NPI</option>
+					<option value="dest_addr_ton">{{`{{dest_addr_ton}}`}} — dest TON</option>
+					<option value="dest_addr_npi">{{`{{dest_addr_npi}}`}} — dest NPI</option>
+				</select>
+			</div>
+			<button type="button" class="btn btn-sm btn-primary" id="var-insert-btn">Insert into focused editor</button>
+		</div>
+
+		<div id="get-method-notice" class="alert alert-warning py-2 mb-0 w-100 {{if eq .HTTPMethod "POST"}}d-none{{end}}">
+			HTTP method is <strong>GET</strong> — body is stored but not sent. Set <strong>POST</strong> on the <strong>Endpoint</strong> tab to dispatch a body.
+		</div>
+
+		<div id="body-editor-wrap" class="w-100">
 			<label class="form-label" for="body_t">Body template</label>
-			<textarea x-ref="bin" x-model="body" name="body_template" class="form-control font-monospace {{if index .Errors "body_template"}}is-invalid{{end}}" id="body_t" rows="20" style="min-height: 18rem">{{.Body}}</textarea>
+			<textarea name="body_template" id="body_h" class="minisms-template-submit-field" aria-hidden="true" tabindex="-1"></textarea>
+			<div id="body-guidelines" class="alert alert-secondary small py-2 mb-2 w-100" role="note"></div>
+			<div id="body-editor-cm" class="minisms-cm-wrap minisms-body-cm w-100 border rounded overflow-hidden {{if index .Errors "body_template"}}border-danger{{end}}">
+				<textarea id="body_t" class="font-monospace w-100"></textarea>
+			</div>
+			<div id="body-editor-form" class="d-none w-100 border rounded p-2 {{if index .Errors "body_template"}}border-danger{{end}}">
+				<p class="text-secondary small mb-2">Form key/value rows (saved as <code>key=value&amp;…</code>).</p>
+				<div class="table-responsive w-100">
+					<table class="table table-sm table-borderless mb-2 align-middle w-100">
+						<thead>
+							<tr class="text-secondary small">
+								<th style="width:28%">Field</th>
+								<th>Value</th>
+								<th style="width:7rem"></th>
+							</tr>
+						</thead>
+						<tbody id="form-kv-body"></tbody>
+					</table>
+				</div>
+				<button type="button" class="btn btn-sm btn-outline-secondary" id="form-kv-add">+ Add field</button>
+			</div>
 			{{if index .Errors "body_template"}}<div class="invalid-feedback d-block">{{index .Errors "body_template"}}</div>{{end}}
 		</div>
-		<div>
-			<label class="form-label" for="q_t">Query template</label>
-			<textarea x-ref="qin" x-model="query" name="query_template" class="form-control font-monospace" id="q_t" rows="5" style="min-height: 6rem">{{.Query}}</textarea>
+
+		<div id="post-method-query-notice" class="alert alert-info py-2 mb-0 w-100 {{if ne .HTTPMethod "POST"}}d-none{{end}}">
+			HTTP method is <strong>POST</strong> — request data is sent in the <strong>body</strong>. Query template is not used.
 		</div>
+
+		<div id="query-editor-wrap" class="w-100 {{if eq .HTTPMethod "POST"}}d-none{{end}}">
+			<label class="form-label" for="q_t">Query template</label>
+			<div id="query-guidelines" class="alert alert-secondary small py-2 mb-2 w-100" role="note"></div>
+			<textarea name="query_template" id="q_h" class="minisms-template-submit-field" aria-hidden="true" tabindex="-1"></textarea>
+			<div class="minisms-cm-wrap minisms-query-cm w-100 border rounded {{if index .Errors "query_template"}}border-danger{{end}}">
+				<textarea id="q_t" class="font-monospace w-100" rows="8"></textarea>
+			</div>
+			<div class="form-text">URL query string (<code>key=value&amp;…</code>). Syntax is checked independently of body Content-Type.</div>
+			{{if index .Errors "query_template"}}<div class="invalid-feedback d-block">{{index .Errors "query_template"}}</div>{{end}}
+		</div>
+
 		{{if .Updated}}<p class="text-secondary small mb-0">Last updated (UTC): {{.Updated}}</p>{{end}}
 		<button class="btn btn-primary align-self-start" type="submit">Save</button>
 	</form>
-	<div class="alert alert-info small" role="note">
-		<strong>Variables</strong> — <code>to</code> destination, <code>from</code> origin, <code>message</code> text, <code>message_id</code>, <code>timestamp</code> ISO 8601, <code>client_id</code>,
-		<code>dlr_callback_url</code> MiniSMS callback URL for DLR registration,
-		<code>source_addr_ton</code>, <code>source_addr_npi</code>, <code>dest_addr_ton</code>, <code>dest_addr_npi</code>.
-	</div>
-	<div>
+
+	<div class="w-100 mt-3">
 		<p class="form-label">Live preview (sample data)</p>
-		<div class="row g-2">
-			<div class="col-12 col-lg-6">
-				<div class="border rounded p-2 bg-body-secondary h-100">
-					<p class="text-secondary small mb-1">Body (preview)</p>
-					<pre x-text="r(body)" class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; font-size:0.8rem; max-height: 20rem; overflow: auto"> </pre>
-				</div>
+		<div class="d-flex flex-column gap-2 w-100">
+			<div class="border rounded p-2 bg-body-secondary w-100">
+				<p class="text-secondary small mb-1">Body (preview)</p>
+				<pre id="body-preview" class="mb-0 small user-select-all w-100" style="white-space: pre-wrap; word-break: break-word; font-size:0.8rem; max-height: 20rem; overflow: auto"></pre>
 			</div>
-			<div class="col-12 col-lg-6">
-				<div class="border rounded p-2 bg-body-secondary h-100">
-					<p class="text-secondary small mb-1">Query (preview)</p>
-					<pre x-text="r(query)" class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; font-size:0.8rem; max-height: 8rem; overflow: auto"> </pre>
-				</div>
+			<div id="query-preview-wrap" class="border rounded p-2 bg-body-secondary w-100 {{if eq .HTTPMethod "POST"}}d-none{{end}}">
+				<p class="text-secondary small mb-1">Query (preview)</p>
+				<pre id="query-preview" class="mb-0 small w-100" style="white-space: pre-wrap; word-break: break-word; font-size:0.8rem; max-height: 8rem; overflow: auto"></pre>
 			</div>
 		</div>
 	</div>

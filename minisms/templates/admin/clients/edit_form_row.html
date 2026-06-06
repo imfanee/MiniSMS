@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "client_edit_form_row"}}
 <tr class="table-info" id="client-row-{{.ClientID}}"><td colspan="8">
 	<form class="row g-2" hx-put="/admin/clients/{{.ClientID}}" hx-target="closest tr" hx-swap="outerHTML">
@@ -17,12 +18,20 @@
 		</div>
 		<div class="col-md-2"><label class="form-label">Rate Group</label><select class="form-select form-select-sm" name="rate_group_id"><option value="">— None —</option>{{range .RateGroups}}<option value="{{.ID}}" {{if eq .ID $.RateGroupID}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
 		<div class="col-md-2"><label class="form-label">Routing Group</label><select class="form-select form-select-sm" name="routing_group_id"><option value="">— None —</option>{{range .RoutingGroups}}<option value="{{.RoutingGroupID}}" {{if eq .RoutingGroupID $.RoutingGroupID}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
-		<div class="col-md-2"><label class="form-label">Default Sender ID</label><input class="form-control form-control-sm" name="default_sender_id_value" maxlength="15" /></div>
-		<div class="col-md-1"><label class="form-label">Allow Any</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_any_sender_id"></div></div>
-		<div class="col-md-1"><label class="form-label">Allow In-Loss</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_in_loss_delivery" checked></div></div>
+		<div class="col-md-2"><label class="form-label">Default Sender ID</label><input class="form-control form-control-sm {{if index .Errors "default_sender_id_value"}}is-invalid{{end}}" name="default_sender_id_value" value="{{.DefaultSenderID}}" maxlength="15" />{{if index .Errors "default_sender_id_value"}}<div class="invalid-feedback d-block">{{index .Errors "default_sender_id_value"}}</div>{{end}}</div>
+		<div class="col-md-2">
+			<label class="form-label">Allowed Sender IDs</label>
+			<select class="form-select form-select-sm {{if index .Errors "allowed_sender_ids_mode"}}is-invalid{{end}}" name="allowed_sender_ids_mode">
+				<option value="list" {{if eq .AllowedSenderIDsMode "list"}}selected{{end}}>From Sender ID List</option>
+				<option value="phone" {{if eq .AllowedSenderIDsMode "phone"}}selected{{end}}>Any Valid Phone Number</option>
+				<option value="any" {{if eq .AllowedSenderIDsMode "any"}}selected{{end}}>Any (pattern)</option>
+			</select>
+			<div class="form-text">Any = letters, digits, space, underscore, dot, hyphen; max 15 chars (see System Settings).</div>
+			{{if index .Errors "allowed_sender_ids_mode"}}<div class="invalid-feedback d-block">{{index .Errors "allowed_sender_ids_mode"}}</div>{{end}}
+		</div>
+		<div class="col-md-1"><label class="form-label">Allow In-Loss</label><div class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" name="allow_in_loss_delivery" {{if .AllowInLossDelivery}}checked{{end}}></div></div>
 		<div class="col-md-2"><label class="form-label">Notes</label><input class="form-control form-control-sm" name="notes" value="{{.Notes}}" /></div>
 		<div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary" type="submit">Save</button><button class="btn btn-sm btn-secondary" type="button" hx-get="/admin/clients/{{.ClientID}}/row" hx-target="closest tr" hx-swap="outerHTML">Cancel</button></div>
 	</form>
 </td></tr>
 {{end}}
-

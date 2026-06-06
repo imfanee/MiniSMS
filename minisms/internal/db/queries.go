@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package db
 
 import (
@@ -31,18 +32,20 @@ func HashTokenHex(raw [32]byte) string {
 }
 
 // CreateAdminSession stores a new session; raw token is 32 bytes (cookie will carry hex of this).
-func CreateAdminSession(ctx context.Context, pool *pgxpool.Pool, tokenHashHex string, sessionIdle time.Duration, clientIP, userAgent *string) error {
+// Returns the new session_id for audit logging.
+func CreateAdminSession(ctx context.Context, pool *pgxpool.Pool, adminUserID, tokenHashHex string, sessionIdle time.Duration, clientIP, userAgent *string) (sessionID string, err error) {
 	now := time.Now()
 	exp := now.Add(sessionIdle)
-	_, err := pool.Exec(ctx, `
-		INSERT INTO admin_sessions (session_token, expires_at, last_active_at, ip_address, user_agent)
-		VALUES ($1, $2, $3, $4::inet, $5)`,
-		tokenHashHex, exp, now, nullableIPString(clientIP), userAgent,
-	)
+	err = pool.QueryRow(ctx, `
+		INSERT INTO admin_sessions (session_token, expires_at, last_active_at, ip_address, user_agent, admin_user_id)
+		VALUES ($1, $2, $3, $4::inet, $5, $6::uuid)
+		RETURNING session_id::text`,
+		tokenHashHex, exp, now, nullableIPString(clientIP), userAgent, adminUserID,
+	).Scan(&sessionID)
 	if err != nil {
-		return fmt.Errorf("insert session: %w", err)
+		return "", fmt.Errorf("insert session: %w", err)
 	}
-	return nil
+	return sessionID, nil
 }
 
 func nullableIPString(ip *string) *string {
@@ -65,6 +68,7 @@ func GetSessionByTokenHash(ctx context.Context, pool *pgxpool.Pool, tokenHashHex
 		SELECT
 			session_id::text,
 			session_token,
+			admin_user_id::text,
 			created_at,
 			expires_at,
 			last_active_at,
@@ -75,7 +79,7 @@ func GetSessionByTokenHash(ctx context.Context, pool *pgxpool.Pool, tokenHashHex
 		WHERE session_token = $1 AND is_revoked = false`,
 		tokenHashHex,
 	).Scan(
-		&s.SessionID, &s.SessionToken, &s.CreatedAt, &s.ExpiresAt, &s.LastActiveAt, &ipStr, &ua, &s.IsRevoked,
+		&s.SessionID, &s.SessionToken, &s.AdminUserID, &s.CreatedAt, &s.ExpiresAt, &s.LastActiveAt, &ipStr, &ua, &s.IsRevoked,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil

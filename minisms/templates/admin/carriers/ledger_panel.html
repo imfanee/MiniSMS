@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "ledger_panel"}}
 <div id="ledger-panel" class="d-flex flex-column gap-3 position-relative" style="z-index:0">
 	<div class="card bg-body border">
@@ -42,14 +43,7 @@
 						<input id="pay-amount-fld" name="amount" type="number" class="form-control" step="0.000001" min="0" value="" required />
 						{{if index .PayErrors "amount"}}<div class="text-danger small">{{index .PayErrors "amount"}}</div>{{end}}
 					</div>
-					<div class="mb-2">
-						<label for="pay-ref" class="form-label">Payment reference</label>
-						<input name="payment_reference" id="pay-ref" class="form-control" />
-					</div>
-					<div class="mb-2">
-						<label for="inv-no" class="form-label">Invoice number</label>
-						<input name="invoice_number" id="inv-no" class="form-control" />
-					</div>
+					{{template "payment_reference_fields" (dict "FieldPrefix" "pay" "RefType" .RefType "OpenInvoices" .OpenInvoices "SelectedInvoiceID" .SelectedInvoiceID "OtherReference" .OtherReference "Errors" .PayErrors)}}
 					<div class="mb-2">
 						<label for="pay-date" class="form-label">Payment date</label>
 						<input name="payment_date" type="date" class="form-control" id="pay-date" value="{{.DefaultPayDate}}"/>
@@ -101,7 +95,7 @@
 					</td>
 					<td class="text-end font-monospace text-secondary small">{{.BalanceAfter}}</td>
 					<td class="text-break" style="max-width:8rem">
-						{{if .PaymentReference}}{{.PaymentReference}}{{else}}—{{end}}
+						{{if .InvoiceNumber}}{{.InvoiceNumber}}{{else if .PaymentReference}}{{.PaymentReference}}{{else}}—{{end}}
 					</td>
 					<td class="text-break small" style="max-width: 12rem;">
 						{{if .Notes}}{{.Notes}}{{else}}—{{end}}

@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package carrier
 
 import "strings"
@@ -14,6 +15,7 @@ func InjectVariables(tmpl string, vars map[string]string) string {
 		"{{timestamp}}", vars["timestamp"],
 		"{{client_id}}", vars["client_id"],
 		"{{dlr_callback_url}}", vars["dlr_callback_url"],
+		"{{dlr_callback_url_encoded}}", vars["dlr_callback_url_encoded"],
 		"{{source_addr_ton}}", vars["source_addr_ton"],
 		"{{source_addr_npi}}", vars["source_addr_npi"],
 		"{{dest_addr_ton}}", vars["dest_addr_ton"],

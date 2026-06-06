@@ -1,24 +1,13 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "edit_form_row"}}
 <tr class="table-info" id="carrier-row-{{.CarrierID}}">
-	<td colspan="8">
+	<td colspan="7">
 		<form class="row g-2" hx-put="/admin/carriers/{{.CarrierID}}" hx-target="closest tr" hx-swap="outerHTML" novalidate>
 			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
 			<div class="col-md-3">
 				<label class="form-label">Name</label>
 				<input class="form-control form-control-sm {{if index .Errors "name"}}is-invalid{{end}}" name="name" value="{{.Name}}" required />
 				{{if index .Errors "name"}}<div class="invalid-feedback d-block">{{index .Errors "name"}}</div>{{end}}
-			</div>
-			<div class="col-md-3">
-				<label class="form-label">Endpoint URL</label>
-				<input class="form-control form-control-sm {{if index .Errors "endpoint_url"}}is-invalid{{end}}" name="endpoint_url" value="{{.EndpointURL}}" required />
-				{{if index .Errors "endpoint_url"}}<div class="invalid-feedback d-block">{{index .Errors "endpoint_url"}}</div>{{end}}
-			</div>
-			<div class="col-md-1">
-				<label class="form-label">Method</label>
-				<select class="form-select form-select-sm" name="http_method">
-					<option value="POST" {{if eq .HTTPMethod "POST"}}selected{{end}}>POST</option>
-					<option value="GET" {{if eq .HTTPMethod "GET"}}selected{{end}}>GET</option>
-				</select>
 			</div>
 			<div class="col-md-1">
 				<label class="form-label">Status</label>
@@ -27,7 +16,7 @@
 					<option value="inactive" {{if eq .Status "inactive"}}selected{{end}}>inactive</option>
 				</select>
 			</div>
-			<div class="col-md-1">
+			<div class="col-md-2">
 				<label class="form-label">CCY</label>
 				<select class="form-select form-select-sm" name="currency" required>
 					{{range .Currencies}}
@@ -46,17 +35,19 @@
 			</div>
 			<div class="col-md-2">
 				<label class="form-label">Sender ID Policy</label>
-				<select class="form-select form-select-sm" name="sender_id_policy">
-					<option value="any">any</option>
-					<option value="numeric">numeric</option>
-					<option value="e164">e164</option>
-					<option value="list">list</option>
-					<option value="none">none</option>
+				<select class="form-select form-select-sm {{if index .Errors "sender_id_policy"}}is-invalid{{end}}" name="sender_id_policy">
+					<option value="any" {{if eq .SenderIDPolicy "any"}}selected{{end}}>any</option>
+					<option value="numeric" {{if eq .SenderIDPolicy "numeric"}}selected{{end}}>numeric</option>
+					<option value="e164" {{if eq .SenderIDPolicy "e164"}}selected{{end}}>e164</option>
+					<option value="list" {{if eq .SenderIDPolicy "list"}}selected{{end}}>list</option>
+					<option value="none" {{if eq .SenderIDPolicy "none"}}selected{{end}}>none</option>
 				</select>
+				{{if index .Errors "sender_id_policy"}}<div class="invalid-feedback d-block">{{index .Errors "sender_id_policy"}}</div>{{end}}
 			</div>
 			<div class="col-md-2">
 				<label class="form-label">Default Sender ID</label>
-				<input class="form-control form-control-sm" name="default_sender_id_value" maxlength="15" />
+				<input class="form-control form-control-sm {{if index .Errors "default_sender_id_value"}}is-invalid{{end}}" name="default_sender_id_value" value="{{.DefaultSenderID}}" maxlength="15" />
+				{{if index .Errors "default_sender_id_value"}}<div class="invalid-feedback d-block">{{index .Errors "default_sender_id_value"}}</div>{{end}}
 			</div>
 			<div class="col-12">
 				<label class="form-label">Notes</label>

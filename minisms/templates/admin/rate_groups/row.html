@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "rg_row"}}
 <tr id="rg-row-{{.RateGroupID}}">
 	<td>{{.Name}}</td>
@@ -6,7 +7,7 @@
 	<td>{{.CarrierCount}}</td>
 	<td>{{.ClientCount}}</td>
 	<td class="d-flex gap-1 flex-wrap">
-		<a class="btn btn-sm btn-outline-light" href="/admin/rate-groups/{{.RateGroupID}}">Manage</a>
+		<a class="btn btn-sm btn-outline-light" href="/admin/rate-groups/{{.RateGroupID}}">Rates</a>
 		<button type="button" class="btn btn-sm btn-outline-primary" hx-get="/admin/rate-groups/{{.RateGroupID}}/edit" hx-target="closest tr" hx-swap="outerHTML">Edit</button>
 		<button
 			type="button"

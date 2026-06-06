@@ -1,0 +1,68 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "client_smpp_panel"}}
+<div id="client-smpp-panel" x-data="{showPassword:false}">
+  {{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+  <form class="row g-3" hx-post="/admin/clients/{{.ClientID}}/smpp-settings" hx-target="#client-smpp-panel" hx-swap="outerHTML">
+    <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+    <div class="col-12">
+      <div class="form-check form-switch">
+        <input type="checkbox" class="form-check-input" role="switch" name="smpp_ingress_enabled" id="smpp_ingress_enabled" {{if .Client.SMPPIngressEnabled}}checked{{end}} />
+        <label class="form-check-label" for="smpp_ingress_enabled">SMPP ingress enabled</label>
+      </div>
+      <div class="form-text">Requires <code>SMPP_SERVER_ENABLED=true</code> on the host and firewall to <code>:2775</code>.</div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">System ID</label>
+      <input class="form-control font-monospace {{if index .Errors "smpp_system_id"}}is-invalid{{end}}" name="smpp_system_id" value="{{if .Client.SMPPSystemID}}{{.Client.SMPPSystemID}}{{end}}" />
+      {{if index .Errors "smpp_system_id"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_system_id"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Password</label>
+      <div class="input-group">
+        <input :type="showPassword ? 'text' : 'password'" class="form-control {{if index .Errors "smpp_password"}}is-invalid{{end}}" name="smpp_password" placeholder="leave blank to keep current" />
+        <button type="button" class="btn btn-outline-secondary" @click="showPassword = !showPassword"><span x-text="showPassword ? 'Hide' : 'Show'"></span></button>
+      </div>
+      {{if .MaskedPassword}}<div class="form-text">Saved: {{.MaskedPassword}}</div>{{end}}
+      {{if index .Errors "smpp_password"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_password"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Max binds</label>
+      <input class="form-control {{if index .Errors "smpp_max_binds"}}is-invalid{{end}}" name="smpp_max_binds" type="number" min="0" max="100" value="{{.Client.SMPPMaxBinds}}" />
+      {{if index .Errors "smpp_max_binds"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_max_binds"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">DLR delivery mode</label>
+      <select class="form-select {{if index .Errors "dlr_delivery_mode"}}is-invalid{{end}}" name="dlr_delivery_mode">
+        <option value="http" {{if eq .Client.DLRDeliveryMode "http"}}selected{{end}}>http — webhook only</option>
+        <option value="smpp" {{if eq .Client.DLRDeliveryMode "smpp"}}selected{{end}}>smpp — deliver_sm only</option>
+        <option value="both" {{if eq .Client.DLRDeliveryMode "both"}}selected{{end}}>both — SMPP if bound, else HTTP</option>
+      </select>
+      {{if index .Errors "dlr_delivery_mode"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_delivery_mode"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Throughput (/s)</label>
+      <input class="form-control {{if index .Errors "smpp_throughput_per_s"}}is-invalid{{end}}" name="smpp_throughput_per_s" type="number" min="1" max="10000" value="{{.Client.SMPPThroughputPerS}}" />
+      {{if index .Errors "smpp_throughput_per_s"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_throughput_per_s"}}</div>{{end}}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Default src TON</label>
+      <input class="form-control {{if index .Errors "smpp_default_src_ton"}}is-invalid{{end}}" name="smpp_default_src_ton" type="number" min="0" max="255" value="{{if .Client.SMPPDefaultSrcTON}}{{.Client.SMPPDefaultSrcTON}}{{end}}" placeholder="auto" />
+      {{if index .Errors "smpp_default_src_ton"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_default_src_ton"}}</div>{{end}}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Default src NPI</label>
+      <input class="form-control {{if index .Errors "smpp_default_src_npi"}}is-invalid{{end}}" name="smpp_default_src_npi" type="number" min="0" max="255" value="{{if .Client.SMPPDefaultSrcNPI}}{{.Client.SMPPDefaultSrcNPI}}{{end}}" placeholder="auto" />
+      {{if index .Errors "smpp_default_src_npi"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_default_src_npi"}}</div>{{end}}
+    </div>
+    <div class="col-12">
+      <label class="form-label">Allowed client IPs (CIDR)</label>
+      <textarea class="form-control font-monospace {{if index .Errors "smpp_allowed_cidrs"}}is-invalid{{end}}" name="smpp_allowed_cidrs" rows="2" placeholder="203.0.113.10/32, 198.51.100.0/24">{{if .Client.SMPPAllowedCIDRs}}{{.Client.SMPPAllowedCIDRs}}{{end}}</textarea>
+      <div class="form-text">Comma- or newline-separated. Empty = allow any (not recommended).</div>
+      {{if index .Errors "smpp_allowed_cidrs"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_allowed_cidrs"}}</div>{{end}}
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Save SMPP ingress</button>
+    </div>
+  </form>
+</div>
+{{end}}

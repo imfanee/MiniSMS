@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "add_auth_header_row"}}
 <tr class="table-warning" id="add-header-form-row">
 	<td colspan="3">
@@ -10,7 +11,7 @@
 			</div>
 			<div class="col-12 col-md-6">
 				<label class="form-label">Value</label>
-				<input name="header_value" class="form-control form-control-sm {{if index .Errors "header_value"}}is-invalid{{end}}" value="{{.HValue}}" type="password" required autocomplete="off" />
+				<input name="header_value" class="form-control form-control-sm font-monospace {{if index .Errors "header_value"}}is-invalid{{end}}" value="{{.HValue}}" type="text" required autocomplete="off" spellcheck="false" />
 				{{if index .Errors "header_value"}}<div class="invalid-feedback d-block">{{index .Errors "header_value"}}</div>{{end}}
 			</div>
 			<div class="col-12 d-flex gap-2">

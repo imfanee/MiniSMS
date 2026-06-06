@@ -1,8 +1,8 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "carrier_row"}}
 <tr id="carrier-row-{{.Row.CarrierID}}">
 	<td><a href="/admin/carriers/{{.Row.CarrierID}}">{{.Row.Name}}</a></td>
-	<td class="text-break" style="max-width: 14rem;"><code class="small">{{.Row.EndpointURL}}</code></td>
-	<td>{{.Row.HTTPMethod}}</td>
+	<td><span class="badge {{if eq .Interconnect "SMPP"}}bg-primary{{else}}bg-info text-dark{{end}}">{{.Interconnect}}</span></td>
 	<td>
 		{{if .Active}}<span class="badge bg-success">active</span>{{else}}<span class="badge bg-secondary">inactive</span>{{end}}
 	</td>

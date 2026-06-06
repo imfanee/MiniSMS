@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package config
 
 import (
@@ -37,5 +38,12 @@ func TestLoad_OK(t *testing.T) {
 	}
 	if c.CarrierDispatchTimeoutSecs != 10 {
 		t.Fatal("default CARRIER dispatch timeout")
+	}
+	if c.SMPPEnquireLinkSecs != 30 || c.SMPPWindowSize != 10 || c.SMPPThroughputPerS != 50 {
+		t.Fatalf("SMPP defaults: enquire=%d window=%d throughput=%d",
+			c.SMPPEnquireLinkSecs, c.SMPPWindowSize, c.SMPPThroughputPerS)
+	}
+	if c.SMPPServerEnabled || c.SMPPListenAddr != ":2775" {
+		t.Fatal("SMPP server defaults")
 	}
 }

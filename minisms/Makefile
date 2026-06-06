@@ -1,13 +1,11 @@
-.PHONY: build run migrate test dev hash-password build-tools schema vet clean docker-build
+# Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
+.PHONY: build run test dev hash-password build-tools schema vet clean docker-build
 
 build:
 	go build -o bin/minisms ./cmd/minisms
 
 run:
 	go run ./cmd/minisms
-
-migrate:
-	migrate -path ./migrations -database $$DATABASE_URL up
 
 test:
 	go test ./...
@@ -24,7 +22,7 @@ build-tools:
 
 schema:
 	@echo "Importing schema to database..."
-	@echo "Usage: make schema DB_URL=postgres://minisms:password@localhost/minisms"
+	@echo "Usage: make schema DB_URL=postgres://minisms:CHANGE_THIS_PASSWORD@localhost/minisms"
 	psql "$(DB_URL)" -f deploy/minisms_db.sql
 
 vet:

@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -11,14 +12,15 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
+	"github.com/minisms/minisms/internal/routecache"
+	"github.com/minisms/minisms/internal/sending"
 )
 
 // Page is common template data for admin pages.
 type Page struct {
+	AdminView
 	Title        string
 	CurrentPath  string
 	CSRFToken    string
@@ -33,6 +35,8 @@ type Page struct {
 type Handlers struct {
 	Config        *config.Config
 	Pool          *pgxpool.Pool
+	RouteCache    *routecache.Cache
+	Send          *sending.Service
 	Log           *slog.Logger
 	LoginT        *template.Template
 	DashT         *template.Template
@@ -53,9 +57,13 @@ type Handlers struct {
 	SMSLogT       *template.Template
 	SMSLogFragT   *template.Template
 	AuditT        *template.Template
-	SettingsT     *template.Template
-	SettingsFragT *template.Template
-	T500          *template.Template
+	SettingsT        *template.Template
+	SettingsFragT    *template.Template
+	AdminUsersListT  *template.Template
+	AdminUsersFormT  *template.Template
+	CurrenciesT      *template.Template
+	SenderIDsT       *template.Template
+	T500             *template.Template
 }
 
 type loginAttempt struct {
@@ -140,6 +148,7 @@ func (h *Handlers) LoginPost() http.HandlerFunc {
 			return
 		}
 		username := strings.TrimSpace(r.FormValue("username"))
+		password := r.FormValue("password")
 		now := time.Now().UTC()
 		throttleKey := loginThrottleKey(r, username)
 		if isLoginBlocked(throttleKey, now) {
@@ -150,17 +159,12 @@ func (h *Handlers) LoginPost() http.HandlerFunc {
 			}
 			return
 		}
-		password := r.FormValue("password")
-		if username != strings.TrimSpace(h.Config.AdminUsername) {
-			markLoginFailure(throttleKey, now)
-			p := Page{Title: "Sign in", CurrentPath: "/admin/login", CSRFToken: csrf.Token(r), Flash: &Flash{Type: "danger", Message: "Invalid username or password"}}
-			w.WriteHeader(http.StatusUnauthorized)
-			if err := h.LoginT.ExecuteTemplate(w, "base", p); err != nil {
-				ServerError(w, r, err, h.Log, h.T500)
-			}
+		adminUser, err := db.AuthenticateAdmin(r.Context(), h.Pool, username, password)
+		if err != nil {
+			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
-		if err := bcrypt.CompareHashAndPassword([]byte(h.Config.AdminPasswordHash), []byte(password)); err != nil {
+		if adminUser == nil {
 			markLoginFailure(throttleKey, now)
 			p := Page{Title: "Sign in", CurrentPath: "/admin/login", CSRFToken: csrf.Token(r), Flash: &Flash{Type: "danger", Message: "Invalid username or password"}}
 			w.WriteHeader(http.StatusUnauthorized)
@@ -170,6 +174,7 @@ func (h *Handlers) LoginPost() http.HandlerFunc {
 			return
 		}
 		clearLoginFailures(throttleKey)
+		_ = db.TouchAdminUserLastLogin(r.Context(), h.Pool, adminUser.AdminUserID)
 		raw, tokenHash, err := db.NewSessionToken()
 		if err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
@@ -185,10 +190,19 @@ func (h *Handlers) LoginPost() http.HandlerFunc {
 		if ip != "" {
 			ipPtr = &ip
 		}
-		if err := db.CreateAdminSession(r.Context(), h.Pool, tokenHash, h.Config.SessionIdle, ipPtr, uap); err != nil {
+		idle := sessionIdle(r.Context(), h.Pool, h.Config)
+		sessID, err := db.CreateAdminSession(r.Context(), h.Pool, adminUser.AdminUserID, tokenHash, idle, ipPtr, uap)
+		if err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
+		name := adminUser.DisplayName
+		if name == "" {
+			name = adminUser.Username
+		}
+		h.recordAuditSession(r, &sessID, &adminUser.AdminUserID, "admin.login", "admin_user", &adminUser.AdminUserID, &name, map[string]string{
+			"username": adminUser.Username,
+		})
 		http.SetCookie(w, &http.Cookie{
 			Name:     SessionCookieName,
 			Value:    hex.EncodeToString(raw[:]),
@@ -196,7 +210,7 @@ func (h *Handlers) LoginPost() http.HandlerFunc {
 			HttpOnly: true,
 			Secure:   h.Config.IsProduction(),
 			SameSite: http.SameSiteStrictMode,
-			MaxAge:   int(h.Config.SessionIdle / time.Second),
+			MaxAge:   int(idle / time.Second),
 		})
 		http.Redirect(w, r, "/admin/dashboard", http.StatusFound)
 	}
@@ -207,7 +221,13 @@ func (h *Handlers) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		raw, err := readSessionCookie(r)
 		if err == nil {
-			_ = db.RevokeSession(r.Context(), h.Pool, db.HashTokenHex(raw))
+			hash := db.HashTokenHex(raw)
+			sess, _ := db.GetSessionByTokenHash(r.Context(), h.Pool, hash)
+			if sess != nil {
+				adminID := sess.AdminUserID
+				h.recordAuditSession(r, &sess.SessionID, adminID, "admin.logout", "admin_session", &sess.SessionID, nil, nil)
+			}
+			_ = db.RevokeSession(r.Context(), h.Pool, hash)
 		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     SessionCookieName,

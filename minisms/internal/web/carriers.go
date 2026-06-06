@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package web
 
 import (
@@ -125,10 +126,6 @@ func (h *Handlers) SaveCarrierDLRSettings() http.HandlerFunc {
 		dlrStatusField := strings.TrimSpace(r.FormValue("dlr_status_field"))
 		dlrStatusMap := strings.TrimSpace(r.FormValue("dlr_status_map"))
 		dlrInboundSecretRaw := strings.TrimSpace(r.FormValue("dlr_inbound_secret"))
-		smppSourceTON := strings.TrimSpace(r.FormValue("smpp_source_addr_ton"))
-		smppSourceNPI := strings.TrimSpace(r.FormValue("smpp_source_addr_npi"))
-		smppDestTON := strings.TrimSpace(r.FormValue("smpp_dest_addr_ton"))
-		smppDestNPI := strings.TrimSpace(r.FormValue("smpp_dest_addr_npi"))
 		if callbackURLTemplate != "" {
 			resolved := strings.ReplaceAll(callbackURLTemplate, "{{message_id}}", "00000000-0000-0000-0000-000000000000")
 			u, e := url.Parse(resolved)
@@ -142,19 +139,6 @@ func (h *Handlers) SaveCarrierDLRSettings() http.HandlerFunc {
 				errs["dlr_status_map"] = "Must be a valid JSON object"
 			}
 		}
-		if !isValidSmppValue(smppSourceTON, true) {
-			errs["smpp_source_addr_ton"] = "Invalid TON value"
-		}
-		if !isValidSmppValue(smppDestTON, true) {
-			errs["smpp_dest_addr_ton"] = "Invalid TON value"
-		}
-		if !isValidSmppValue(smppSourceNPI, false) {
-			errs["smpp_source_addr_npi"] = "Invalid NPI value"
-		}
-		if !isValidSmppValue(smppDestNPI, false) {
-			errs["smpp_dest_addr_npi"] = "Invalid NPI value"
-		}
-
 		inboundSecret := c.DLRInboundSecret
 		if dlrInboundSecretRaw != "" {
 			enc, e := db.EncryptValue(h.Config.SecretKey, dlrInboundSecretRaw)
@@ -172,15 +156,12 @@ func (h *Handlers) SaveCarrierDLRSettings() http.HandlerFunc {
 				DLRMessageIDField:      strPtr(dlrMessageIDField),
 				DLRStatusField:         strPtr(dlrStatusField),
 				DLRStatusMap:           strPtr(dlrStatusMap),
-				SMPPSourceAddrTON:      defaultSmpp(smppSourceTON),
-				SMPPSourceAddrNPI:      defaultSmpp(smppSourceNPI),
-				SMPPDestAddrTON:        defaultSmpp(smppDestTON),
-				SMPPDestAddrNPI:        defaultSmpp(smppDestNPI),
 			})
 			if err != nil {
 				ServerError(w, r, err, h.Log, h.T500)
 				return
 			}
+			h.reloadRouteCache(r.Context())
 			c, _ = db.GetCarrier(r.Context(), h.Pool, cid)
 		}
 		maskedSecret := ""
@@ -209,6 +190,75 @@ func defaultSmpp(v string) string {
 		return "dynamic"
 	}
 	return v
+}
+
+func (h *Handlers) GetCarrierSMPPAddressing() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cid := chi.URLParam(r, "id")
+		c, err := db.GetCarrier(r.Context(), h.Pool, cid)
+		if err != nil {
+			ServerError(w, r, err, h.Log, h.T500)
+			return
+		}
+		_ = execT(w, h.CarrFragT, "smpp_addressing_panel", struct {
+			CarrierID, CSRFToken string
+			Carrier              *db.CarrierFull
+			Success              string
+			Errors               map[string]string
+		}{cid, csrf.Token(r), c, "", nil})
+	}
+}
+
+func (h *Handlers) SaveCarrierSMPPAddressing() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cid := chi.URLParam(r, "id")
+		_ = r.ParseForm()
+		c, err := db.GetCarrier(r.Context(), h.Pool, cid)
+		if err != nil {
+			ServerError(w, r, err, h.Log, h.T500)
+			return
+		}
+		errs := map[string]string{}
+		smppSourceTON := strings.TrimSpace(r.FormValue("smpp_source_addr_ton"))
+		smppSourceNPI := strings.TrimSpace(r.FormValue("smpp_source_addr_npi"))
+		smppDestTON := strings.TrimSpace(r.FormValue("smpp_dest_addr_ton"))
+		smppDestNPI := strings.TrimSpace(r.FormValue("smpp_dest_addr_npi"))
+		if !isValidSmppValue(smppSourceTON, true) {
+			errs["smpp_source_addr_ton"] = "Invalid TON value"
+		}
+		if !isValidSmppValue(smppDestTON, true) {
+			errs["smpp_dest_addr_ton"] = "Invalid TON value"
+		}
+		if !isValidSmppValue(smppSourceNPI, false) {
+			errs["smpp_source_addr_npi"] = "Invalid NPI value"
+		}
+		if !isValidSmppValue(smppDestNPI, false) {
+			errs["smpp_dest_addr_npi"] = "Invalid NPI value"
+		}
+		if len(errs) == 0 {
+			err = db.UpdateCarrierSMPPAddressing(r.Context(), h.Pool, cid, db.CarrierSMPPAddressingSettings{
+				SMPPSourceAddrTON: defaultSmpp(smppSourceTON),
+				SMPPSourceAddrNPI: defaultSmpp(smppSourceNPI),
+				SMPPDestAddrTON:   defaultSmpp(smppDestTON),
+				SMPPDestAddrNPI:   defaultSmpp(smppDestNPI),
+			})
+			if err != nil {
+				ServerError(w, r, err, h.Log, h.T500)
+				return
+			}
+			h.reloadRouteCache(r.Context())
+			c, _ = db.GetCarrier(r.Context(), h.Pool, cid)
+		}
+		if len(errs) > 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+		}
+		_ = execT(w, h.CarrFragT, "smpp_addressing_panel", struct {
+			CarrierID, CSRFToken string
+			Carrier              *db.CarrierFull
+			Success              string
+			Errors               map[string]string
+		}{cid, csrf.Token(r), c, map[bool]string{true: "", false: "SMPP parameters saved"}[len(errs) > 0], errs})
+	}
 }
 
 func isValidSmppValue(v string, ton bool) bool {

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Creates the minisms role and database (default password: password, matches .env.example).
+# Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
+# Creates the minisms role and database (set password via CHANGE_THIS_PASSWORD in examples).
 #
 #   cd minisms && ./scripts/bootstrap_postgres.sh
 # You will be prompted for sudo once unless you run as the postgres system user, e.g.:
@@ -31,4 +32,4 @@ if ! runas_postgres "${PSQL[@]}" -tAc "SELECT 1 FROM pg_database WHERE datname =
 fi
 
 echo "OK: role and database 'minisms' are ready."
-echo "DATABASE_URL=postgres://minisms:password@127.0.0.1:5432/minisms?sslmode=disable"
+echo "DATABASE_URL=postgres://minisms:CHANGE_THIS_PASSWORD@127.0.0.1:5432/minisms?sslmode=disable"

@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package db
 
 import (
@@ -53,13 +54,17 @@ func ListLedgerEntries(ctx context.Context, pool *pgxpool.Pool, carrierID string
 	return out, rows.Err()
 }
 
+type paymentRecorder interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
 // RecordPayment calls record_carrier_payment().
 func RecordPayment(
-	ctx context.Context, pool *pgxpool.Pool, carrierID string, amount, currency string,
+	ctx context.Context, q paymentRecorder, carrierID string, amount, currency string,
 	paymentRef, invoice *string, paymentDate time.Time, notes *string,
 ) (string, error) {
 	var out string
-	err := pool.QueryRow(ctx, `SELECT record_carrier_payment($1::uuid, $2::numeric(18,6), $3::char(3), $4, $5, $6::date, $7)::text`,
+	err := q.QueryRow(ctx, `SELECT record_carrier_payment($1::uuid, $2::numeric(18,6), $3::char(3), $4, $5, $6::date, $7)::text`,
 		carrierID, amount, currency, paymentRef, invoice, paymentDate.Format("2006-01-02"), notes,
 	).Scan(&out)
 	return out, err

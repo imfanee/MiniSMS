@@ -1,3 +1,4 @@
+// Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 package config
 
 import (
@@ -19,6 +20,8 @@ type Config struct {
 	AdminUsername              string
 	AdminPasswordHash          string
 	Port                       string
+	HTTPListenAddr             string // e.g. 127.0.0.1:18080; empty → ":"+PORT
+	CSRFTrustedOrigins         []string // CSRF_TRUSTED_ORIGINS comma-separated (behind nginx TLS)
 	TLSEnabled                 bool
 	TLSCertFile                string
 	TLSKeyFile                 string
@@ -26,7 +29,18 @@ type Config struct {
 	AppEnv                     string
 	CSRFSigningKey             []byte
 	SessionIdle                time.Duration
-	CarrierDispatchTimeoutSecs int
+	CarrierDispatchTimeoutSecs   int
+	HTTPCarrierInsecureTLS       bool // skip TLS verify for outbound HTTP carriers (self-signed Kamex, etc.)
+	SMPPServerEnabled          bool
+	SMPPListenAddr             string
+	SMPPSystemID               string
+	SMPPTLSEnabled             bool
+	SMPPTLSCertFile            string
+	SMPPTLSKeyFile             string
+	// Defaults for carrier/client SMPP rows when DB values are unset (ADR §7).
+	SMPPEnquireLinkSecs int
+	SMPPWindowSize      int
+	SMPPThroughputPerS  int
 }
 
 // Load reads configuration from the environment, optionally from a .env file.
@@ -35,6 +49,7 @@ func Load() (*Config, error) {
 
 	c := &Config{
 		Port:              getDefault("PORT", "8080"),
+		HTTPListenAddr:    strings.TrimSpace(os.Getenv("HTTP_LISTEN_ADDR")),
 		LogLevel:          getDefault("LOG_LEVEL", "info"),
 		AppEnv:            getDefault("APP_ENV", "development"),
 		DatabaseURL:       os.Getenv("DATABASE_URL"),
@@ -81,6 +96,45 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	c.CarrierDispatchTimeoutSecs = secs
+	c.HTTPCarrierInsecureTLS = parseBoolDefault("HTTP_CARRIER_INSECURE_TLS", false)
+
+	c.SMPPServerEnabled = parseBoolDefault("SMPP_SERVER_ENABLED", false)
+	c.SMPPListenAddr = getDefault("SMPP_LISTEN_ADDR", ":2775")
+	c.SMPPSystemID = getDefault("SMPP_SYSTEM_ID", "MiniSMS")
+	c.SMPPTLSEnabled = parseBoolDefault("SMPP_TLS_ENABLED", false)
+	c.SMPPTLSCertFile = strings.TrimSpace(os.Getenv("SMPP_TLS_CERT_FILE"))
+	c.SMPPTLSKeyFile = strings.TrimSpace(os.Getenv("SMPP_TLS_KEY_FILE"))
+	if c.SMPPTLSEnabled {
+		if c.SMPPTLSCertFile == "" {
+			return nil, fmt.Errorf("SMPP_TLS_CERT_FILE is required when SMPP_TLS_ENABLED=true")
+		}
+		if c.SMPPTLSKeyFile == "" {
+			return nil, fmt.Errorf("SMPP_TLS_KEY_FILE is required when SMPP_TLS_ENABLED=true")
+		}
+	}
+
+	c.SMPPEnquireLinkSecs, err = parseIntDefault("SMPP_ENQUIRE_LINK_S", 30, 5, 3600)
+	if err != nil {
+		return nil, err
+	}
+	c.SMPPWindowSize, err = parseIntDefault("SMPP_WINDOW_SIZE", 10, 1, 1000)
+	if err != nil {
+		return nil, err
+	}
+	c.SMPPThroughputPerS, err = parseIntDefault("SMPP_THROUGHPUT_PER_S", 50, 1, 10000)
+	if err != nil {
+		return nil, err
+	}
+
+	if raw := strings.TrimSpace(os.Getenv("CSRF_TRUSTED_ORIGINS")); raw != "" {
+		for _, o := range strings.Split(raw, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				c.CSRFTrustedOrigins = append(c.CSRFTrustedOrigins, o)
+			}
+		}
+	}
+
 	if c.TLSEnabled {
 		if c.TLSCertFile == "" {
 			return nil, fmt.Errorf("TLS_CERT_FILE is required when TLS_ENABLED=true")
@@ -150,4 +204,12 @@ func parseBoolDefault(name string, def bool) bool {
 // IsProduction returns true when the app should use stricter security (e.g. Secure cookies).
 func (c *Config) IsProduction() bool {
 	return c.AppEnv == "production"
+}
+
+// HTTPAddr is the address passed to http.Server (Listen).
+func (c *Config) HTTPAddr() string {
+	if c.HTTPListenAddr != "" {
+		return c.HTTPListenAddr
+	}
+	return ":" + c.Port
 }

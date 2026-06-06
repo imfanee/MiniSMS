@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "content"}}
 <div class="d-flex justify-content-between align-items-center mb-3">
 	<h1 class="h4 mb-0">Audit Log</h1>
@@ -10,12 +11,13 @@
 			<thead>
 				<tr>
 					<th>Created At (UTC)</th>
+					<th>User</th>
 					<th>Action</th>
-					<th>Actor Type</th>
-					<th>Actor ID</th>
 					<th>Entity Type</th>
 					<th>Entity ID</th>
-					<th>Metadata</th>
+					<th>Entity Name</th>
+					<th>Payload</th>
+					<th>IP</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -23,17 +25,21 @@
 					{{range .Rows}}
 					<tr>
 						<td class="text-nowrap">{{.CreatedAt.UTC.Format "2006-01-02 15:04:05"}}</td>
+						<td>
+							<div class="fw-semibold">{{.ActorName}}</div>
+							{{if .ActorUsername}}<div class="small text-secondary">{{.ActorUsername}}</div>{{end}}
+						</td>
 						<td><span class="badge bg-info-subtle text-info-emphasis">{{.Action}}</span></td>
-						<td>{{.ActorType}}</td>
-						<td>{{if .ActorID}}{{.ActorID}}{{else}}-{{end}}</td>
-						<td>{{if .EntityType}}{{.EntityType}}{{else}}-{{end}}</td>
-						<td>{{if .EntityID}}{{.EntityID}}{{else}}-{{end}}</td>
-						<td><code class="small">{{if .Meta}}{{.Meta}}{{else}}-{{end}}</code></td>
+						<td>{{.EntityType}}</td>
+						<td class="small text-break">{{if .EntityID}}{{.EntityID}}{{else}}—{{end}}</td>
+						<td>{{if .EntityName}}{{.EntityName}}{{else}}—{{end}}</td>
+						<td><code class="small text-break">{{if .Payload}}{{.Payload}}{{else}}—{{end}}</code></td>
+						<td class="text-nowrap small">{{if .IPAddress}}{{.IPAddress}}{{else}}—{{end}}</td>
 					</tr>
 					{{end}}
 				{{else}}
 					<tr>
-						<td colspan="7" class="text-center text-secondary py-4">No audit entries found.</td>
+						<td colspan="8" class="text-center text-secondary py-4">No audit entries found.</td>
 					</tr>
 				{{end}}
 			</tbody>
@@ -41,4 +47,3 @@
 	</div>
 </div>
 {{end}}
-

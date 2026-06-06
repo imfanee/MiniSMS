@@ -1,0 +1,74 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "carrier_smpp_panel"}}
+<div id="carrier-smpp-panel" x-data="{showPassword:false}">
+  {{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+  <form class="row g-3" hx-post="/admin/carriers/{{.CarrierID}}/smpp-settings" hx-target="#carrier-smpp-panel" hx-swap="outerHTML">
+    <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+    <div class="col-md-4">
+      <label class="form-label">Session status</label>
+      <input class="form-control font-monospace" readonly value="{{.Carrier.SMPPStatus}}" />
+      <div class="form-text">Updated by the egress supervisor (read-only).</div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Bind mode</label>
+      <select class="form-select {{if index .Errors "smpp_bind_mode"}}is-invalid{{end}}" name="smpp_bind_mode">
+        <option value="tx" {{if eq .Carrier.SMPPBindMode "tx"}}selected{{end}}>tx — submit only</option>
+        <option value="trx" {{if eq .Carrier.SMPPBindMode "trx"}}selected{{end}}>trx — submit + deliver_sm DLR</option>
+      </select>
+      {{if index .Errors "smpp_bind_mode"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_bind_mode"}}</div>{{end}}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">SMSC host</label>
+      <input class="form-control {{if index .Errors "smpp_host"}}is-invalid{{end}}" name="smpp_host" value="{{if .Carrier.SMPPHost}}{{.Carrier.SMPPHost}}{{end}}" placeholder="smsc.carrier.example" />
+      {{if index .Errors "smpp_host"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_host"}}</div>{{end}}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Port</label>
+      <input class="form-control {{if index .Errors "smpp_port"}}is-invalid{{end}}" name="smpp_port" type="number" min="1" max="65535" value="{{if .Carrier.SMPPPort}}{{.Carrier.SMPPPort}}{{end}}" placeholder="2775" />
+      {{if index .Errors "smpp_port"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_port"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">System ID</label>
+      <input class="form-control font-monospace {{if index .Errors "smpp_system_id"}}is-invalid{{end}}" name="smpp_system_id" value="{{if .Carrier.SMPPSystemID}}{{.Carrier.SMPPSystemID}}{{end}}" />
+      {{if index .Errors "smpp_system_id"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_system_id"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Password</label>
+      <div class="input-group">
+        <input :type="showPassword ? 'text' : 'password'" class="form-control {{if index .Errors "smpp_password"}}is-invalid{{end}}" name="smpp_password" placeholder="leave blank to keep current" />
+        <button type="button" class="btn btn-outline-secondary" @click="showPassword = !showPassword"><span x-text="showPassword ? 'Hide' : 'Show'"></span></button>
+      </div>
+      {{if .MaskedPassword}}<div class="form-text">Saved: {{.MaskedPassword}}</div>{{end}}
+      {{if index .Errors "smpp_password"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_password"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">System type</label>
+      <input class="form-control" name="smpp_system_type" value="{{if .Carrier.SMPPSystemType}}{{.Carrier.SMPPSystemType}}{{end}}" placeholder="optional" />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label d-block">TLS</label>
+      <div class="form-check form-switch mt-2">
+        <input type="checkbox" class="form-check-input" role="switch" name="smpp_tls" {{if .Carrier.SMPPTLS}}checked{{end}} />
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Enquire link (s)</label>
+      <input class="form-control {{if index .Errors "smpp_enquire_link_s"}}is-invalid{{end}}" name="smpp_enquire_link_s" type="number" min="5" max="3600" value="{{.Carrier.SMPPEnquireLinkS}}" />
+      {{if index .Errors "smpp_enquire_link_s"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_enquire_link_s"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Window size</label>
+      <input class="form-control {{if index .Errors "smpp_window_size"}}is-invalid{{end}}" name="smpp_window_size" type="number" min="1" max="1000" value="{{.Carrier.SMPPWindowSize}}" />
+      {{if index .Errors "smpp_window_size"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_window_size"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Throughput (/s)</label>
+      <input class="form-control {{if index .Errors "smpp_throughput_per_s"}}is-invalid{{end}}" name="smpp_throughput_per_s" type="number" min="1" max="10000" value="{{.Carrier.SMPPThroughputPerS}}" />
+      {{if index .Errors "smpp_throughput_per_s"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_throughput_per_s"}}</div>{{end}}
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Save SMPP settings</button>
+    </div>
+  </form>
+</div>
+{{end}}

@@ -1,3 +1,5 @@
+<!-- Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. -->
+
 # MiniSMS Admin User Guide
 
 This guide helps you operate MiniSMS from the Admin UI. It is written for system operators who are comfortable with web admin tools.
@@ -26,15 +28,18 @@ MiniSMS also receives delivery receipts (DLRs) from carriers and forwards them t
 ### 1.2 Logging in
 
 1. Open your MiniSMS admin URL in a browser, for example: `https://your-domain/admin/login`.
-2. Enter your admin username and password.
+2. Enter your **admin username** and **password** (your account is stored in **Admin users**, not in a shared env password after initial setup).
 3. Click **Sign in**.
+
+On first install, the server creates one **super admin** from environment variables `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH` when the `admin_users` table is empty. Use that account to sign in, then create additional operators under **Admin users** (super admin only).
 
 If login fails:
 
 1. Check username/password carefully.
-2. Confirm Caps Lock is off.
-3. Try again from a private window.
-4. If still blocked, ask your DevOps owner to validate `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH`.
+2. Confirm your account is **Active** (super admin can re-enable under **Admin users**).
+3. Confirm Caps Lock is off.
+4. Try again from a private window.
+5. If still blocked, ask DevOps to verify the account exists in `admin_users` or, on a fresh DB only, that bootstrap env credentials match.
 
 Login abuse protection:
 
@@ -50,7 +55,8 @@ Session behavior:
 
 You work in a dark-themed interface with:
 
-- left navigation menu (active item highlighted)
+- left navigation menu (active item highlighted; items hidden if your account lacks permission)
+- **Sign out** at the bottom of the sidebar (ends your session and returns you to login)
 - flash messages (success/error notices)
 - HTMX partial updates (many actions update only part of the page)
 - LED footer branding at the bottom of the content area
@@ -72,6 +78,37 @@ Practical meaning of HTMX updates:
 - **DLR:** Delivery receipt callback from carrier after submit.
 - **Webhook:** HTTP endpoint receiving asynchronous events.
 - **In-Loss Delivery:** Whether MiniSMS allows sending through a carrier that would lose money on that route.
+- **Super admin:** Full access including Settings, Audit log, and Admin users.
+- **Permission:** A granular capability (for example `clients_view`) assigned to non–super admin accounts.
+
+### 1.5 Admin users and permissions (super admin)
+
+Open **Admin users** from the sidebar (visible only to super admins).
+
+| Task | Steps |
+|------|--------|
+| Add operator | **Add user** → username, display name, password, active → choose **Super admin** or select permissions → Save |
+| Edit permissions | Open user → adjust checkboxes by group (Dashboard, Carriers, Rate groups, …) → Save |
+| Disable access | Uncheck **Active** or remove sensitive permissions |
+| Protect last super admin | You cannot demote or deactivate the only remaining super admin |
+
+**Super-admin-only screens:** Settings, Audit log, Admin users. All other menu entries depend on permission keys below.
+
+| Permission key | Grants |
+|----------------|--------|
+| `dashboard_stats` | Dashboard stats and reports |
+| `carriers_view` / `carriers_edit` / `carriers_payment` | Carrier list, edit, ledger payments |
+| `rate_groups_view` / `rate_groups_edit` / `rate_groups_manage` | Rate groups and entries |
+| `routing_groups_view` / `routing_groups_edit` / `routing_groups_manage` | Routing groups and routes |
+| `clients_view` / `clients_edit` / `clients_payment` | Clients, edit, credit/payments |
+| `currencies_view` / `currencies_edit` | Currency registry |
+| `sender_ids_view` / `sender_ids_edit` | Sender ID library |
+| `sms_logs_view` | SMS Logs |
+| `simulate` | Diagnoses — simulate and test send |
+
+Super admins implicitly have every permission above plus Settings, Audit log, and Admin users.
+
+> **Warning (Security):** Share passwords only through your organization’s secure channel. Rotate credentials after staff changes.
 
 ---
 
@@ -197,14 +234,36 @@ Actions:
 
 ### 5.2 Carrier detail tabs
 
-You manage a carrier through tabs:
+Primary navigation on the carrier detail page:
 
-- **Auth Headers**
-- **Request Template**
+- **Interconnect** (HTTP or SMPP — choose type first)
+- **Auth Headers** (HTTP)
+- **Request Template** (HTTP)
 - **Sender IDs**
 - **Ledger**
 - **Usage**
+- **Invoices**
 - **DLR Settings**
+- **SMPP** (when interconnect is SMPP — bind credentials, TON/NPI)
+
+### 5.2.1 Interconnect (HTTP vs SMPP)
+
+1. Open carrier → **Interconnect**.
+2. Select **HTTP** or **SMPP** and save.
+
+**HTTP interconnect**
+
+- **Endpoint** — URL, method (GET/POST), timeouts as configured.
+- **Request Template** — JSON, `application/x-www-form-urlencoded`, XML, or GET query string. Use the template editor; for binary or non-UTF8 bodies, use **base64** mode where offered.
+- **Auth Headers** — encrypted at rest; masked in UI.
+
+**SMPP interconnect**
+
+- Configure bind parameters on the **SMPP** tab (system ID, password, host/port).
+- Outbound dispatch uses SMPP `submit_sm` instead of HTTP.
+- TON/NPI fields may be static or `dynamic` per carrier.
+
+Switching interconnect type changes which downstream path MiniSMS uses; retest with a single message after any change.
 
 ### 5.3 Auth Headers
 
@@ -349,7 +408,88 @@ Low-balance alerts:
 - configured in Settings
 - used as operational warning thresholds
 
-### 5.7 DLR Settings (new)
+### 5.8 Invoices tab
+
+Generate PDF invoices for carrier usage over a date range. Summary cards at the top show:
+
+| Card | Meaning |
+|------|---------|
+| **Total Invoices** | Count of all invoices for this carrier |
+| **Pending** | Count of Unpaid + Partially Paid invoices |
+| **Unpaid Amount** | Sum of outstanding `pending_amount` on those invoices |
+
+**New Invoice:**
+
+1. Open carrier → **Invoices** → **New Invoice**.
+2. Set **From Date** / **To Date** (default: last calendar week Mon–Sun).
+3. **Preview** — downloads PDF without saving.
+4. **Generate Invoice** — saves record and PDF; appears in the table.
+
+**Invoice table columns:** number, dates, total amount, pending amount, status (Pending / Partially Paid / Paid), PDF download.
+
+**Recording payments:** Open **Ledger** → **Record Payment** → set **Payment Reference** to **Invoice** and select an open invoice. Pending amount and status update automatically.
+
+**Invoice header image:** Upload once under **Settings** (210 mm width recommended). Used on page 1 of all generated PDFs.
+
+### 5.7 DLR Settings (Kamex / Kannel-style HTTP)
+
+This tab controls callback interoperability with each carrier. **Kamex** (and Kannel-compatible gateways) use `dlr-mask` + `dlr-url` on the outbound GET query; Kamex then **calls your `dlr-url`**, replacing placeholders in that URL.
+
+#### Kamex DLR mask (`dlr-mask` in request template)
+
+| Bit value | Meaning |
+|-----------|---------|
+| 1 | Delivered to handset |
+| 2 | Non-delivered to handset |
+| 4 | Queued on SMSC |
+| 8 | Delivered to SMSC (submitted) |
+| 16 | Non-delivered to SMSC (rejected) |
+| **31** | All of the above (recommended for testing) |
+
+Put `dlr-mask=31` in the carrier **query template** (already required for IZZI Kamex).
+
+#### Kamex `dlr-url` placeholders (in DLR callback URL template)
+
+Configure **DLR callback URL template** so MiniSMS passes a URL **with Kamex placeholders** to the gateway. MiniSMS replaces only `{{message_id}}`; Kamex replaces `%d`, `%A`, etc. on callback.
+
+| Placeholder | Kamex fills with |
+|-------------|------------------|
+| `%d` | Numeric DLR status code (1, 2, 4, 8, 16) |
+| `%A` | DLR status text (e.g. `DELIVRD`) |
+| `%P` | Recipient MSISDN |
+| `%p` | Sender ID |
+| `%i` | SMSC id (e.g. `airtel-drc`) |
+| `%I` | SMSC message id |
+| `%t` / `%T` | Submit / done timestamps |
+
+**Recommended template for MiniSMS:**
+
+```text
+https://your-minisms-host/api/v1/dlr/{{message_id}}?status=%d&answer=%A&to=%P&from=%p&smsc=%i&smsc_msgid=%I
+```
+
+**DLR status field name:** `status` (query param filled from `%d`).
+
+**DLR status map (JSON)** — map Kamex numeric codes to MiniSMS values:
+
+```json
+{
+  "1": "delivered",
+  "2": "undelivered",
+  "4": "queued",
+  "8": "submitted",
+  "16": "undelivered",
+  "DELIVRD": "delivered",
+  "UNDELIV": "undelivered",
+  "REJECTD": "rejected"
+}
+```
+
+> **Important:** If the callback URL template has **no** `%d` / `%A` placeholders, Kamex may call `/api/v1/dlr/{id}` with an empty query string and status will stay `unknown`.
+
+Official references: [Kamex `doc/dlr.md`](https://github.com/vaska94/Kamex/blob/main/doc/dlr.md), [OpenAPI `dlr-mask`](https://github.com/vaska94/Kamex/blob/main/doc/openapi.yaml).
+
+### 5.7.1 DLR Settings (general)
 
 This tab controls callback interoperability with each carrier.
 
@@ -543,6 +683,7 @@ You see columns for identity, status, currency, and balance context. Use this pa
 - **Info**
 - **Sender IDs**
 - **Ledger**
+- **Invoices**
 - **API Key**
 - **DLR Webhook**
 
@@ -577,7 +718,13 @@ Add credit:
 
 Ledger records include debit and credit events for traceability.
 
-### 8.6 API Key tab
+When adding credit, **Payment Reference** can link to an open invoice (same behavior as carrier ledger payments).
+
+### 8.6 Invoices tab
+
+Same workflow as carrier invoices (§5.8): summary cards, paginated list, **New Invoice** with Preview/Generate, PDF download. Invoices reflect client SMS usage and charges for the selected period.
+
+### 8.7 API Key tab
 
 Generate key:
 
@@ -592,7 +739,16 @@ Rotate key:
 2. Ask client to switch traffic.
 3. Revoke old key after cutover.
 
-### 8.7 DLR Webhook tab (new)
+### 8.8 DLR Webhook tab
+
+Configure how MiniSMS forwards delivery receipts to your application.
+
+#### DLR delivery method
+
+- **POST** (default) — JSON body; customize via **Body template**.
+- **GET** — query string; customize via **Query template**.
+
+Defaults are pre-filled. Use placeholders such as `{{message_id}}`, `{{status}}`, `{{to}}`, `{{from}}` per the in-form hints.
 
 #### DLR Webhook URL
 
@@ -682,17 +838,46 @@ You can inspect:
 
 ## 10. Audit Log
 
-Audit Log records administrative changes.
+**Audit log** is available to **super admins** only (`/admin/audit-log`).
 
-Use it to:
+It records selected administrative actions in an **append-only** table (rows cannot be updated or deleted through normal SQL).
 
-1. identify who changed what
-2. track when config changed
-3. support incident review and compliance evidence
+### 10.1 What you see
 
-Retention:
+Typical columns:
 
-- append-only operational history (no routine auto-purge by default)
+| Column | Meaning |
+|--------|---------|
+| Time | When the action occurred (`created_at`) |
+| Admin user | Display name / username of the signed-in operator (`admin_user_id`) |
+| Action | Event type (for example `admin.login`, `carrier.update`) |
+| Entity | Type and name/ID of the affected object |
+| IP address | Client IP when available |
+| Payload | JSON summary of relevant fields (expand in UI if shown) |
+
+Older rows created before migration `009` may show a blank admin user (no backfill).
+
+### 10.2 Actions recorded today
+
+Examples (not exhaustive):
+
+| Action | When |
+|--------|------|
+| `admin.login` / `admin.logout` | Sign in / sign out |
+| `admin_user.create` / `admin_user.update` | Admin user CRUD |
+| `setting.update` | System Settings change |
+| `carrier.create` / `carrier.update` / `carrier.payment` | Carrier lifecycle and ledger payment |
+| `client.create` / `client.update` / `client.credit` | Client lifecycle and credit |
+
+Additional mutations may be added in future releases; absence of an audit row does not mean no change occurred if that action is not yet instrumented.
+
+### 10.3 Operational use
+
+1. Filter or scan by time during an incident.
+2. Correlate **Admin user** with operator accounts under **Admin users**.
+3. Use **Payload** to see what fields changed without opening every entity.
+
+Retention: no routine auto-purge by default (database growth is an ops concern).
 
 ---
 
@@ -711,6 +896,7 @@ System Settings control global runtime behavior.
 | `api_rate_limit_per_minute` | `60` | per-client API throttle | abuse prevention/throughput |
 | `failover_enabled` | `true` | enable multi-carrier failover | emergency control only |
 | `carrier_low_balance_alert` | `10.00` | carrier low balance warning | finance threshold tuning |
+| `invoice_header_image` | `assets/invoice_header.png` | PNG/JPEG for invoice PDF page 1 | branding; upload via Settings form |
 
 > **Warning (Service risk):** Disabling failover or setting very low timeout values can sharply increase failed sends.
 
@@ -792,6 +978,14 @@ System Settings control global runtime behavior.
 3. Review overlap/order.
 4. Validate expected match by prefix test.
 5. Monitor first post-cutover traffic in logs.
+
+### 12.9 Onboarding a new admin operator
+
+1. Super admin signs in → **Admin users** → **Add user**.
+2. Set username, display name, strong password, **Active**.
+3. Either enable **Super admin** (full access) or assign least-privilege checkboxes.
+4. Operator signs in and confirms sidebar shows expected sections only.
+5. After role change, operator should sign out and back in if menu looks stale.
 
 ---
 

@@ -1,3 +1,4 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "dlr_panel"}}
 <div id="carrier-dlr-panel" x-data="{showSecret:false}">
   {{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
@@ -34,35 +35,6 @@
       <label class="form-label">DLR Status Map (JSON)</label>
       <textarea class="form-control font-monospace {{if index .Errors "dlr_status_map"}}is-invalid{{end}}" rows="3" name="dlr_status_map" placeholder='{"DELIVRD":"delivered","UNDELIV":"undelivered"}'>{{if .Carrier.DLRStatusMap}}{{.Carrier.DLRStatusMap}}{{end}}</textarea>
       {{if index .Errors "dlr_status_map"}}<div class="invalid-feedback d-block">{{index .Errors "dlr_status_map"}}</div>{{end}}
-    </div>
-    <div class="col-12"><h6 class="mb-2">SMPP Parameters</h6></div>
-    <div class="col-md-3">
-      <label class="form-label">Source Addr TON</label>
-      <select class="form-select {{if index .Errors "smpp_source_addr_ton"}}is-invalid{{end}}" name="smpp_source_addr_ton">
-        {{template "ton_options" .Carrier.SMPPSourceAddrTON}}
-      </select>
-      {{if index .Errors "smpp_source_addr_ton"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_source_addr_ton"}}</div>{{end}}
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">Source Addr NPI</label>
-      <select class="form-select {{if index .Errors "smpp_source_addr_npi"}}is-invalid{{end}}" name="smpp_source_addr_npi">
-        {{template "npi_options" .Carrier.SMPPSourceAddrNPI}}
-      </select>
-      {{if index .Errors "smpp_source_addr_npi"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_source_addr_npi"}}</div>{{end}}
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">Dest Addr TON</label>
-      <select class="form-select {{if index .Errors "smpp_dest_addr_ton"}}is-invalid{{end}}" name="smpp_dest_addr_ton">
-        {{template "ton_options" .Carrier.SMPPDestAddrTON}}
-      </select>
-      {{if index .Errors "smpp_dest_addr_ton"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_dest_addr_ton"}}</div>{{end}}
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">Dest Addr NPI</label>
-      <select class="form-select {{if index .Errors "smpp_dest_addr_npi"}}is-invalid{{end}}" name="smpp_dest_addr_npi">
-        {{template "npi_options" .Carrier.SMPPDestAddrNPI}}
-      </select>
-      {{if index .Errors "smpp_dest_addr_npi"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_dest_addr_npi"}}</div>{{end}}
     </div>
     <div class="col-12">
       <button class="btn btn-primary" type="submit">Save DLR Settings</button>

@@ -1,10 +1,10 @@
 {/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "navbar"}}
 <aside id="ms-sidebar" class="ms-sidebar">
-	<div class="ms-sidebar-brand">
-		<div class="ms-brand-dot"></div>
-		<span class="ms-sidebar-label">MiniSMS</span>
-	</div>
+	<a href="/admin/dashboard" hx-boost="false" class="ms-sidebar-brand" aria-label="MiniSMS home">
+		<img src="/static/img/minisms-logo.png" alt="MiniSMS" class="ms-brand-logo" width="753" height="272" />
+		<img src="/static/img/favico.png" alt="" class="ms-brand-icon" width="202" height="184" aria-hidden="true" />
+	</a>
 	<nav class="ms-sidebar-nav" aria-label="Main navigation">
 		<a href="/admin/dashboard" hx-boost="false" class="ms-nav-item{{if eq .CurrentPath "/admin/dashboard"}} active{{end}}" aria-label="Dashboard">
 			<span class="ms-nav-icon" aria-hidden="true">

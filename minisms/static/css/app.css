@@ -273,21 +273,49 @@ body {
 .ms-sidebar-brand {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
-  padding: 16px 14px 12px;
+  padding: 14px 12px 12px;
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
   min-height: 56px;
   overflow: hidden;
   flex-shrink: 0;
+  text-decoration: none !important;
 }
 
-.ms-brand-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22d3ee;
-  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.22);
+.ms-sidebar-brand:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ms-brand-logo {
+  display: block;
+  height: 36px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
   flex-shrink: 0;
+}
+
+.ms-brand-icon {
+  display: none;
+  height: 28px;
+  width: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.ms-sidebar.ms-collapsed .ms-sidebar-brand {
+  justify-content: center;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.ms-sidebar.ms-collapsed .ms-brand-logo {
+  display: none;
+}
+
+.ms-sidebar.ms-collapsed .ms-brand-icon {
+  display: block;
 }
 
 /* ── Nav ── */

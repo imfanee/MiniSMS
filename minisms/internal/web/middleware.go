@@ -38,7 +38,7 @@ func CSRF(cfg *config.Config) func(http.Handler) http.Handler {
 			fmt.Sprintf("127.0.0.1:%s", cfg.Port),
 			fmt.Sprintf("localhost:%s", cfg.Port),
 			fmt.Sprintf("[::1]:%s", cfg.Port),
-			"sms.telecotech.net:18080",
+			"staging.example.com:18080",
 		)
 	}
 	if hosts := csrfTrustedHosts(cfg.CSRFTrustedOrigins, extra...); len(hosts) > 0 {

@@ -16,7 +16,7 @@ Use this page as the entry point for operators, integrators, and developers.
 |----------|----------|----------|
 | [MiniSMS_Admin_Guide.md](./MiniSMS_Admin_Guide.md) | Admin UI users | Login, RBAC, carriers, clients, invoices, SMS logs, settings |
 | [MiniSMS_API_Guide.md](./MiniSMS_API_Guide.md) | Client integrators | REST API: send, balance, status, DLR webhooks |
-| [examples/Telecotech_Live_Test_HTTP_Send.md](./examples/Telecotech_Live_Test_HTTP_Send.md) | Integrators / QA | Worked HTTP curl example |
+| [examples/HTTP_API_Send_Example.md](./examples/HTTP_API_Send_Example.md) | Integrators / QA | Worked HTTP curl example |
 | [MiniSMS_Product_Documentation.md](./MiniSMS_Product_Documentation.md) | Product / architecture | System overview, concepts, data model |
 | [MiniSMS_SMPP_Guide.md](./MiniSMS_SMPP_Guide.md) | SMPP operators | ESME binds, carrier/client SMPP tabs |
 | [MiniSMS_DevOps_Guide.md](./MiniSMS_DevOps_Guide.md) | DevOps | Install, build, schema, systemd, nginx, env vars |
@@ -71,8 +71,8 @@ The application **does not** auto-apply schema on startup.
 
 | Environment | Admin / API base | Notes |
 |-------------|------------------|-------|
-| Production | `https://sms.telecotech.net` | nginx → `127.0.0.1:8080` |
-| Staging | `https://sms.telecotech.net:18080` | `minisms_test`, app `127.0.0.1:18081` |
+| Production | `https://YOUR_DOMAIN` | nginx → `127.0.0.1:8080` |
+| Staging | `https://YOUR_DOMAIN:18080` | `minisms_test`, app `127.0.0.1:18081` (optional; can be stopped) |
 
 ---
 
@@ -82,7 +82,7 @@ The application **does not** auto-apply schema on startup.
 |------|--------|
 | Last deploy | 2026-06-05T23:09:41Z (`20260605T230941Z`) |
 | Build | `004b5f3` |
-| Services | `minisms` + `minisms-staging` active |
+| Services | `minisms` active; `minisms-staging` **stopped** |
 
 Details: [agent/OPERATIONS.md](./agent/OPERATIONS.md).
 

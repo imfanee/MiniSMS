@@ -7,7 +7,7 @@ This guide helps you integrate your application with MiniSMS to send SMS and rec
 You use this guide for the **client-facing API only**. It does not cover the admin UI.
 
 **Related docs:** [Admin Guide](./MiniSMS_Admin_Guide.md) (operators), [Product Documentation](./MiniSMS_Product_Documentation.md), [documentation index](./README.md).  
-**Worked example (this deployment):** [Telecotech Live Test HTTP send](./examples/Telecotech_Live_Test_HTTP_Send.md).
+**Worked example:** [HTTP API send](./examples/HTTP_API_Send_Example.md).
 
 ---
 

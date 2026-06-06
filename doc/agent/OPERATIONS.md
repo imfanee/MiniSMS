@@ -14,15 +14,15 @@
 | Item | Value |
 |------|--------|
 | **Last deploy** | 2026-06-05T23:09:41Z (`20260605T230941Z`) |
-| **Environments** | Production + staging (same binary) |
-| **Git commit** | `004b5f3` |
+| **Environments** | Production **active**; staging **stopped** (2026-06-06) |
+| **Git commit** | `5ca3ccc` (repo); deployed binary `004b5f3` until next deploy |
 | **Schema** | `deploy/minisms_db.sql` (consolidated; replaces migrations 001–014) |
 | **Release dir** | `/opt/minisms/releases/20260605T230941Z/` |
 
 | Check | Production | Staging |
 |-------|------------|---------|
-| URL | `https://sms.telecotech.net` | `https://sms.telecotech.net:18080` |
-| Service | `minisms.service` | `minisms-staging.service` |
+| URL | `https://YOUR_DOMAIN` | `https://YOUR_DOMAIN:18080` (staging stopped) |
+| Service | `minisms.service` **active** | `minisms-staging.service` **inactive** |
 | Database | `minisms` | `minisms_test` |
 | App bind | `127.0.0.1:8080` | `127.0.0.1:18081` |
 | SMPP ingress | disabled | disabled |

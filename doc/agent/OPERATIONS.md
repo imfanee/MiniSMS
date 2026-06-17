@@ -13,11 +13,12 @@
 
 | Item | Value |
 |------|--------|
-| **Last deploy** | 2026-06-05T23:09:41Z (`20260605T230941Z`) |
+| **Last deploy** | 2026-06-17T15:56:15Z (Kamex DLR encoding + multi-bit fixes) |
 | **Environments** | Production **active**; staging **stopped** (2026-06-06) |
-| **Git commit** | `5ca3ccc` (repo); deployed binary `004b5f3` until next deploy |
-| **Schema** | `deploy/minisms_db.sql` (consolidated; replaces migrations 001–014) |
-| **Release dir** | `/opt/minisms/releases/20260605T230941Z/` |
+| **Git commit** | `3cce913` (on `main`); this is the deployed binary |
+| **Binary** | `/usr/local/bin/minisms` (built from `/usr/src/MiniSMS/minisms`, installed by hand) |
+| **Schema** | **Live DB is authoritative.** `deploy/minisms_db.sql` is a fresh-install/hybrid file and is NOT applied to the populated prod DB; upgrades apply only additive deltas after a restored-copy rehearsal. |
+| **/opt/minisms** | Data-only working dir (`assets/`, `invoices/`); contains no source code or `releases/` as of this deploy. |
 
 | Check | Production | Staging |
 |-------|------------|---------|
@@ -115,53 +116,57 @@ The app **does not** auto-apply schema on startup. For schema changes:
 
 ## 5. Deploy runbook
 
+Model as of 2026-06-17: single binary at `/usr/local/bin/minisms`; `/opt/minisms` is data-only (`assets/`, `invoices/`); no `releases/` or `/opt/minisms/bin`. Staging service is stopped.
+
 ### Preconditions
 
-- `go vet ./...` and `go test -race ./...` green
+- `go vet ./...` and `go test ./...` green (from `minisms/`)
 - Explicit deploy approval
-- Schema already applied on target DB (or run `make schema` before first start)
+- If the code expects new columns/objects: diff the LIVE DB against a scratch DB built from `deploy/minisms_db.sql`, and apply only additive deltas (see §4). Do NOT apply the whole schema file to the populated prod DB.
 
-### Standard deploy (production + staging)
+### Standard deploy (production)
 
 ```bash
 TS=$(date -u +%Y%m%dT%H%M%SZ)
-REL="/opt/minisms/releases/${TS}"
-mkdir -p "$REL"
-DATABASE_URL=$(grep '^DATABASE_URL=' /etc/minisms/minisms.env | cut -d= -f2-)
+BK="/root/minisms-upgrade-backup-${TS}"; mkdir -p "$BK"
+# Load DATABASE_URL literally (bcrypt hash etc. contain $, so never `set -a; . env`)
+DATABASE_URL=$(grep '^DATABASE_URL=' /etc/minisms/minisms.env | cut -d= -f2- | sed -E "s/^['\"]//; s/['\"]$//")
 
-pg_dump -Fc -f "$REL/minisms_${TS}.dump" "$DATABASE_URL"
-cp -a /usr/local/bin/minisms "$REL/minisms.bin.prev"
-cp -a /opt/minisms/bin/minisms "$REL/minisms.opt.prev"
-cp -a /opt/minisms/bin/minisms-staging "$REL/minisms-staging.prev"
-cp -a /etc/minisms/minisms.env "$REL/minisms.env.prev"
+# 1) Backups
+pg_dump -Fc -f "$BK/minisms_db.dump" "$DATABASE_URL"
+cp -a /usr/local/bin/minisms "$BK/minisms.binary.bak"
+tar -C /opt -czf "$BK/opt_minisms_folder.tgz" minisms
 
-cd /usr/src/MiniSMS/minisms
-COMMIT=$(git rev-parse --short HEAD)
-BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-CGO_ENABLED=0 go build -trimpath \
-  -ldflags="-s -w -X main.version=${COMMIT} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
-  -o "$REL/minisms.new" ./cmd/minisms
+# 2) Build
+cd /usr/src/MiniSMS/minisms && go build -o /tmp/minisms_new ./cmd/minisms
 
-install -m 0755 "$REL/minisms.new" /usr/local/bin/minisms
-install -m 0755 -o minisms -g minisms "$REL/minisms.new" /opt/minisms/bin/minisms
-install -m 0755 -o minisms -g minisms "$REL/minisms.new" /opt/minisms/bin/minisms-staging
+# 3) (Recommended) Rehearse on a restored copy before touching live:
+#    createdb ms_rehearsal; pg_restore -d ms_rehearsal "$BK/minisms_db.dump"
+#    run /tmp/minisms_new with DATABASE_URL=...ms_rehearsal PORT=19099 TLS_ENABLED=false → expect /healthz 200
 
-systemctl restart minisms.service minisms-staging.service
-sleep 3
-curl -sS http://127.0.0.1:8080/healthz
-curl -skS https://127.0.0.1:18080/healthz
+# 4) Cutover with health check + auto-rollback
+cp -a /usr/local/bin/minisms "/usr/local/bin/minisms.pre-upgrade-${TS}"
+systemctl stop minisms
+install -m 0755 /tmp/minisms_new /usr/local/bin/minisms
+systemctl start minisms
+code=$(curl -s --retry 30 --retry-delay 1 --retry-connrefused -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/healthz)
+if [ "$code" != 200 ]; then
+  systemctl stop minisms
+  install -m 0755 "/usr/local/bin/minisms.pre-upgrade-${TS}" /usr/local/bin/minisms
+  systemctl start minisms
+  echo "ROLLED BACK"; fi
 ```
 
-> Do not `source /etc/minisms/minisms.env` with `set -u` — bcrypt hash may contain `$`.
+> Health-check the DIRECT app port `http://127.0.0.1:8080/healthz` (what nginx proxies to), not `https` via nginx; a transient nginx probe can false-negative and trigger an unnecessary rollback.
 
-### Rollback (binary only)
+### Rollback (binary)
 
 ```bash
-REL=/opt/minisms/releases/20260605T230941Z
-install -m 0755 "$REL/minisms.bin.prev" /usr/local/bin/minisms
-install -m 0755 -o minisms -g minisms "$REL/minisms.opt.prev" /opt/minisms/bin/minisms
-install -m 0755 -o minisms -g minisms "$REL/minisms-staging.prev" /opt/minisms/bin/minisms-staging
-systemctl restart minisms.service minisms-staging.service
+systemctl stop minisms
+install -m 0755 /usr/local/bin/minisms.pre-upgrade-<TS> /usr/local/bin/minisms   # or $BK/minisms.binary.bak
+systemctl start minisms
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/healthz
+# DB rollback if ever needed: pg_restore from $BK/minisms_db.dump
 ```
 
 ### SMPP network
@@ -214,10 +219,12 @@ go test -race ./... -count=1
 
 | Item | Mitigation |
 |------|------------|
-| Carrier SSRF | `carrier/urlguard.go` |
+| Carrier dispatch SSRF | `carrier/urlguard.go` (`ValidateEndpointURL`) |
+| DLR client-webhook SSRF (2026-06-17) | `ValidateEndpointURL` on forward URL; blocked forwards recorded `blocked` |
+| Carrier query `+`/`&`/`=` corruption (2026-06-17) | `carrier.InjectQueryVariables` URL-encodes each query value (`+` → `%2B`, not a space) |
+| DLR multi-bit `dlr-mask` (2026-06-17) | `db.UpdateDLRReceived` applies only while non-final; an intermediate (SMSC ACK/queued) never blocks or overwrites the final |
 | Invoice/path traversal | `pathutil.ResolveUnder` |
 | API body DoS | 64KB `MaxBytesReader` on send |
-| DLR replay | Skip if `dlr_received_at` set |
 | GET logout CSRF | `POST /admin/logout` |
 | SMPP CIDR | Default deny when allowlist empty |
 | Invoice header upload | Magic-byte validation |

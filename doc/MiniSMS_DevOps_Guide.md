@@ -115,7 +115,7 @@ cd /usr/src/MiniSMS/minisms
 make schema DB_URL='postgres://minisms:change_me_now@localhost:5432/minisms?sslmode=disable'
 ```
 
-The application **does not** auto-apply schema on startup. Apply explicitly when provisioning a database or after schema changes. Deploy runbook: [agent/OPERATIONS.md](./agent/OPERATIONS.md).
+The application **does not** auto-apply schema on startup. `make schema` is for **provisioning a fresh database** only. `deploy/minisms_db.sql` is a fresh-install/hybrid file (plain `CREATE TABLE` for base tables): running it against a **populated** database will error. To upgrade an existing/production DB, treat the **live DB schema as authoritative**, diff it against a scratch DB built from the file, and apply only additive deltas after rehearsing on a restored copy. Deploy + upgrade runbook: [agent/OPERATIONS.md](./agent/OPERATIONS.md).
 
 **Note:** `audit_log` is immutable; do not run UPDATE backfills against it. Historical audit rows may have NULL `admin_user_id`.
 

@@ -18,7 +18,7 @@ import (
 
 func (h *Handlers) HandleDLR() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		payloadFields, _ := parseDLRPayload(r)
+		payloadFields, queryParams, bodyBytes := parseDLRPayload(r)
 		messageID := strings.TrimSpace(chi.URLParam(r, "message_id"))
 		if messageID == "" {
 			for _, k := range []string{"ref", "msgid", "reference"} {
@@ -60,39 +60,45 @@ func (h *Handlers) HandleDLR() http.HandlerFunc {
 		if proc == nil {
 			proc = &dlr.Processor{Pool: h.Pool, SecretKey: h.Config.SecretKey}
 		}
-		_ = proc.HandleInbound(r.Context(), messageID, payloadFields)
+		_ = proc.HandleInbound(r.Context(), messageID, payloadFields, dlr.InboundFromHTTP(r, queryParams, bodyBytes))
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 
-func parseDLRPayload(r *http.Request) (map[string]string, []byte) {
-	out := map[string]string{}
-	for k, vals := range r.URL.Query() {
-		if len(vals) > 0 {
-			out[strings.ToLower(strings.TrimSpace(k))] = strings.TrimSpace(vals[0])
+func parseDLRPayload(r *http.Request) (payloadFields map[string]string, queryParams map[string]string, bodyBytes []byte) {
+	payloadFields = map[string]string{}
+	queryParams = map[string]string{}
+	if raw := strings.TrimSpace(r.URL.RawQuery); raw != "" {
+		if vals, err := url.ParseQuery(raw); err == nil {
+			for k, v := range vals {
+				if len(v) > 0 {
+					queryParams[k] = v[0]
+					payloadFields[strings.ToLower(strings.TrimSpace(k))] = strings.TrimSpace(v[0])
+				}
+			}
 		}
 	}
-	bodyBytes, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	bodyBytes, _ = io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	_ = r.Body.Close()
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	if len(bodyBytes) == 0 {
-		return out, bodyBytes
+		return payloadFields, queryParams, bodyBytes
 	}
 	var asJSON map[string]any
 	if err := json.Unmarshal(bodyBytes, &asJSON); err == nil {
 		for k, v := range asJSON {
-			out[strings.ToLower(strings.TrimSpace(k))] = strings.TrimSpace(toString(v))
+			payloadFields[strings.ToLower(strings.TrimSpace(k))] = strings.TrimSpace(toString(v))
 		}
-		return out, bodyBytes
+		return payloadFields, queryParams, bodyBytes
 	}
 	if vals, err := url.ParseQuery(string(bodyBytes)); err == nil {
 		for k, v := range vals {
 			if len(v) > 0 {
-				out[strings.ToLower(strings.TrimSpace(k))] = strings.TrimSpace(v[0])
+				payloadFields[strings.ToLower(strings.TrimSpace(k))] = strings.TrimSpace(v[0])
 			}
 		}
 	}
-	return out, bodyBytes
+	return payloadFields, queryParams, bodyBytes
 }
 
 func toString(v any) string {

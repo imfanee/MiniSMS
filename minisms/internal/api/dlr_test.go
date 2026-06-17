@@ -73,3 +73,18 @@ func TestVerifyInboundDLRSecret(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestParseDLRPayloadSeparatesQueryAndBody(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/dlr/abc?status=DELIVRD&ref=xyz", strings.NewReader(`{"status":"DELIVRD","note":"ok"}`))
+	req.Header.Set("Content-Type", "application/json")
+	fields, query, body := parseDLRPayload(req)
+	if query["status"] != "DELIVRD" || query["ref"] != "xyz" {
+		t.Fatalf("query: %#v", query)
+	}
+	if string(body) != `{"status":"DELIVRD","note":"ok"}` {
+		t.Fatalf("body: %q", string(body))
+	}
+	if fields["status"] != "DELIVRD" {
+		t.Fatalf("fields status: %q", fields["status"])
+	}
+}

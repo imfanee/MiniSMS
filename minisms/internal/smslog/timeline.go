@@ -30,12 +30,20 @@ type TimelineEvent struct {
 
 // TimelineEventView is formatted for admin templates.
 type TimelineEventView struct {
-	AtDisplay string
-	Kind      string
-	Title     string
-	Detail    string
-	MetaJSON  string
-	Badge     string
+	AtDisplay       string
+	Kind            string
+	Title           string
+	Detail          string
+	MetaJSON        string
+	Badge           string
+	MappedStatus    string
+	HTTPMethod      string
+	RequestPath     string
+	QueryParamsJSON string
+	RequestBody     string
+	SMPPReceiptRef  string
+	SMPPReceiptStat string
+	Channel         string
 }
 
 func NewEvent(kind, title, detail string, meta map[string]any) TimelineEvent {
@@ -82,7 +90,9 @@ func FormatViews(events []TimelineEvent) []TimelineEventView {
 			Detail:    e.Detail,
 			Badge:     timelineBadge(e.Kind),
 		}
-		if len(e.Meta) > 0 {
+		if e.Kind == EventDLRReceived {
+			populateDLRReceivedView(&v, e.Meta)
+		} else if len(e.Meta) > 0 {
 			if b, err := json.MarshalIndent(e.Meta, "", "  "); err == nil {
 				v.MetaJSON = string(b)
 			}
@@ -90,6 +100,55 @@ func FormatViews(events []TimelineEvent) []TimelineEventView {
 		out = append(out, v)
 	}
 	return out
+}
+
+func populateDLRReceivedView(v *TimelineEventView, meta map[string]any) {
+	if meta == nil {
+		return
+	}
+	if s, ok := metaString(meta, "mapped_status"); ok {
+		v.MappedStatus = s
+	}
+	if s, ok := metaString(meta, "channel"); ok {
+		v.Channel = s
+	}
+	if s, ok := metaString(meta, "http_method"); ok {
+		v.HTTPMethod = s
+	}
+	if s, ok := metaString(meta, "request_path"); ok {
+		v.RequestPath = s
+	}
+	if s, ok := metaString(meta, "request_body"); ok {
+		v.RequestBody = s
+	}
+	if s, ok := metaString(meta, "smpp_receipt_ref"); ok {
+		v.SMPPReceiptRef = s
+	}
+	if s, ok := metaString(meta, "smpp_receipt_stat"); ok {
+		v.SMPPReceiptStat = s
+	}
+	if qp, ok := meta["query_params"]; ok {
+		if b, err := json.MarshalIndent(qp, "", "  "); err == nil {
+			v.QueryParamsJSON = string(b)
+		}
+	}
+}
+
+func metaString(meta map[string]any, key string) (string, bool) {
+	v, ok := meta[key]
+	if !ok || v == nil {
+		return "", false
+	}
+	switch t := v.(type) {
+	case string:
+		s := strings.TrimSpace(t)
+		if s == "" {
+			return "", false
+		}
+		return s, true
+	default:
+		return fmt.Sprint(t), true
+	}
 }
 
 func timelineBadge(kind string) string {

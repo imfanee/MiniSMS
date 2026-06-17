@@ -444,9 +444,14 @@ This tab controls callback interoperability with each carrier. **Kamex** (and Ka
 | 4 | Queued on SMSC |
 | 8 | Delivered to SMSC (submitted) |
 | 16 | Non-delivered to SMSC (rejected) |
-| **31** | All of the above (recommended for testing) |
+| **3** | Final states only: delivered + non-delivered to handset (**recommended for production**) |
+| **31** | All of the above (one ACK callback at submit time, one final) |
 
-Put `dlr-mask=31` in the carrier **query template** (already required for IZZI Kamex).
+Put `dlr-mask=3` in the carrier **query template** for production: it yields exactly one callback per message (the final state), which is the cleanest fit for MiniSMS. `dlr-mask=31` is also supported for forensic tracing: MiniSMS records the intermediate SMSC ACK and then upgrades to the final `DELIVRD` / `UNDELIV` when it arrives, so an intermediate receipt never blocks or overwrites the final one (your client webhook may then receive two callbacks, the second carrying the final status). The query template must also forward the callback URL, for example:
+
+```text
+...&dlr-mask=3&dlr-url={{dlr_callback_url_encoded}}
+```
 
 #### Kamex `dlr-url` placeholders (in DLR callback URL template)
 
@@ -486,6 +491,8 @@ https://your-minisms-host/api/v1/dlr/{{message_id}}?status=%d&answer=%A&to=%P&fr
 ```
 
 > **Important:** If the callback URL template has **no** `%d` / `%A` placeholders, Kamex may call `/api/v1/dlr/{id}` with an empty query string and status will stay `unknown`.
+
+> **Number encoding:** MiniSMS URL-encodes every outbound query value, so a sender or recipient carrying a leading `+` (for example `+17725216279`) reaches the gateway as `%2B17725216279` and is decoded back to `+17725216279`, never a leading space. The literal Kamex placeholders inside `dlr-url` (`%d`, `%A`, ...) are preserved through that encoding, so put them in verbatim.
 
 Official references: [Kamex `doc/dlr.md`](https://github.com/vaska94/Kamex/blob/main/doc/dlr.md), [OpenAPI `dlr-mask`](https://github.com/vaska94/Kamex/blob/main/doc/openapi.yaml).
 

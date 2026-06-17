@@ -16,6 +16,7 @@ import (
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/dlr"
+	"github.com/minisms/minisms/internal/smslog"
 )
 
 func testHandlers(pool *pgxpool.Pool, key []byte) *Handlers {
@@ -127,7 +128,7 @@ func TestHandleDLR_NoWebhookURL(t *testing.T) {
 	key := []byte("0123456789abcdef0123456789abcdef")
 	h := testHandlers(pool, key)
 	fx := insertDLRFixture(t, pool, key, true, nil, nil, nil)
-	rr := performDLRRequest(h, fx.messageID, "", `{"status":"DELIVRD"}`, "")
+	rr := performDLRRequest(h, fx.messageID, "carrier_status=DELIVRD", `{"status":"DELIVRD","detail":"ok"}`, "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
@@ -137,6 +138,31 @@ func TestHandleDLR_NoWebhookURL(t *testing.T) {
 	}
 	if status != "no_url" {
 		t.Fatalf("expected no_url, got %q", status)
+	}
+	var timelineRaw []byte
+	if err := pool.QueryRow(context.Background(), `SELECT event_timeline FROM sms_logs WHERE message_id=$1::uuid`, fx.messageID).Scan(&timelineRaw); err != nil {
+		t.Fatalf("query timeline: %v", err)
+	}
+	events := smslog.ParseTimeline(timelineRaw)
+	var dlrEvent *smslog.TimelineEvent
+	for i := range events {
+		if events[i].Kind == smslog.EventDLRReceived {
+			dlrEvent = &events[i]
+			break
+		}
+	}
+	if dlrEvent == nil {
+		t.Fatal("expected dlr_received timeline event")
+	}
+	if dlrEvent.Meta["mapped_status"] != "delivered" {
+		t.Fatalf("mapped_status: %v", dlrEvent.Meta["mapped_status"])
+	}
+	qp, ok := dlrEvent.Meta["query_params"].(map[string]any)
+	if !ok || qp["carrier_status"] != "DELIVRD" {
+		t.Fatalf("query_params: %v", dlrEvent.Meta["query_params"])
+	}
+	if dlrEvent.Meta["request_body"] != `{"status":"DELIVRD","detail":"ok"}` {
+		t.Fatalf("request_body: %v", dlrEvent.Meta["request_body"])
 	}
 }
 

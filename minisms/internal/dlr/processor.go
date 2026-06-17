@@ -17,9 +17,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/minisms/minisms/internal/carrier"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/smslog"
 )
+
+// forwardEndpointValidator guards client DLR webhook URLs against SSRF (loopback, RFC1918,
+// link-local, metadata). It is a package var so tests can substitute httptest targets.
+var forwardEndpointValidator = carrier.ValidateEndpointURL
 
 // ClientDeliverer sends DLR to a bound client ESME session (RX/TRX).
 type ClientDeliverer interface {
@@ -54,7 +59,7 @@ type forwardPayload struct {
 
 // HandleInbound updates sms_logs and forwards to the client when configured.
 // messageID must be a MiniSMS UUID string.
-func (p *Processor) HandleInbound(ctx context.Context, messageID string, payloadFields map[string]string) error {
+func (p *Processor) HandleInbound(ctx context.Context, messageID string, payloadFields map[string]string, inbound *InboundCallback) error {
 	messageID = strings.TrimSpace(messageID)
 	if messageID == "" {
 		return nil
@@ -66,15 +71,17 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 	if err != nil {
 		return nil
 	}
-	if row.DLRReceivedAt != nil {
+	hadPriorReceipt := row.DLRReceivedAt != nil
+	dlrStatus := NormalizeFromFields(payloadFields, row.CarrierDLRStatusField, row.CarrierDLRStatusMap)
+	// A multi-bit dlr-mask (e.g. Kamex 31) can deliver an intermediate receipt (SMSC ACK, queued)
+	// before the final DELIVRD/UNDELIV. UpdateDLRReceived applies only while no final status is
+	// stored, so an intermediate never blocks a later final and a final is never overwritten; when
+	// it reports no change, this receipt is a duplicate/superseded one and is ignored.
+	applied, err := db.UpdateDLRReceived(ctx, p.Pool, messageID, dlrStatus)
+	if err != nil || !applied {
 		return nil
 	}
-	dlrStatus := NormalizeFromFields(payloadFields, row.CarrierDLRStatusField, row.CarrierDLRStatusMap)
-	_ = db.UpdateDLRReceived(ctx, p.Pool, messageID, dlrStatus)
-	rawMeta := map[string]any{"mapped_status": dlrStatus}
-	for k, v := range payloadFields {
-		rawMeta[k] = v
-	}
+	rawMeta := inbound.TimelineMeta(dlrStatus)
 	_ = db.AppendSMSEventTimeline(ctx, p.Pool, messageID, smslog.NewEvent(
 		smslog.EventDLRReceived,
 		"DLR received from carrier",
@@ -82,6 +89,11 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 		rawMeta,
 	))
 	if !row.DLRRequested {
+		return nil
+	}
+	// Forward to the client on the first receipt, and again only once a final state is reached, so
+	// a trailing intermediate receipt does not trigger a duplicate forward.
+	if !shouldForwardDLR(hadPriorReceipt, dlrStatus) {
 		return nil
 	}
 	mode := strings.ToLower(strings.TrimSpace(row.DLRDeliveryMode))
@@ -118,6 +130,14 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 		p.recordDLRForward(ctx, messageID, "failed", "Failed to build DLR webhook payload", map[string]any{
 			"channel": "http", "error": err.Error(),
 		})
+		return nil
+	}
+	if err := forwardEndpointValidator(fwd.URL); err != nil {
+		_ = db.UpdateDLRForwardStatus(ctx, p.Pool, messageID, "blocked", false, false)
+		p.recordDLRForward(ctx, messageID, "blocked", "DLR webhook URL blocked by SSRF guard", map[string]any{
+			"channel": "http", "webhook_url": fwd.URL, "error": err.Error(),
+		})
+		slog.Warn("dlr forward blocked by ssrf guard", "message_id", messageID, "webhook_url", fwd.URL, "error", err.Error())
 		return nil
 	}
 	var bodyReader io.Reader
@@ -171,6 +191,13 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 	return nil
 }
 
+// shouldForwardDLR decides whether an applied receipt should be pushed to the client. The first
+// receipt always forwards; later receipts forward only once they reach a final state, so a trailing
+// intermediate receipt (from a multi-bit dlr-mask) does not cause a duplicate client callback.
+func shouldForwardDLR(hadPriorReceipt bool, status string) bool {
+	return !hadPriorReceipt || IsFinalStatus(status)
+}
+
 func (p *Processor) recordDLRForward(ctx context.Context, messageID, status, detail string, meta map[string]any) {
 	title := "DLR forward to client"
 	switch status {
@@ -178,7 +205,7 @@ func (p *Processor) recordDLRForward(ctx context.Context, messageID, status, det
 		title = "DLR forwarded to client"
 	case "no_url":
 		title = "DLR not forwarded — no client webhook"
-	case "failed", "smpp_no_bind":
+	case "failed", "smpp_no_bind", "blocked":
 		title = "DLR forward to client failed"
 	}
 	if meta == nil {
@@ -201,7 +228,7 @@ func (p *Processor) HandleCarrierSMPP(ctx context.Context, carrierID, receiptRef
 		return
 	}
 	fields := map[string]string{"status": StatusFromSMPPReceipt(receiptStat)}
-	_ = p.HandleInbound(ctx, messageID, fields)
+	_ = p.HandleInbound(ctx, messageID, fields, InboundFromSMPP(receiptRef, receiptStat))
 }
 
 func signForward(body []byte, secretKey []byte, secretEnc *string) string {

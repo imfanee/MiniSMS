@@ -51,8 +51,28 @@
 							</div>
 							<span class="text-secondary small text-nowrap">{{.AtDisplay}}</span>
 						</div>
+						{{if eq .Kind "dlr_received"}}
+						{{if .MappedStatus}}<div class="small mt-2 mb-0"><span class="text-secondary">Mapped status:</span> <strong>{{.MappedStatus}}</strong></div>{{end}}
+						{{if eq .Channel "smpp"}}
+						{{if or .SMPPReceiptRef .SMPPReceiptStat}}
+						<div class="small mt-2 mb-0"><span class="text-secondary">SMPP delivery receipt:</span></div>
+						<pre class="small mt-1 mb-0 text-break" style="white-space:pre-wrap">{{if .SMPPReceiptRef}}id: {{.SMPPReceiptRef}}{{end}}{{if and .SMPPReceiptRef .SMPPReceiptStat}}&#10;{{end}}{{if .SMPPReceiptStat}}stat: {{.SMPPReceiptStat}}{{end}}</pre>
+						{{end}}
+						{{else}}
+						{{if or .HTTPMethod .RequestPath}}<div class="small mt-2 mb-0"><span class="text-secondary">Request:</span> {{if .HTTPMethod}}{{.HTTPMethod}}{{end}}{{if and .HTTPMethod .RequestPath}} {{end}}{{if .RequestPath}}{{.RequestPath}}{{end}}</div>{{end}}
+						{{if .QueryParamsJSON}}
+						<div class="small mt-2 mb-0 text-secondary">Query parameters</div>
+						<pre class="small mt-1 mb-0 text-break">{{.QueryParamsJSON}}</pre>
+						{{end}}
+						{{if .RequestBody}}
+						<div class="small mt-2 mb-0 text-secondary">Request body</div>
+						<pre class="small mt-1 mb-0 text-break" style="white-space:pre-wrap">{{.RequestBody}}</pre>
+						{{end}}
+						{{end}}
+						{{else}}
 						{{if .Detail}}<pre class="small mt-2 mb-0 text-break" style="white-space:pre-wrap">{{.Detail}}</pre>{{end}}
 						{{if .MetaJSON}}<pre class="small mt-2 mb-0 text-secondary">{{.MetaJSON}}</pre>{{end}}
+						{{end}}
 					</div>
 					{{end}}
 				</div>

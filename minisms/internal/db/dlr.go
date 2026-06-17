@@ -78,8 +78,12 @@ func GetSMSLogForDLR(ctx context.Context, pool *pgxpool.Pool, messageID string) 
 	return &m, nil
 }
 
-func UpdateDLRReceived(ctx context.Context, pool *pgxpool.Pool, messageID, dlrStatus string) error {
-	_, err := pool.Exec(ctx, `
+// UpdateDLRReceived records an inbound delivery receipt. It applies only while no final status
+// (delivered, undelivered, rejected) has been stored yet, so a multi-bit dlr-mask cannot let an
+// intermediate receipt (SMSC ACK, queued) overwrite or block a later final one, and a duplicate
+// final receipt is ignored. The returned bool is true when a row was actually updated.
+func UpdateDLRReceived(ctx context.Context, pool *pgxpool.Pool, messageID, dlrStatus string) (bool, error) {
+	tag, err := pool.Exec(ctx, `
 		UPDATE sms_logs
 		SET dlr_status = $2,
 			dlr_received_at = now(),
@@ -89,10 +93,14 @@ func UpdateDLRReceived(ctx context.Context, pool *pgxpool.Pool, messageID, dlrSt
 				ELSE status
 			END,
 			delivered_at = CASE WHEN $2 = 'delivered' THEN now() ELSE delivered_at END
-		WHERE message_id = $1::uuid`,
+		WHERE message_id = $1::uuid
+			AND (dlr_status IS NULL OR dlr_status NOT IN ('delivered', 'undelivered', 'rejected'))`,
 		messageID, dlrStatus,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func UpdateDLRForwardStatus(ctx context.Context, pool *pgxpool.Pool, messageID, forwardStatus string, success bool, countAttempt bool) error {

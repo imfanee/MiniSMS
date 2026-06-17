@@ -20,6 +20,16 @@ func StandardStatus(raw string) string {
 	}
 }
 
+// IsFinalStatus reports whether a normalized DLR status is terminal (no further receipt expected).
+// Intermediate Kamex events (SMSC ACK, queued) normalize to "unknown" and are not final.
+func IsFinalStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "delivered", "undelivered", "rejected":
+		return true
+	}
+	return false
+}
+
 func fieldValue(fields map[string]string, keys ...string) string {
 	for _, k := range keys {
 		if v := strings.TrimSpace(fields[strings.ToLower(strings.TrimSpace(k))]); v != "" {

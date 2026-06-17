@@ -290,7 +290,7 @@ func (s *Service) tryHTTPDispatch(
 		EndpointURL: endpointURL,
 		ContentType: tpl.ContentType,
 		Body:        carrier.InjectVariables(tpl.BodyTemplate, vars),
-		Query:       carrier.InjectVariables(tpl.QueryTemplate, vars),
+		Query:       carrier.InjectQueryVariables(tpl.QueryTemplate, vars),
 		Headers:     hdrs,
 		Timeout:     timeout,
 	})

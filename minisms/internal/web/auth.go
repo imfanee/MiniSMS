@@ -47,6 +47,7 @@ type Handlers struct {
 	CarrFragT     *template.Template
 	CarrSMPPLogsT *template.Template
 	SMPPLogHub    *egresslog.Hub
+	SMPPCtl       SMPPController
 	RGListT       *template.Template
 	RGDetT        *template.Template
 	RGFragT       *template.Template

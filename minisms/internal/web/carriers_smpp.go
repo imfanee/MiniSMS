@@ -19,6 +19,9 @@ type carrierSMPPPanelData struct {
 	MaskedPassword string
 	Success        string
 	Errors         map[string]string
+	BindsKnown     bool
+	BindsReady     int
+	BindsTotal     int
 }
 
 func (h *Handlers) GetCarrierSMPPSettings() http.HandlerFunc {
@@ -157,12 +160,43 @@ func (h *Handlers) carrierSMPPPanelData(r *http.Request, c *db.CarrierFull, succ
 			masked = maskTail(dec)
 		}
 	}
-	return carrierSMPPPanelData{
+	data := carrierSMPPPanelData{
 		CarrierID:      cid,
 		CSRFToken:      csrf.Token(r),
 		Carrier:        c,
 		MaskedPassword: masked,
 		Success:        success,
 		Errors:         errs,
+	}
+	if h.SMPPCtl != nil {
+		if ready, total, present := h.SMPPCtl.BindStatus(cid); present {
+			data.BindsKnown = true
+			data.BindsReady = ready
+			data.BindsTotal = total
+		}
+	}
+	return data
+}
+
+// RestartCarrierSMPP tears down and immediately rebinds the carrier's SMPP
+// sessions (a common carrier troubleshooting request) and re-renders the panel.
+// State-changing, so it sits behind PermCarriersEdit + CSRF. The log popup calls
+// the same endpoint via fetch, so its live stream shows the fresh bind attempts.
+func (h *Handlers) RestartCarrierSMPP() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cid := chi.URLParam(r, "id")
+		c, err := db.GetCarrier(r.Context(), h.Pool, cid)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if h.SMPPCtl == nil {
+			ServerError(w, r, errSMPPControllerUnavailable, h.Log, h.T500)
+			return
+		}
+		h.SMPPCtl.Restart(c.CarrierID)
+		c, _ = db.GetCarrier(r.Context(), h.Pool, cid)
+		_ = execT(w, h.CarrFragT, "carrier_smpp_panel",
+			h.carrierSMPPPanelData(r, c, "SMPP restart requested; sessions are rebinding.", nil))
 	}
 }

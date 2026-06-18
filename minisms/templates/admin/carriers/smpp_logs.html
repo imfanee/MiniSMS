@@ -35,6 +35,7 @@
     <span id="status" class="badge off">connecting</span>
     <span id="count" class="count">0 lines</span>
     <label class="toggle"><input type="checkbox" id="autoscroll" checked /> auto-scroll</label>
+    <button id="restart" type="button">Restart SMPP</button>
     <button id="pause" type="button">Pause</button>
     <button id="copy" type="button">Copy</button>
     <button id="clear" type="button">Clear</button>
@@ -45,6 +46,8 @@
   <script nonce="{{.Nonce}}">
     (function () {
       var streamURL = {{ printf "/admin/carriers/%s/smpp-logs/stream" .CarrierID }};
+      var restartURL = {{ printf "/admin/carriers/%s/smpp-restart" .CarrierID }};
+      var csrfToken = {{ .CSRFToken }};
       var logEl = document.getElementById('log');
       var scroller = document.getElementById('scroller');
       var statusEl = document.getElementById('status');
@@ -85,6 +88,21 @@
         paused = !paused;
         if (paused) { disconnect(); setStatus('paused', false); pauseBtn.textContent = 'Resume'; }
         else { pauseBtn.textContent = 'Pause'; setStatus('connecting', false); connect(); }
+      });
+      var restartBtn = document.getElementById('restart');
+      restartBtn.addEventListener('click', function () {
+        if (!window.confirm('Restart all SMPP sessions for this carrier now?')) { return; }
+        restartBtn.disabled = true;
+        fetch(restartURL, {                // POST governed by CSP connect-src 'self'
+          method: 'POST',
+          headers: { 'X-CSRF-Token': csrfToken },
+          credentials: 'same-origin'
+        }).then(function (r) {
+          if (!r.ok) { window.alert('Restart failed (HTTP ' + r.status + ')'); }
+          // Success is visible as new bind events arriving on the live stream.
+        }).catch(function () {
+          window.alert('Restart request failed');
+        }).finally(function () { restartBtn.disabled = false; });
       });
       document.getElementById('clear').addEventListener('click', function () {
         logEl.replaceChildren(); lines = 0; countEl.textContent = '0 lines';

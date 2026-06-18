@@ -413,6 +413,7 @@ func main() {
 	h.Send = app.Send
 	if app.Egress != nil {
 		h.SMPPLogHub = app.Egress.LogHub()
+		h.SMPPCtl = app.Egress
 	}
 
 	apiHandlers := api.NewHandlers(pool, cfg, app.Egress, app.Send)

@@ -5,19 +5,32 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/smpp/egresslog"
 )
 
+// SMPPController is the slice of the egress manager the web layer needs: live
+// bind counts and a per-carrier restart. Implemented by *egress.Manager and
+// wired in main; kept as an interface so web does not import the egress package.
+type SMPPController interface {
+	BindStatus(carrierID string) (ready, total int, present bool)
+	Restart(carrierID string)
+}
+
+var errSMPPControllerUnavailable = errors.New("smpp controller unavailable")
+
 type carrierSMPPLogsPage struct {
 	CarrierID   string
 	CarrierName string
+	CSRFToken   string
 	Nonce       string
 }
 
@@ -45,6 +58,7 @@ func (h *Handlers) GetCarrierSMPPLogsView() http.HandlerFunc {
 		if err := execT(w, h.CarrSMPPLogsT, "carrier_smpp_logs", carrierSMPPLogsPage{
 			CarrierID:   c.CarrierID,
 			CarrierName: c.Name,
+			CSRFToken:   csrf.Token(r),
 			Nonce:       nonce,
 		}); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)

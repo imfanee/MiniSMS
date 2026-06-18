@@ -88,6 +88,15 @@ func TestManager_SubmitViaSMPTest(t *testing.T) {
 	_ = mgr
 }
 
+func TestManager_BindStatusAndRestartSafety(t *testing.T) {
+	mgr := NewManager(nil, &config.Config{SecretKey: []byte("0123456789abcdef0123456789abcdef")}, nil)
+	if _, _, present := mgr.BindStatus("unknown-carrier"); present {
+		t.Fatal("expected no session group for unknown carrier")
+	}
+	// Restart with no started run loop and an unknown carrier must be a safe no-op.
+	mgr.Restart("unknown-carrier")
+}
+
 func TestSessionGroup_ParallelBindsRoundRobin(t *testing.T) {
 	srv := smpptest.NewUnstartedServer()
 	srv.Handler = submitSMRespHandler

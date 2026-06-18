@@ -24,6 +24,7 @@ type Manager struct {
 	logHub    *egresslog.Hub
 	mu        sync.RWMutex
 	groups    map[string]*sessionGroup
+	runCtx    context.Context
 	runCancel context.CancelFunc
 }
 
@@ -40,9 +41,41 @@ func NewManager(pool *pgxpool.Pool, cfg *config.Config, dlrProc *dlr.Processor) 
 // LogHub returns the per-carrier SMPP session log hub for live admin tailing.
 func (m *Manager) LogHub() *egresslog.Hub { return m.logHub }
 
+// BindStatus reports how many of the carrier's parallel binds are currently up
+// and the configured total. present is false when no session group exists (the
+// carrier is not an active SMPP egress carrier).
+func (m *Manager) BindStatus(carrierID string) (ready, total int, present bool) {
+	m.mu.RLock()
+	g := m.groups[carrierID]
+	m.mu.RUnlock()
+	if g == nil {
+		return 0, 0, false
+	}
+	return g.readyCount(), len(g.sessions), true
+}
+
+// Restart tears down and immediately rebinds the carrier's SMPP session group.
+// Used for troubleshooting (carriers sometimes ask for a bind restart). The log
+// hub records the request and the fresh bind attempts stream to any live viewer.
+func (m *Manager) Restart(carrierID string) {
+	m.logHub.Event(carrierID, "WARN", "restart requested via admin")
+	m.mu.Lock()
+	if g := m.groups[carrierID]; g != nil {
+		g.stop()
+		delete(m.groups, carrierID)
+	}
+	ctx := m.runCtx
+	m.mu.Unlock()
+	// Rebind now rather than waiting for the periodic refresh tick.
+	if ctx != nil {
+		m.refresh(ctx)
+	}
+}
+
 // Start launches supervisors for carriers with SMPP egress configured.
 func (m *Manager) Start(parent context.Context) {
 	ctx, cancel := context.WithCancel(parent)
+	m.runCtx = ctx
 	m.runCancel = cancel
 	m.refresh(ctx)
 	go func() {

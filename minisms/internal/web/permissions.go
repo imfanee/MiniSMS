@@ -136,6 +136,7 @@ func RegisterProtectedAdminRoutes(r chi.Router, h *Handlers) {
 		r.Post("/carriers/{id}/interconnect", h.SaveCarrierInterconnect())
 		r.Post("/carriers/{id}/interconnect/http", h.SaveCarrierHTTPInterconnect())
 		r.Post("/carriers/{id}/smpp-settings", h.SaveCarrierSMPPSettings())
+		r.Post("/carriers/{id}/smpp-restart", h.RestartCarrierSMPP())
 		r.Post("/carriers/{id}/invoices/preview", h.PreviewCarrierInvoice())
 		r.Post("/carriers/{id}/invoices/generate", h.GenerateCarrierInvoice())
 	})

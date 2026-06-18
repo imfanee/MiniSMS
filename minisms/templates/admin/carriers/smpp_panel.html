@@ -6,7 +6,7 @@
     <input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
     <div class="col-md-4">
       <label class="form-label">Session status</label>
-      <input class="form-control font-monospace" readonly value="{{.Carrier.SMPPStatus}}" />
+      <input class="form-control font-monospace" readonly value="{{.Carrier.SMPPStatus}}{{if .BindsKnown}} ({{.BindsReady}}/{{.BindsTotal}} binds up){{end}}" />
       <div class="form-text">Updated by the egress supervisor (read-only).</div>
     </div>
     <div class="col-md-4">
@@ -16,6 +16,17 @@
         Open SMPP logs
       </button>
       <div class="form-text">Live bind / DLR / error stream in a resizable window; connects only while open.</div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label d-block">Restart sessions</label>
+      <button type="button" class="btn btn-outline-warning"
+        hx-post="/admin/carriers/{{.CarrierID}}/smpp-restart"
+        hx-headers='{"X-CSRF-Token": "{{.CSRFToken}}"}'
+        hx-target="#carrier-smpp-panel" hx-swap="outerHTML"
+        hx-confirm="Restart all SMPP sessions for this carrier now?">
+        Restart SMPP
+      </button>
+      <div class="form-text">Unbinds and immediately rebinds all sessions (carrier troubleshooting).</div>
     </div>
     <div class="col-md-4">
       <label class="form-label">Bind mode</label>

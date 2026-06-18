@@ -1,0 +1,106 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "carrier_smpp_logs"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SMPP logs - {{.CarrierName}}</title>
+  <style nonce="{{.Nonce}}">
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; background: #0d1117; color: #c9d1d9;
+           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    header { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+             padding: 8px 10px; background: #161b22; border-bottom: 1px solid #30363d; }
+    header .title { font-weight: 600; color: #e6edf3; margin-right: auto; }
+    button, label.toggle { background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+             border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
+    button:hover { background: #30363d; }
+    .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; border: 1px solid #30363d; }
+    .badge.on { color: #3fb950; border-color: #2ea043; }
+    .badge.off { color: #f85149; border-color: #da3633; }
+    .count { color: #8b949e; }
+    main { flex: 1 1 auto; overflow: auto; }
+    pre#log { margin: 0; padding: 8px 10px; white-space: pre-wrap; word-break: break-word;
+              user-select: text; min-height: 100%; }
+    .ln-ERROR { color: #ff7b72; }
+    .ln-WARN  { color: #d29922; }
+    .ln-INFO  { color: #c9d1d9; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="title">SMPP &middot; {{.CarrierName}}</span>
+    <span id="status" class="badge off">connecting</span>
+    <span id="count" class="count">0 lines</span>
+    <label class="toggle"><input type="checkbox" id="autoscroll" checked /> auto-scroll</label>
+    <button id="pause" type="button">Pause</button>
+    <button id="copy" type="button">Copy</button>
+    <button id="clear" type="button">Clear</button>
+  </header>
+  <main id="scroller">
+    <pre id="log" tabindex="0"></pre>
+  </main>
+  <script nonce="{{.Nonce}}">
+    (function () {
+      var streamURL = {{ printf "/admin/carriers/%s/smpp-logs/stream" .CarrierID }};
+      var logEl = document.getElementById('log');
+      var scroller = document.getElementById('scroller');
+      var statusEl = document.getElementById('status');
+      var countEl = document.getElementById('count');
+      var autoscroll = document.getElementById('autoscroll');
+      var pauseBtn = document.getElementById('pause');
+      var lines = 0, es = null, paused = false;
+
+      function setStatus(text, on) {
+        statusEl.textContent = text;
+        statusEl.className = 'badge ' + (on ? 'on' : 'off');
+      }
+      function atBottom() {
+        return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 24;
+      }
+      function append(text) {
+        var stick = autoscroll.checked && atBottom();
+        var div = document.createElement('div');
+        var level = 'INFO';
+        var m = text.match(/^\S+\s+(ERROR|WARN|INFO)\b/);
+        if (m) { level = m[1]; }
+        div.className = 'ln-' + level;
+        div.textContent = text;            // textContent only: no HTML is ever parsed
+        logEl.appendChild(div);
+        lines++;
+        countEl.textContent = lines + (lines === 1 ? ' line' : ' lines');
+        if (stick) { scroller.scrollTop = scroller.scrollHeight; }
+      }
+      function connect() {
+        es = new EventSource(streamURL);   // same-origin; sends admin session cookie
+        es.onopen = function () { setStatus('connected', true); };
+        es.onmessage = function (ev) { append(ev.data); };
+        es.onerror = function () { setStatus('reconnecting', false); };
+      }
+      function disconnect() { if (es) { es.close(); es = null; } }
+
+      pauseBtn.addEventListener('click', function () {
+        paused = !paused;
+        if (paused) { disconnect(); setStatus('paused', false); pauseBtn.textContent = 'Resume'; }
+        else { pauseBtn.textContent = 'Pause'; setStatus('connecting', false); connect(); }
+      });
+      document.getElementById('clear').addEventListener('click', function () {
+        logEl.replaceChildren(); lines = 0; countEl.textContent = '0 lines';
+      });
+      document.getElementById('copy').addEventListener('click', function () {
+        var text = logEl.innerText;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text);
+        } else {
+          var r = document.createRange(); r.selectNodeContents(logEl);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        }
+      });
+      window.addEventListener('beforeunload', disconnect);
+      connect();                            // connects only now, on launch
+    })();
+  </script>
+</body>
+</html>{{end}}

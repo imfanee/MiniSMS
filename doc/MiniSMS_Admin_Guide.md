@@ -262,6 +262,8 @@ Primary navigation on the carrier detail page:
 - Configure bind parameters on the **SMPP** tab (system ID, password, host/port).
 - Outbound dispatch uses SMPP `submit_sm` instead of HTTP.
 - TON/NPI fields may be static or `dynamic` per carrier.
+- **Open SMPP logs** (button on the SMPP tab) launches a resizable popup window that live-tails this carrier's SMPP session events (bind attempts, bind established or failed, disconnects/reconnects, `deliver_sm` receipts, and `submit_sm` errors). It connects only while the window is open, shows recent history first then streams new lines, auto-scrolls (toggleable), and offers Pause, Copy, and Clear. Lines never contain credentials. The viewer is read-only and requires the same admin permission and session as the rest of the carrier screens, so it adds no new exposure.
+- **Parallel binds** (1..16): the number of concurrent ESME sessions MiniSMS opens to the SMSC. Many operators (for example Airtel DRC) advise several parallel transceiver binds for throughput and so the SMSC can spread delivery receipts across sessions. **Throughput (/s)** is applied per bind, so aggregate throughput is binds times that value. A `deliver_sm` receipt can arrive on any bind; MiniSMS correlates it to the original message regardless. Changing the bind count rebinds within about 60 seconds; the **Session status** field reads `up` once at least one bind is established.
 
 Switching interconnect type changes which downstream path MiniSMS uses; retest with a single message after any change.
 

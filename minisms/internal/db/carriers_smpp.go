@@ -21,12 +21,14 @@ type CarrierSMPPEgress struct {
 	SMPPEnquireLinkS    int
 	SMPPWindowSize      int
 	SMPPThroughputPerS int
+	SMPPBindCount       int
 }
 
 func ListCarriersSMPPEgress(ctx context.Context, pool *pgxpool.Pool) ([]CarrierSMPPEgress, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT carrier_id::text, egress_transport, smpp_host, smpp_port, smpp_system_id, smpp_password_enc,
-			smpp_system_type, smpp_bind_mode, smpp_tls, smpp_enquire_link_s, smpp_window_size, smpp_throughput_per_s
+			smpp_system_type, smpp_bind_mode, smpp_tls, smpp_enquire_link_s, smpp_window_size, smpp_throughput_per_s,
+			COALESCE(smpp_bind_count, 1)
 		FROM carriers
 		WHERE status = 'active'
 		  AND egress_transport = 'smpp'
@@ -45,6 +47,7 @@ func ListCarriersSMPPEgress(ctx context.Context, pool *pgxpool.Pool) ([]CarrierS
 		if err := rows.Scan(
 			&c.CarrierID, &c.EgressTransport, &c.SMPPHost, &c.SMPPPort, &c.SMPPSystemID, &c.SMPPPasswordEnc,
 			&c.SMPPSystemType, &c.SMPPBindMode, &c.SMPPTLS, &c.SMPPEnquireLinkS, &c.SMPPWindowSize, &c.SMPPThroughputPerS,
+			&c.SMPPBindCount,
 		); err != nil {
 			return nil, err
 		}

@@ -13,9 +13,9 @@
 
 | Item | Value |
 |------|--------|
-| **Last deploy** | 2026-06-17T15:56:15Z (Kamex DLR encoding + multi-bit fixes) |
+| **Last deploy** | 2026-06-18 (direct Airtel SMPP interconnect + N parallel binds; carrier DLR over `deliver_sm`) |
 | **Environments** | Production **active**; staging **stopped** (2026-06-06) |
-| **Git commit** | `3cce913` (on `main`); this is the deployed binary |
+| **Git commit** | deployed binary built from local working tree (multi-bind SMPP egress + `smpp_bind_count` UI); commit when landed on `main` |
 | **Binary** | `/usr/local/bin/minisms` (built from `/usr/src/MiniSMS/minisms`, installed by hand) |
 | **Schema** | **Live DB is authoritative.** `deploy/minisms_db.sql` is a fresh-install/hybrid file and is NOT applied to the populated prod DB; upgrades apply only additive deltas after a restored-copy rehearsal. |
 | **/opt/minisms** | Data-only working dir (`assets/`, `invoices/`); contains no source code or `releases/` as of this deploy. |
@@ -174,6 +174,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/healthz
 - HTTP/API/DLR: nginx → `:8080`
 - Client ESME: TCP `:2775` (not behind nginx); firewall to trusted IPs
 - Start with `SMPP_SERVER_ENABLED=false` until clients ready
+
+### Carrier SMPP egress: Airtel DRC direct interconnect (2026-06-18)
+
+- DRC Airtel traffic now goes over a **direct outbound SMPP** carrier (`Airtel DRC Direct (SMPP)`, `egress_transport=smpp`) to the Airtel DRC SMSC, replacing the previous path through the Kamex (Kannel) HTTP `sendsms` gateway.
+- The carrier runs **8 parallel transceiver binds** (`smpp_bind_count=8`, `smpp_throughput_per_s=1` per bind so aggregate ~8/s, matching the prior Kamex setup). The egress manager opens one `sessionGroup` of N binds per carrier and round-robins `submit_sm`; delivery receipts (`deliver_sm`) arriving on any bind are correlated carrier-wide by `carrier_message_id`. Bind count is editable in the admin carrier SMPP panel and rebinds within about 60 seconds.
+- The Kamex gateway host (`jasmin-gw`) has its Kannel stack **stopped and disabled** so MiniSMS is the sole ESME on the Airtel system_id and receives all DLRs. Roll back by re-enabling the Kamex units and repointing the DRC route_entries to the old HTTP carrier (`IZZI DRC Airtel`). Topology details (host, ids, credentials handling) live in the agent project memory `minisms-airtel-smpp`, not in this repo.
+- Schema delta for this change: `carriers.smpp_bind_count INT NOT NULL DEFAULT 1` with `CHECK (1..16)` (already in `deploy/minisms_db.sql`; applied to the live DB additively).
 
 ---
 

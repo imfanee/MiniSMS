@@ -144,6 +144,11 @@ func main() {
 		log.Error("template carrier fragments", "err", err)
 		os.Exit(1)
 	}
+	carrierSMPPLogsT, err := parseTemplateFS(tfs, "templates/admin/carriers/smpp_logs.html")
+	if err != nil {
+		log.Error("template carrier smpp logs", "err", err)
+		os.Exit(1)
+	}
 	rateGroupListT, err := parseTemplateFS(
 		tfs,
 		"templates/layout/base.html",
@@ -376,6 +381,7 @@ func main() {
 		CarrListT:     carrierListT,
 		CarrDetT:      carrierDetT,
 		CarrFragT:     carrierFragT,
+		CarrSMPPLogsT: carrierSMPPLogsT,
 		RGListT:       rateGroupListT,
 		RGDetT:        rateGroupDetT,
 		RGFragT:       rateGroupFragT,
@@ -405,6 +411,9 @@ func main() {
 	defer app.Stop()
 	h.RouteCache = app.Routes
 	h.Send = app.Send
+	if app.Egress != nil {
+		h.SMPPLogHub = app.Egress.LogHub()
+	}
 
 	apiHandlers := api.NewHandlers(pool, cfg, app.Egress, app.Send)
 	if app.SMPPServer != nil {

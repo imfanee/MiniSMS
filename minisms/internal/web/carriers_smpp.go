@@ -69,6 +69,10 @@ func (h *Handlers) SaveCarrierSMPPSettings() http.HandlerFunc {
 		if err != nil || throughput < 1 || throughput > 10000 {
 			errs["smpp_throughput_per_s"] = "Must be 1–10000"
 		}
+		bindCount, err := strconv.Atoi(strings.TrimSpace(r.FormValue("smpp_bind_count")))
+		if err != nil || bindCount < 1 || bindCount > 16 {
+			errs["smpp_bind_count"] = "Must be 1–16"
+		}
 
 		var port *int
 		if portStr != "" {
@@ -117,6 +121,7 @@ func (h *Handlers) SaveCarrierSMPPSettings() http.HandlerFunc {
 				SMPPEnquireLinkS:   enquireS,
 				SMPPWindowSize:     window,
 				SMPPThroughputPerS: throughput,
+				SMPPBindCount:      bindCount,
 			}
 			if err := db.UpdateCarrierSMPPSettings(r.Context(), h.Pool, cid, settings, keepPassword); err != nil {
 				if errors.Is(err, db.ErrDuplicateSMPPSystemID) {

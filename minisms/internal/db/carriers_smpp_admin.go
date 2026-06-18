@@ -24,6 +24,7 @@ type CarrierSMPPSettings struct {
 	SMPPEnquireLinkS   int
 	SMPPWindowSize     int
 	SMPPThroughputPerS int
+	SMPPBindCount      int
 }
 
 func UpdateCarrierSMPPSettings(ctx context.Context, pool *pgxpool.Pool, carrierID string, s CarrierSMPPSettings, keepPassword bool) error {
@@ -39,11 +40,12 @@ func UpdateCarrierSMPPSettings(ctx context.Context, pool *pgxpool.Pool, carrierI
 				smpp_host=$1, smpp_port=$2, smpp_system_id=$3,
 				smpp_system_type=$4, smpp_bind_mode=$5, smpp_tls=$6,
 				smpp_enquire_link_s=$7, smpp_window_size=$8, smpp_throughput_per_s=$9,
+				smpp_bind_count=$10,
 				updated_at=now()
-			WHERE carrier_id=$10::uuid`,
+			WHERE carrier_id=$11::uuid`,
 			s.SMPPHost, s.SMPPPort, s.SMPPSystemID,
 			s.SMPPSystemType, s.SMPPBindMode, s.SMPPTLS,
-			s.SMPPEnquireLinkS, s.SMPPWindowSize, s.SMPPThroughputPerS, carrierID,
+			s.SMPPEnquireLinkS, s.SMPPWindowSize, s.SMPPThroughputPerS, s.SMPPBindCount, carrierID,
 		)
 		return mapSMPPUnique(err)
 	}
@@ -52,11 +54,12 @@ func UpdateCarrierSMPPSettings(ctx context.Context, pool *pgxpool.Pool, carrierI
 			smpp_host=$1, smpp_port=$2, smpp_system_id=$3, smpp_password_enc=$4,
 			smpp_system_type=$5, smpp_bind_mode=$6, smpp_tls=$7,
 			smpp_enquire_link_s=$8, smpp_window_size=$9, smpp_throughput_per_s=$10,
+			smpp_bind_count=$11,
 			updated_at=now()
-		WHERE carrier_id=$11::uuid`,
+		WHERE carrier_id=$12::uuid`,
 		s.SMPPHost, s.SMPPPort, s.SMPPSystemID, password,
 		s.SMPPSystemType, s.SMPPBindMode, s.SMPPTLS,
-		s.SMPPEnquireLinkS, s.SMPPWindowSize, s.SMPPThroughputPerS, carrierID,
+		s.SMPPEnquireLinkS, s.SMPPWindowSize, s.SMPPThroughputPerS, s.SMPPBindCount, carrierID,
 	)
 	return mapSMPPUnique(err)
 }

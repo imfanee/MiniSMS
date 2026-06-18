@@ -11,26 +11,34 @@ import (
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/dlr"
+	"github.com/minisms/minisms/internal/smpp/egresslog"
 )
 
-// Manager supervises per-carrier SMPP ESME sessions and executes submit_sm.
+// Manager supervises per-carrier SMPP ESME session groups and executes
+// submit_sm. Each carrier may run several parallel binds (smpp_bind_count);
+// the group load-balances submits and aggregates delivery receipts.
 type Manager struct {
 	pool      *pgxpool.Pool
 	cfg       *config.Config
 	dlr       *dlr.Processor
+	logHub    *egresslog.Hub
 	mu        sync.RWMutex
-	sessions  map[string]*liveSession
+	groups    map[string]*sessionGroup
 	runCancel context.CancelFunc
 }
 
 func NewManager(pool *pgxpool.Pool, cfg *config.Config, dlrProc *dlr.Processor) *Manager {
 	return &Manager{
-		pool:     pool,
-		cfg:      cfg,
-		dlr:      dlrProc,
-		sessions: make(map[string]*liveSession),
+		pool:   pool,
+		cfg:    cfg,
+		dlr:    dlrProc,
+		logHub: egresslog.NewHub(),
+		groups: make(map[string]*sessionGroup),
 	}
 }
+
+// LogHub returns the per-carrier SMPP session log hub for live admin tailing.
+func (m *Manager) LogHub() *egresslog.Hub { return m.logHub }
 
 // Start launches supervisors for carriers with SMPP egress configured.
 func (m *Manager) Start(parent context.Context) {
@@ -65,22 +73,31 @@ func (m *Manager) refresh(ctx context.Context) {
 			continue
 		}
 		cc := carrierConfigFromRow(row, password, m.cfg)
-		active[row.CarrierID] = struct{}{}
+		carrierID := row.CarrierID
+		active[carrierID] = struct{}{}
 		m.mu.Lock()
-		if _, ok := m.sessions[row.CarrierID]; !ok {
-			sess := newLiveSession(cc, m.dlr)
-			m.sessions[row.CarrierID] = sess
-			go sess.run(ctx, func(status string) {
-				_ = db.UpdateCarrierSMPPStatus(context.Background(), m.pool, row.CarrierID, status)
+		existing := m.groups[carrierID]
+		// Rebuild the group if the bind count changed so admins can scale
+		// parallel binds without a full restart (next refresh tick).
+		if existing != nil && existing.bindCount != cc.BindCount {
+			existing.stop()
+			delete(m.groups, carrierID)
+			existing = nil
+		}
+		if existing == nil {
+			g := newSessionGroup(cc, m.dlr, m.logHub)
+			m.groups[carrierID] = g
+			g.start(ctx, func(status string) {
+				_ = db.UpdateCarrierSMPPStatus(context.Background(), m.pool, carrierID, status)
 			})
 		}
 		m.mu.Unlock()
 	}
 	m.mu.Lock()
-	for id, sess := range m.sessions {
+	for id, g := range m.groups {
 		if _, ok := active[id]; !ok {
-			sess.stop()
-			delete(m.sessions, id)
+			g.stop()
+			delete(m.groups, id)
 			_ = db.UpdateCarrierSMPPStatus(context.Background(), m.pool, id, "disabled")
 		}
 	}
@@ -93,31 +110,31 @@ func (m *Manager) Stop() {
 		m.runCancel()
 	}
 	m.mu.Lock()
-	for _, sess := range m.sessions {
-		sess.stop()
+	for _, g := range m.groups {
+		g.stop()
 	}
-	m.sessions = make(map[string]*liveSession)
+	m.groups = make(map[string]*sessionGroup)
 	m.mu.Unlock()
 }
 
-// Submit sends via the carrier's SMPP session when bound.
+// Submit sends via one of the carrier's SMPP sessions when bound.
 func (m *Manager) Submit(ctx context.Context, carrierID string, req SubmitRequest) (*SubmitResult, error) {
 	m.mu.RLock()
-	sess := m.sessions[carrierID]
+	g := m.groups[carrierID]
 	m.mu.RUnlock()
-	if sess == nil {
+	if g == nil {
 		return nil, ErrSessionUnavailable
 	}
-	return sess.submit(ctx, req)
+	return g.submit(ctx, req)
 }
 
-// Ready reports whether the carrier has an active SMPP session.
+// Ready reports whether the carrier has at least one active SMPP session.
 func (m *Manager) Ready(carrierID string) bool {
 	m.mu.RLock()
-	sess := m.sessions[carrierID]
+	g := m.groups[carrierID]
 	m.mu.RUnlock()
-	if sess == nil {
+	if g == nil {
 		return false
 	}
-	return sess.isReady()
+	return g.ready()
 }

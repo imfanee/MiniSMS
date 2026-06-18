@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/fiorix/go-smpp/v2/smpp/pdu"
 	"github.com/fiorix/go-smpp/v2/smpp/pdu/pdufield"
 	"github.com/minisms/minisms/internal/dlr"
+	"github.com/minisms/minisms/internal/smpp/egresslog"
 	"golang.org/x/time/rate"
 )
 
@@ -19,6 +21,8 @@ type liveSession struct {
 	cfg     CarrierConfig
 	limiter *rate.Limiter
 	dlr     *dlr.Processor
+	hub     *egresslog.Hub
+	idx     int
 
 	mu      sync.RWMutex
 	ready   bool
@@ -28,12 +32,22 @@ type liveSession struct {
 	cancel  context.CancelFunc
 }
 
-func newLiveSession(cfg CarrierConfig, dlrProc *dlr.Processor) *liveSession {
+func newLiveSession(cfg CarrierConfig, dlrProc *dlr.Processor, hub *egresslog.Hub, idx int) *liveSession {
 	lim := rate.NewLimiter(rate.Limit(cfg.ThroughputPerSecond), cfg.ThroughputPerSecond)
 	if cfg.ThroughputPerSecond < 1 {
 		lim = rate.NewLimiter(rate.Limit(50), 50)
 	}
-	return &liveSession{cfg: cfg, limiter: lim, dlr: dlrProc}
+	return &liveSession{cfg: cfg, limiter: lim, dlr: dlrProc, hub: hub, idx: idx}
+}
+
+// logEvent appends a session-scoped event to the per-carrier log hub (no-op when
+// no hub is wired, e.g. in unit tests). It never carries credentials.
+func (s *liveSession) logEvent(level, msg string, kv ...string) {
+	if s.hub == nil {
+		return
+	}
+	args := append([]string{"bind", "#" + strconv.Itoa(s.idx)}, kv...)
+	s.hub.Event(s.cfg.CarrierID, level, msg, args...)
 }
 
 func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
@@ -49,8 +63,10 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 			return
 		}
 		onStatus("binding")
+		s.logEvent("INFO", "bind attempt", "addr", s.cfg.Addr, "mode", s.cfg.BindMode)
 		if err := s.bind(ctx); err != nil {
 			slog.Warn("smpp egress bind failed", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "error", err)
+			s.logEvent("ERROR", "bind failed", "error", err.Error())
 			onStatus("down")
 			select {
 			case <-ctx.Done():
@@ -66,6 +82,7 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 			continue
 		}
 		backoff = time.Second
+		s.logEvent("INFO", "bind established", "addr", s.cfg.Addr)
 		onStatus("up")
 		s.mu.Lock()
 		s.ready = true
@@ -92,6 +109,7 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		s.ready = false
 		s.mu.Unlock()
 		s.closeClient()
+		s.logEvent("WARN", "session disconnected", "reconnect_in", backoff.String())
 		onStatus("down")
 		select {
 		case <-ctx.Done():
@@ -179,9 +197,6 @@ func (s *liveSession) bind(ctx context.Context) error {
 }
 
 func (s *liveSession) handleDeliverSM(ctx context.Context, p pdu.Body) {
-	if s.dlr == nil {
-		return
-	}
 	f := p.Fields()
 	sm := f[pdufield.ShortMessage]
 	if sm == nil {
@@ -190,6 +205,11 @@ func (s *liveSession) handleDeliverSM(ctx context.Context, p pdu.Body) {
 	body := sm.Bytes()
 	receipt, err := pdufield.ParseDeliveryReceipt(body)
 	if err != nil {
+		s.logEvent("WARN", "deliver_sm parse failed", "error", err.Error())
+		return
+	}
+	s.logEvent("INFO", "deliver_sm receipt", "smsc_id", receipt.ID, "stat", receipt.State)
+	if s.dlr == nil {
 		return
 	}
 	s.dlr.HandleCarrierSMPP(ctx, s.cfg.CarrierID, receipt.ID, receipt.State)
@@ -229,11 +249,21 @@ func (s *liveSession) submit(ctx context.Context, req SubmitRequest) (*SubmitRes
 	if !s.isReady() {
 		return nil, smpp.ErrNotBound
 	}
-	if trx != nil {
-		return submitOn(ctx, trx, nil, req)
+	var res *SubmitResult
+	var err error
+	switch {
+	case trx != nil:
+		res, err = submitOn(ctx, trx, nil, req)
+	case tx != nil:
+		res, err = submitOn(ctx, tx, nil, req)
+	default:
+		return nil, smpp.ErrNotBound
 	}
-	if tx != nil {
-		return submitOn(ctx, tx, nil, req)
+	// Surface submit problems for debugging without logging message content.
+	if err != nil {
+		s.logEvent("ERROR", "submit_sm error", "dst", req.Dst, "error", err.Error())
+	} else if res != nil && res.CommandStatus != 0 {
+		s.logEvent("ERROR", "submit_sm rejected", "dst", req.Dst, "command_status", strconv.Itoa(res.CommandStatus))
 	}
-	return nil, smpp.ErrNotBound
+	return res, err
 }

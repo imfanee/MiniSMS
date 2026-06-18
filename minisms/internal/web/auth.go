@@ -16,6 +16,7 @@ import (
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/routecache"
 	"github.com/minisms/minisms/internal/sending"
+	"github.com/minisms/minisms/internal/smpp/egresslog"
 )
 
 // Page is common template data for admin pages.
@@ -44,6 +45,8 @@ type Handlers struct {
 	CarrListT     *template.Template
 	CarrDetT      *template.Template
 	CarrFragT     *template.Template
+	CarrSMPPLogsT *template.Template
+	SMPPLogHub    *egresslog.Hub
 	RGListT       *template.Template
 	RGDetT        *template.Template
 	RGFragT       *template.Template

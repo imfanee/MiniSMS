@@ -22,6 +22,7 @@ type CarrierConfig struct {
 	EnquireLink         time.Duration
 	WindowSize          uint
 	ThroughputPerSecond int
+	BindCount           int
 }
 
 func carrierConfigFromRow(row db.CarrierSMPPEgress, password string, cfg *config.Config) CarrierConfig {
@@ -32,6 +33,10 @@ func carrierConfigFromRow(row db.CarrierSMPPEgress, password string, cfg *config
 	enquireS := row.SMPPEnquireLinkS
 	window := row.SMPPWindowSize
 	throughput := row.SMPPThroughputPerS
+	bindCount := row.SMPPBindCount
+	if bindCount < 1 {
+		bindCount = 1
+	}
 	if cfg != nil {
 		if enquireS < 5 {
 			enquireS = cfg.SMPPEnquireLinkSecs
@@ -55,5 +60,6 @@ func carrierConfigFromRow(row db.CarrierSMPPEgress, password string, cfg *config
 		EnquireLink:         time.Duration(enquireS) * time.Second,
 		WindowSize:          uint(window),
 		ThroughputPerSecond: throughput,
+		BindCount:           bindCount,
 	}
 }

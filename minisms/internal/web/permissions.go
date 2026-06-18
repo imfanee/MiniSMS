@@ -110,6 +110,8 @@ func RegisterProtectedAdminRoutes(r chi.Router, h *Handlers) {
 		r.Get("/carriers/{id}/interconnect", h.GetCarrierInterconnect())
 		r.Get("/carriers/{id}/interconnect/http", h.GetCarrierHTTPInterconnect())
 		r.Get("/carriers/{id}/smpp-settings", h.GetCarrierSMPPSettings())
+		r.Get("/carriers/{id}/smpp-logs", h.GetCarrierSMPPLogsView())
+		r.Get("/carriers/{id}/smpp-logs/stream", h.StreamCarrierSMPPLogs())
 		r.Get("/carriers/{id}/auth-headers", h.ListAuthHeaders())
 		r.Get("/carriers/{id}/template", h.GetTemplatePanel())
 		r.Get("/carriers/{id}/invoices", h.GetCarrierInvoicesPanel())

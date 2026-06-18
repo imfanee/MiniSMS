@@ -43,7 +43,7 @@ func TestManager_SubmitViaSMPTest(t *testing.T) {
 		EnquireLink:         30 * time.Second,
 		WindowSize:          10,
 		ThroughputPerSecond: 50,
-	}, nil)
+	}, nil, nil, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -86,4 +86,57 @@ func TestManager_SubmitViaSMPTest(t *testing.T) {
 	cancel()
 	<-done
 	_ = mgr
+}
+
+func TestSessionGroup_ParallelBindsRoundRobin(t *testing.T) {
+	srv := smpptest.NewUnstartedServer()
+	srv.Handler = submitSMRespHandler
+	srv.Start()
+	defer srv.Close()
+
+	const binds = 3
+	g := newSessionGroup(CarrierConfig{
+		CarrierID:           "test-carrier",
+		Addr:                srv.Addr(),
+		SystemID:            smpptest.DefaultUser,
+		Password:            smpptest.DefaultPasswd,
+		BindMode:            "tx",
+		EnquireLink:         30 * time.Second,
+		WindowSize:          10,
+		ThroughputPerSecond: 50,
+		BindCount:           binds,
+	}, nil, nil)
+	if len(g.sessions) != binds {
+		t.Fatalf("expected %d sessions, got %d", binds, len(g.sessions))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	g.start(ctx, func(string) {})
+	defer g.stop()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for g.readyCount() < binds {
+		if time.Now().After(deadline) {
+			t.Fatalf("only %d/%d sessions ready", g.readyCount(), binds)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if !g.ready() {
+		t.Fatal("group not ready")
+	}
+
+	// Submit more than one message so the round-robin spreads across sessions.
+	for i := 0; i < binds*2; i++ {
+		res, err := g.submit(ctx, SubmitRequest{
+			Src: "MiniSMS", Dst: "+243993873999", Body: "hello", DestTON: 1, DestNPI: 1,
+			SourceTON: 5, SourceNPI: 0, Encoding: "GSM7", Segments: 1, Timeout: 5 * time.Second,
+		})
+		if err != nil {
+			t.Fatalf("submit %d: %v", i, err)
+		}
+		if res.CommandStatus != 0 || res.CarrierMessageID == "" {
+			t.Fatalf("submit %d bad result: status=%d id=%q", i, res.CommandStatus, res.CarrierMessageID)
+		}
+	}
 }

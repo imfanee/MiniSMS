@@ -58,6 +58,7 @@ type CarrierFull struct {
 	SMPPEnquireLinkS       int
 	SMPPWindowSize         int
 	SMPPThroughputPerS     int
+	SMPPBindCount          int
 	SMPPStatus             string
 	SenderIDPolicy         string
 	DefaultSenderIDValue   *string
@@ -103,7 +104,8 @@ func GetCarrier(ctx context.Context, pool *pgxpool.Pool, id string) (*CarrierFul
 			c.dlr_message_id_field, c.dlr_status_field, c.dlr_status_map::text,
 			c.smpp_source_addr_ton, c.smpp_source_addr_npi, c.smpp_dest_addr_ton, c.smpp_dest_addr_npi,
 			c.egress_transport, c.smpp_host, c.smpp_port, c.smpp_system_id, c.smpp_password_enc,
-			c.smpp_system_type, c.smpp_bind_mode, c.smpp_tls, c.smpp_enquire_link_s, c.smpp_window_size, c.smpp_throughput_per_s, c.smpp_status,
+			c.smpp_system_type, c.smpp_bind_mode, c.smpp_tls, c.smpp_enquire_link_s, c.smpp_window_size, c.smpp_throughput_per_s,
+			COALESCE(c.smpp_bind_count, 1), c.smpp_status,
 			c.sender_id_policy, c.default_sender_id_value,
 			c.updated_at
 		FROM carriers c
@@ -112,7 +114,8 @@ func GetCarrier(ctx context.Context, pool *pgxpool.Pool, id string) (*CarrierFul
 		&c.DLRCallbackURLTemplate, &c.DLRFieldName, &c.DLRInboundSecret, &c.DLRMessageIDField, &c.DLRStatusField, &c.DLRStatusMap,
 		&c.SMPPSourceAddrTON, &c.SMPPSourceAddrNPI, &c.SMPPDestAddrTON, &c.SMPPDestAddrNPI,
 		&c.EgressTransport, &c.SMPPHost, &c.SMPPPort, &c.SMPPSystemID, &c.SMPPPasswordEnc,
-		&c.SMPPSystemType, &c.SMPPBindMode, &c.SMPPTLS, &c.SMPPEnquireLinkS, &c.SMPPWindowSize, &c.SMPPThroughputPerS, &c.SMPPStatus,
+		&c.SMPPSystemType, &c.SMPPBindMode, &c.SMPPTLS, &c.SMPPEnquireLinkS, &c.SMPPWindowSize, &c.SMPPThroughputPerS,
+		&c.SMPPBindCount, &c.SMPPStatus,
 		&c.SenderIDPolicy, &defaultSID,
 		&uat)
 	if err != nil {

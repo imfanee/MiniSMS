@@ -10,6 +10,14 @@
       <div class="form-text">Updated by the egress supervisor (read-only).</div>
     </div>
     <div class="col-md-4">
+      <label class="form-label d-block">Connection logs</label>
+      <button type="button" class="btn btn-outline-info"
+        @click="window.open('/admin/carriers/{{.CarrierID}}/smpp-logs','smpplogs_{{.CarrierID}}','width=960,height=640,resizable=yes,scrollbars=yes')">
+        Open SMPP logs
+      </button>
+      <div class="form-text">Live bind / DLR / error stream in a resizable window; connects only while open.</div>
+    </div>
+    <div class="col-md-4">
       <label class="form-label">Bind mode</label>
       <select class="form-select {{if index .Errors "smpp_bind_mode"}}is-invalid{{end}}" name="smpp_bind_mode">
         <option value="tx" {{if eq .Carrier.SMPPBindMode "tx"}}selected{{end}}>tx — submit only</option>
@@ -62,9 +70,15 @@
       {{if index .Errors "smpp_window_size"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_window_size"}}</div>{{end}}
     </div>
     <div class="col-md-4">
-      <label class="form-label">Throughput (/s)</label>
+      <label class="form-label">Throughput (/s per bind)</label>
       <input class="form-control {{if index .Errors "smpp_throughput_per_s"}}is-invalid{{end}}" name="smpp_throughput_per_s" type="number" min="1" max="10000" value="{{.Carrier.SMPPThroughputPerS}}" />
       {{if index .Errors "smpp_throughput_per_s"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_throughput_per_s"}}</div>{{end}}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Parallel binds</label>
+      <input class="form-control {{if index .Errors "smpp_bind_count"}}is-invalid{{end}}" name="smpp_bind_count" type="number" min="1" max="16" value="{{.Carrier.SMPPBindCount}}" />
+      <div class="form-text">Number of concurrent ESME sessions to the SMSC (1–16). Aggregate throughput is this times the per-bind value. Changing it rebinds within ~60s.</div>
+      {{if index .Errors "smpp_bind_count"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_bind_count"}}</div>{{end}}
     </div>
     <div class="col-12">
       <button class="btn btn-primary" type="submit">Save SMPP settings</button>

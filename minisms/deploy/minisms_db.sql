@@ -1194,6 +1194,7 @@ ALTER TABLE carriers
     ADD COLUMN IF NOT EXISTS smpp_enquire_link_s INT NOT NULL DEFAULT 30,
     ADD COLUMN IF NOT EXISTS smpp_window_size INT NOT NULL DEFAULT 10,
     ADD COLUMN IF NOT EXISTS smpp_throughput_per_s INT NOT NULL DEFAULT 50,
+    ADD COLUMN IF NOT EXISTS smpp_bind_count INT NOT NULL DEFAULT 1,
     ADD COLUMN IF NOT EXISTS smpp_status TEXT NOT NULL DEFAULT 'disabled';
 
 ALTER TABLE carriers
@@ -1215,6 +1216,9 @@ ALTER TABLE carriers
     DROP CONSTRAINT IF EXISTS chk_carriers_smpp_throughput_per_s,
     ADD CONSTRAINT chk_carriers_smpp_throughput_per_s
         CHECK (smpp_throughput_per_s >= 1 AND smpp_throughput_per_s <= 10000),
+    DROP CONSTRAINT IF EXISTS chk_carriers_smpp_bind_count,
+    ADD CONSTRAINT chk_carriers_smpp_bind_count
+        CHECK (smpp_bind_count >= 1 AND smpp_bind_count <= 16),
     DROP CONSTRAINT IF EXISTS chk_carriers_smpp_status,
     ADD CONSTRAINT chk_carriers_smpp_status
         CHECK (smpp_status IN ('disabled', 'down', 'binding', 'up', 'throttled'));

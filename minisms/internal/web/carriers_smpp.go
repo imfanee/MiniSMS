@@ -195,6 +195,14 @@ func (h *Handlers) RestartCarrierSMPP() http.HandlerFunc {
 			return
 		}
 		h.SMPPCtl.Restart(c.CarrierID)
+
+		ready, total, _ := h.SMPPCtl.BindStatus(c.CarrierID)
+		name := c.Name
+		h.recordAudit(r, "carrier.smpp_restart", "carrier", &c.CarrierID, &name, map[string]any{
+			"binds_ready": ready,
+			"binds_total": total,
+		})
+
 		c, _ = db.GetCarrier(r.Context(), h.Pool, cid)
 		_ = execT(w, h.CarrFragT, "carrier_smpp_panel",
 			h.carrierSMPPPanelData(r, c, "SMPP restart requested; sessions are rebinding.", nil))

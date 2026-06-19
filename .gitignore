@@ -21,3 +21,5 @@ coverage_all.out
 .cursor/
 *.swp
 *~
+.claude/leak-denylist.local
+.claude/settings.local.json

@@ -21,7 +21,7 @@ func StandardStatus(raw string) string {
 }
 
 // IsFinalStatus reports whether a normalized DLR status is terminal (no further receipt expected).
-// Intermediate Kamex events (SMSC ACK, queued) normalize to "unknown" and are not final.
+// Intermediate Gateway events (SMSC ACK, queued) normalize to "unknown" and are not final.
 func IsFinalStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "delivered", "undelivered", "rejected":
@@ -56,7 +56,7 @@ func mapRawStatus(raw string, statusMap map[string]string) string {
 }
 
 // NormalizeFromFields applies carrier-specific field names and status maps.
-// Kamex/Kannel DLR callbacks use numeric status (%d → query "status") and optional text (%A → "answer").
+// Gateway/Kannel DLR callbacks use numeric status (%d → query "status") and optional text (%A → "answer").
 func NormalizeFromFields(fields map[string]string, statusField *string, statusMap map[string]string) string {
 	primary := "status"
 	if statusField != nil && strings.TrimSpace(*statusField) != "" {

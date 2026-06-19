@@ -73,7 +73,7 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 	}
 	hadPriorReceipt := row.DLRReceivedAt != nil
 	dlrStatus := NormalizeFromFields(payloadFields, row.CarrierDLRStatusField, row.CarrierDLRStatusMap)
-	// A multi-bit dlr-mask (e.g. Kamex 31) can deliver an intermediate receipt (SMSC ACK, queued)
+	// A multi-bit dlr-mask (e.g. Gateway 31) can deliver an intermediate receipt (SMSC ACK, queued)
 	// before the final DELIVRD/UNDELIV. UpdateDLRReceived applies only while no final status is
 	// stored, so an intermediate never blocks a later final and a final is never overwritten; when
 	// it reports no change, this receipt is a duplicate/superseded one and is ignored.

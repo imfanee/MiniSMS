@@ -99,7 +99,7 @@ func TestApplyCarrierSenderFields(t *testing.T) {
 	em := map[string]string{}
 	policy, def := applyCarrierSenderFields(url.Values{
 		"sender_id_policy":        {"list"},
-		"default_sender_id_value": {"IZ tech"},
+		"default_sender_id_value": {"My Brand"},
 	}, em)
 	if len(em) != 0 {
 		t.Fatalf("unexpected errors: %v", em)
@@ -107,7 +107,7 @@ func TestApplyCarrierSenderFields(t *testing.T) {
 	if policy != "list" {
 		t.Fatalf("policy: got %q", policy)
 	}
-	if def == nil || *def != "IZ tech" {
+	if def == nil || *def != "My Brand" {
 		t.Fatalf("default: got %v", def)
 	}
 

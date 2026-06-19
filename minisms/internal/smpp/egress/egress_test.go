@@ -138,7 +138,7 @@ func TestSessionGroup_ParallelBindsRoundRobin(t *testing.T) {
 	// Submit more than one message so the round-robin spreads across sessions.
 	for i := 0; i < binds*2; i++ {
 		res, err := g.submit(ctx, SubmitRequest{
-			Src: "MiniSMS", Dst: "+243993873999", Body: "hello", DestTON: 1, DestNPI: 1,
+			Src: "MiniSMS", Dst: "+14155550102", Body: "hello", DestTON: 1, DestNPI: 1,
 			SourceTON: 5, SourceNPI: 0, Encoding: "GSM7", Segments: 1, Timeout: 5 * time.Second,
 		})
 		if err != nil {

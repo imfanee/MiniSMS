@@ -22,7 +22,7 @@ func TestIsValidAnySenderIDDefaultPattern(t *testing.T) {
 	if !IsValidAnySenderID(context.Background(), nil, "MiniSMS") {
 		t.Fatal("expected alphanumeric any")
 	}
-	if !IsValidAnySenderID(context.Background(), nil, "IZ tech") {
+	if !IsValidAnySenderID(context.Background(), nil, "My Brand") {
 		t.Fatal("expected space in any mode")
 	}
 	if !IsValidAnySenderID(context.Background(), nil, "IZ_tech") {

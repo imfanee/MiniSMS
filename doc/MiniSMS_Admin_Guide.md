@@ -265,7 +265,7 @@ Primary navigation on the carrier detail page:
 - **Session status** shows the live state plus how many parallel binds are currently up, for example `up (6/8 binds up)`. The count comes from the running egress supervisor (not the database), so it reflects binds in real time, including while a restart is rebinding.
 - **Open SMPP logs** (button on the SMPP tab) launches a resizable popup window that live-tails this carrier's SMPP session events (bind attempts, bind established or failed, disconnects/reconnects, `deliver_sm` receipts, and `submit_sm` errors). It connects only while the window is open, shows recent history first then streams new lines, auto-scrolls (toggleable), and offers Pause, Copy, and Clear. Lines never contain credentials. The viewer is read-only and requires the same admin permission and session as the rest of the carrier screens, so it adds no new exposure.
 - **Restart SMPP** (button on both the SMPP tab and inside the log popup) tears down and immediately rebinds all of this carrier's SMPP sessions. Use it when a carrier asks for a bind restart during troubleshooting. The action requires the carrier-edit permission and is CSRF-protected. If the log popup is open, the restart request and the fresh bind attempts appear in it in real time (the log stream is independent of the SMPP sessions, so it keeps updating across the restart).
-- **Parallel binds** (1..16): the number of concurrent ESME sessions MiniSMS opens to the SMSC. Many operators (for example Airtel DRC) advise several parallel transceiver binds for throughput and so the SMSC can spread delivery receipts across sessions. **Throughput (/s)** is applied per bind, so aggregate throughput is binds times that value. A `deliver_sm` receipt can arrive on any bind; MiniSMS correlates it to the original message regardless. Changing the bind count rebinds within about 60 seconds; the **Session status** field reads `up` once at least one bind is established.
+- **Parallel binds** (1..16): the number of concurrent ESME sessions MiniSMS opens to the SMSC. Many operators advise several parallel transceiver binds for throughput and so the SMSC can spread delivery receipts across sessions. **Throughput (/s)** is applied per bind, so aggregate throughput is binds times that value. A `deliver_sm` receipt can arrive on any bind; MiniSMS correlates it to the original message regardless. Changing the bind count rebinds within about 60 seconds; the **Session status** field reads `up` once at least one bind is established.
 
 Switching interconnect type changes which downstream path MiniSMS uses; retest with a single message after any change.
 
@@ -435,11 +435,11 @@ Generate PDF invoices for carrier usage over a date range. Summary cards at the 
 
 **Invoice header image:** Upload once under **Settings** (210 mm width recommended). Used on page 1 of all generated PDFs.
 
-### 5.7 DLR Settings (Kamex / Kannel-style HTTP)
+### 5.7 DLR Settings (Kannel-style HTTP gateway)
 
-This tab controls callback interoperability with each carrier. **Kamex** (and Kannel-compatible gateways) use `dlr-mask` + `dlr-url` on the outbound GET query; Kamex then **calls your `dlr-url`**, replacing placeholders in that URL.
+This tab controls callback interoperability with each carrier. Kannel-style HTTP gateways use `dlr-mask` + `dlr-url` on the outbound GET query; the gateway then **calls your `dlr-url`**, replacing placeholders in that URL.
 
-#### Kamex DLR mask (`dlr-mask` in request template)
+#### Gateway DLR mask (`dlr-mask` in request template)
 
 | Bit value | Meaning |
 |-----------|---------|
@@ -457,17 +457,17 @@ Put `dlr-mask=3` in the carrier **query template** for production: it yields exa
 ...&dlr-mask=3&dlr-url={{dlr_callback_url_encoded}}
 ```
 
-#### Kamex `dlr-url` placeholders (in DLR callback URL template)
+#### Gateway `dlr-url` placeholders (in DLR callback URL template)
 
-Configure **DLR callback URL template** so MiniSMS passes a URL **with Kamex placeholders** to the gateway. MiniSMS replaces only `{{message_id}}`; Kamex replaces `%d`, `%A`, etc. on callback.
+Configure **DLR callback URL template** so MiniSMS passes a URL **with the gateway placeholders** to the gateway. MiniSMS replaces only `{{message_id}}`; the gateway replaces `%d`, `%A`, etc. on callback.
 
-| Placeholder | Kamex fills with |
+| Placeholder | the gateway fills with |
 |-------------|------------------|
 | `%d` | Numeric DLR status code (1, 2, 4, 8, 16) |
 | `%A` | DLR status text (e.g. `DELIVRD`) |
 | `%P` | Recipient MSISDN |
 | `%p` | Sender ID |
-| `%i` | SMSC id (e.g. `airtel-drc`) |
+| `%i` | SMSC id (e.g. `smsc-1`) |
 | `%I` | SMSC message id |
 | `%t` / `%T` | Submit / done timestamps |
 
@@ -479,7 +479,7 @@ https://your-minisms-host/api/v1/dlr/{{message_id}}?status=%d&answer=%A&to=%P&fr
 
 **DLR status field name:** `status` (query param filled from `%d`).
 
-**DLR status map (JSON)** — map Kamex numeric codes to MiniSMS values:
+**DLR status map (JSON)**, mapping the gateway numeric codes to MiniSMS values:
 
 ```json
 {
@@ -494,11 +494,11 @@ https://your-minisms-host/api/v1/dlr/{{message_id}}?status=%d&answer=%A&to=%P&fr
 }
 ```
 
-> **Important:** If the callback URL template has **no** `%d` / `%A` placeholders, Kamex may call `/api/v1/dlr/{id}` with an empty query string and status will stay `unknown`.
+> **Important:** If the callback URL template has **no** `%d` / `%A` placeholders, the gateway may call `/api/v1/dlr/{id}` with an empty query string and status will stay `unknown`.
 
-> **Number encoding:** MiniSMS URL-encodes every outbound query value, so a sender or recipient carrying a leading `+` (for example `+17725216279`) reaches the gateway as `%2B17725216279` and is decoded back to `+17725216279`, never a leading space. The literal Kamex placeholders inside `dlr-url` (`%d`, `%A`, ...) are preserved through that encoding, so put them in verbatim.
+> **Number encoding:** MiniSMS URL-encodes every outbound query value, so a sender or recipient carrying a leading `+` (for example `+14155550101`) reaches the gateway as `%2B14155550101` and is decoded back to `+14155550101`, never a leading space. The literal the gateway placeholders inside `dlr-url` (`%d`, `%A`, ...) are preserved through that encoding, so put them in verbatim.
 
-Official references: [Kamex `doc/dlr.md`](https://github.com/vaska94/Kamex/blob/main/doc/dlr.md), [OpenAPI `dlr-mask`](https://github.com/vaska94/Kamex/blob/main/doc/openapi.yaml).
+Refer to your gateway vendor's `dlr-mask` / `dlr-url` documentation for the exact bit values and placeholder tokens, as these vary slightly between Kannel-derived gateways.
 
 ### 5.7.1 DLR Settings (general)
 

@@ -13,7 +13,7 @@
 
 | Item | Value |
 |------|--------|
-| **Last deploy** | 2026-06-18 (direct Airtel SMPP interconnect + N parallel binds; carrier DLR over `deliver_sm`) |
+| **Last deploy** | 2026-06-18 (direct SMPP carrier interconnect + N parallel binds; carrier DLR over `deliver_sm`) |
 | **Environments** | Production **active**; staging **stopped** (2026-06-06) |
 | **Git commit** | deployed binary built from local working tree (multi-bind SMPP egress + `smpp_bind_count` UI); commit when landed on `main` |
 | **Binary** | `/usr/local/bin/minisms` (built from `/usr/src/MiniSMS/minisms`, installed by hand) |
@@ -26,7 +26,7 @@
 | Service | `minisms.service` **active** | `minisms-staging.service` **inactive** |
 | Database | `minisms` | `minisms_test` |
 | App bind | `127.0.0.1:8080` | `127.0.0.1:18081` |
-| SMPP ingress | **enabled, PUBLIC** on `:2775` (`SMPP_LISTEN_ADDR=:2775`). No host firewall is active, so the port is open to the internet; app-level protection is per-client CIDR allowlist + bind-rate limiting + password. Restrict with a cloud/host firewall to known client IPs. | disabled |
+| SMPP ingress | enabled (`SMPP_LISTEN_ADDR` per env). Restrict `:2775` with a firewall to known client IPs and set each client's `smpp_allowed_cidrs`. | disabled |
 
 **Credentials:** Never commit `/etc/minisms/*.env`, API keys, or database passwords. Docs use placeholders only.
 
@@ -173,13 +173,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/healthz
 
 - HTTP/API/DLR: nginx → `:8080`
 - Client ESME: TCP `:2775` (not behind nginx); firewall to trusted IPs
-- SMPP ingress is **enabled and public** (`SMPP_SERVER_ENABLED=true`, `SMPP_LISTEN_ADDR=:2775`), listening on all interfaces (reachable at the host public IP `:2775`). The client-ingress path is validated end-to-end (bind, `submit_sm` to Airtel, `deliver_sm` DLR back) with `minisms/scripts/smpp_ingress_demo.py`. **There is no host firewall** (ufw inactive, iptables INPUT ACCEPT), so the port is exposed to the internet; the only access control is per-client `smpp_allowed_cidrs`, bind-rate limiting, and password verification. Strongly recommended: add a cloud/host firewall allowing `:2775` only from known client IPs, and keep every enabled SMPP client's `smpp_allowed_cidrs` tight. The `SMPP Ingress Test` client (system_id `ingresstest`) is **disabled** (status `disabled`, `smpp_ingress_enabled=false`); its binds are rejected.
+- SMPP ingress (clients bind to MiniSMS as ESME) is gated by `SMPP_SERVER_ENABLED`; the bind address is `SMPP_LISTEN_ADDR`. The client-ingress path is validated end-to-end (bind, `submit_sm` to a carrier, `deliver_sm` DLR back) with `minisms/scripts/smpp_ingress_demo.py`. The listener is not behind nginx, so restrict `:2775` with a firewall to known client IPs, keep every enabled SMPP client's `smpp_allowed_cidrs` tight, and disable any test client before exposing the port. App-level controls are per-client CIDR allowlist, bind-rate limiting, and password verification.
 
-### Carrier SMPP egress: Airtel DRC direct interconnect (2026-06-18)
+### Carrier SMPP egress: direct interconnect (2026-06-18)
 
-- DRC Airtel traffic now goes over a **direct outbound SMPP** carrier (`Airtel DRC Direct (SMPP)`, `egress_transport=smpp`) to the Airtel DRC SMSC, replacing the previous path through the Kamex (Kannel) HTTP `sendsms` gateway.
-- The carrier runs **8 parallel transceiver binds** (`smpp_bind_count=8`, `smpp_throughput_per_s=1` per bind so aggregate ~8/s, matching the prior Kamex setup). The egress manager opens one `sessionGroup` of N binds per carrier and round-robins `submit_sm`; delivery receipts (`deliver_sm`) arriving on any bind are correlated carrier-wide by `carrier_message_id`. Bind count is editable in the admin carrier SMPP panel and rebinds within about 60 seconds.
-- The Kamex gateway host (`jasmin-gw`) has its Kannel stack **stopped and disabled** so MiniSMS is the sole ESME on the Airtel system_id and receives all DLRs. Roll back by re-enabling the Kamex units and repointing the DRC route_entries to the old HTTP carrier (`IZZI DRC Airtel`). Topology details (host, ids, credentials handling) live in the agent project memory `minisms-airtel-smpp`, not in this repo.
+- Outbound traffic for the relevant destination prefixes goes over a **direct outbound SMPP** carrier (`egress_transport=smpp`) to the upstream SMSC, replacing an earlier path through a Kannel-style HTTP `sendsms` gateway.
+- The carrier can run multiple **parallel transceiver binds** (`smpp_bind_count`, `smpp_throughput_per_s` applied per bind). The egress manager opens one `sessionGroup` of N binds per carrier and round-robins `submit_sm`; delivery receipts (`deliver_sm`) arriving on any bind are correlated carrier-wide by `carrier_message_id`. Bind count is editable in the admin carrier SMPP panel and rebinds within about 60 seconds.
+- When migrating off a legacy gateway, ensure only one ESME holds the upstream session credentials so all DLRs route to the active sender. Deployment specifics (hosts, identifiers, credentials) live in operator-side notes, not in this repo. Roll back by repointing the route_entries to the previous HTTP carrier.
 - Schema delta for this change: `carriers.smpp_bind_count INT NOT NULL DEFAULT 1` with `CHECK (1..16)` (already in `deploy/minisms_db.sql`; applied to the live DB additively).
 
 ---

@@ -4,13 +4,13 @@
 
 Point-in-time engineering assessment from a read-only onboarding pass. Every claim traces to a file path read during the pass. Where code and docs disagree, code wins.
 
-> **Update 2026-06-18 (direct Airtel SMPP interconnect, deployed to production).** DRC Airtel traffic moved from the Kamex (Kannel) HTTP `sendsms` gateway to a direct outbound SMPP interconnect to the Airtel DRC SMSC, verified delivered end-to-end with correlated DLRs.
-> - **Direct SMPP carrier** `Airtel DRC Direct (SMPP)` (`egress_transport=smpp`), AES-GCM encrypted bind password, src TON/NPI 5/0, dst 1/1; DRC route prefixes repointed to it. The Kamex stack on the gateway host is stopped/disabled so MiniSMS is the sole ESME on the Airtel system_id and receives all `deliver_sm` DLRs. Topology in memory `minisms-airtel-smpp`.
-> - **N parallel binds per carrier:** new `carriers.smpp_bind_count` (1..16, additive schema delta, `CHECK`), egress `sessionGroup` opens N binds and round-robins `submit_sm`; DLRs correlate carrier-wide by `carrier_message_id`. Editable in the admin carrier SMPP panel; changing it rebinds within ~60s. Airtel runs 8 binds. Tests: `egress.TestSessionGroup_ParallelBindsRoundRobin`.
+> **Update 2026-06-18 (direct SMPP carrier interconnect, deployed to production).** Traffic for the relevant destination prefixes moved from a Kannel-style HTTP `sendsms` gateway to a direct outbound SMPP interconnect to the upstream SMSC, verified delivered end-to-end with correlated DLRs.
+> - **Direct SMPP carrier** (`egress_transport=smpp`), AES-GCM encrypted bind password, src/dst TON/NPI per the upstream spec; route prefixes repointed to it. Only one ESME holds the upstream credentials so MiniSMS receives all `deliver_sm` DLRs.
+> - **N parallel binds per carrier:** new `carriers.smpp_bind_count` (1..16, additive schema delta, `CHECK`), egress `sessionGroup` opens N binds and round-robins `submit_sm`; DLRs correlate carrier-wide by `carrier_message_id`. Editable in the admin carrier SMPP panel; changing it rebinds within ~60s. Tests: `egress.TestSessionGroup_ParallelBindsRoundRobin`.
 > - **SMPP connection-log viewer:** per-carrier in-memory ring buffer (`internal/smpp/egresslog`, no secrets/no disk) with an admin popup that live-tails over SSE (`/admin/carriers/{id}/smpp-logs` + `/stream`, `PermCarriersView`, GET-only, nginx `X-Accel-Buffering: no`, strict per-response CSP nonce, `textContent` rendering). Tests: `egresslog` hub tests + `web.TestStreamSMPPLogs`; auth gate verified (unauth -> 302, no leak).
 >
 > **Update 2026-06-17 (commit `3cce913`, deployed to production).** Since the onboarding pass the following landed and are live in prod (verified SMS + DLR working from the UI):
-> - **Bug #1 carrier query encoding:** `carrier.InjectQueryVariables` URL-encodes each query-template value so a literal `+` in from/to reaches the Kamex gateway as `%2B` (not a leading space). Was the root cause of "no DR".
+> - **Bug #1 carrier query encoding:** `carrier.InjectQueryVariables` URL-encodes each query-template value so a literal `+` in from/to reaches the HTTP gateway as `%2B` (not a leading space). Was the root cause of "no DR".
 > - **Multi-bit `dlr-mask`:** `db.UpdateDLRReceived` is now conditional (applies only while non-final), so an intermediate SMSC ACK from `dlr-mask=31` no longer blocks the final DELIVRD/UNDELIV (`dlr.IsFinalStatus`, `shouldForwardDLR`).
 > - **Risk 1 (DLR client-webhook SSRF):** resolved (see risk register).
 > - **DLR timeline enrichment** (inbound callback metadata) committed (was the in-flight `inbound.go`).

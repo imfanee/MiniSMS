@@ -16,8 +16,8 @@ import (
 // characters (+, &, =, /, space) in any value round-trip when the gateway parses the query.
 func TestInjectQueryVariablesEscapesReservedChars(t *testing.T) {
 	vars := map[string]string{
-		"from":                     "+17725216279",
-		"to":                       "+243993873999",
+		"from":                     "+14155550101",
+		"to":                       "+14155550102",
 		"message":                  "1+1=2 & a/b done",
 		"dlr_callback_url_encoded": "https%3A%2F%2Fsw%2Fdlr%3Fx%3D%25d",
 	}
@@ -26,7 +26,7 @@ func TestInjectQueryVariablesEscapesReservedChars(t *testing.T) {
 		vars,
 	)
 
-	if !strings.Contains(out, "from=%2B17725216279") {
+	if !strings.Contains(out, "from=%2B14155550101") {
 		t.Fatalf("from must be percent-encoded: %s", out)
 	}
 	if strings.Contains(out, "from=+17") || strings.Contains(out, "from= 17") {
@@ -44,11 +44,11 @@ func TestInjectQueryVariablesEscapesReservedChars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encoded query does not parse: %v", err)
 	}
-	if q.Get("from") != "+17725216279" {
-		t.Fatalf("from round-trip = %q, want +17725216279", q.Get("from"))
+	if q.Get("from") != "+14155550101" {
+		t.Fatalf("from round-trip = %q, want +14155550101", q.Get("from"))
 	}
-	if q.Get("to") != "+243993873999" {
-		t.Fatalf("to round-trip = %q, want +243993873999", q.Get("to"))
+	if q.Get("to") != "+14155550102" {
+		t.Fatalf("to round-trip = %q, want +14155550102", q.Get("to"))
 	}
 	if q.Get("text") != "1+1=2 & a/b done" {
 		t.Fatalf("text round-trip = %q (reserved chars corrupted)", q.Get("text"))
@@ -56,7 +56,7 @@ func TestInjectQueryVariablesEscapesReservedChars(t *testing.T) {
 }
 
 // TestDispatchToCarrierDeliversPlusAsEncoded is the end-to-end acceptance test for Bug #1:
-// the gateway must receive from decoded as "+17725216279", not " 17725216279".
+// the gateway must receive from decoded as "+14155550101", not " 14155550101".
 func TestDispatchToCarrierDeliversPlusAsEncoded(t *testing.T) {
 	var rawQuery, gotFrom, gotTo, gotText, gotMask string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,8 +73,8 @@ func TestDispatchToCarrierDeliversPlusAsEncoded(t *testing.T) {
 	defer ResetDispatchEndpointValidator()
 
 	vars := map[string]string{
-		"from":    "+17725216279",
-		"to":      "+243993873999",
+		"from":    "+14155550101",
+		"to":      "+14155550102",
 		"message": "Hello from switch & co",
 	}
 	query := InjectQueryVariables("username=switch&from={{from}}&to={{to}}&text={{message}}&dlr-mask=31", vars)
@@ -90,14 +90,14 @@ func TestDispatchToCarrierDeliversPlusAsEncoded(t *testing.T) {
 	if res.StatusCode != http.StatusOK || res.Body != "0: Accepted for delivery" {
 		t.Fatalf("unexpected gateway response: %d %q", res.StatusCode, res.Body)
 	}
-	if !strings.Contains(rawQuery, "from=%2B17725216279") {
+	if !strings.Contains(rawQuery, "from=%2B14155550101") {
 		t.Fatalf("wire query must encode + as %%2B, got: %s", rawQuery)
 	}
-	if gotFrom != "+17725216279" {
-		t.Fatalf("gateway decoded from = %q, want +17725216279 (a leading space means the bug is present)", gotFrom)
+	if gotFrom != "+14155550101" {
+		t.Fatalf("gateway decoded from = %q, want +14155550101 (a leading space means the bug is present)", gotFrom)
 	}
-	if gotTo != "+243993873999" {
-		t.Fatalf("gateway decoded to = %q, want +243993873999", gotTo)
+	if gotTo != "+14155550102" {
+		t.Fatalf("gateway decoded to = %q, want +14155550102", gotTo)
 	}
 	if gotText != "Hello from switch & co" {
 		t.Fatalf("message corrupted in transit: %q", gotText)
@@ -112,15 +112,15 @@ func TestDispatchToCarrierDeliversPlusAsEncoded(t *testing.T) {
 // default (5). cfg is empty so detection is dynamic.
 func TestResolveTONNPISenderClassification(t *testing.T) {
 	cfg := SMPPConfig{}
-	dest := "+243993873999"
+	dest := "+14155550102"
 
-	if p := ResolveTONNPI(cfg, "+17725216279", dest); p.SourceAddrTON != 1 || p.SourceAddrNPI != 1 {
+	if p := ResolveTONNPI(cfg, "+14155550101", dest); p.SourceAddrTON != 1 || p.SourceAddrNPI != 1 {
 		t.Fatalf("numeric +MSISDN: got ton=%d npi=%d, want ton=1 npi=1", p.SourceAddrTON, p.SourceAddrNPI)
 	}
-	if p := ResolveTONNPI(cfg, "17725216279", dest); p.SourceAddrTON == 5 {
+	if p := ResolveTONNPI(cfg, "14155550101", dest); p.SourceAddrTON == 5 {
 		t.Fatalf("bare-digit sender must not be classified alphanumeric (got ton=5)")
 	}
-	for _, alpha := range []string{"ACME", "Zaz.Bet", "IZ tech"} {
+	for _, alpha := range []string{"ACME", "Zaz.Bet", "My Brand"} {
 		if p := ResolveTONNPI(cfg, alpha, dest); p.SourceAddrTON != 5 {
 			t.Fatalf("alphanumeric sender %q: got ton=%d, want 5 (SMSC default)", alpha, p.SourceAddrTON)
 		}

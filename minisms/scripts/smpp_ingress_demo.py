@@ -1,12 +1,17 @@
 # Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
 # Minimal dependency-free SMPP v3.4 transceiver client for testing MiniSMS ingress.
 # Binds, submit_sm to a destination requesting a DLR, then prints the deliver_sm receipt.
-import socket, struct, sys, time
+import os, socket, struct, sys, time
 
-HOST, PORT = "127.0.0.1", 2775
-SYS_ID, PWD = b"ingresstest", b"ingresspass"
-SRC = b"IZ tech"
-DST = (sys.argv[1] if len(sys.argv) > 1 else "243982821454").encode()
+# Configure via env or argv; no real credentials or numbers are stored here.
+#   SMPP_HOST, SMPP_PORT, SMPP_SYSTEM_ID, SMPP_PASSWORD, SMPP_SRC
+#   argv[1] = destination MSISDN (E.164 without '+')
+HOST = os.getenv("SMPP_HOST", "127.0.0.1")
+PORT = int(os.getenv("SMPP_PORT", "2775"))
+SYS_ID = os.getenv("SMPP_SYSTEM_ID", "CHANGEME").encode()
+PWD = os.getenv("SMPP_PASSWORD", "CHANGEME").encode()
+SRC = os.getenv("SMPP_SRC", "DEMO").encode()
+DST = (sys.argv[1] if len(sys.argv) > 1 else "10000000000").encode()
 TEXT = b"MiniSMS ingress SMPP test"
 
 BIND_TRX, SUBMIT_SM, DELIVER_SM = 0x00000009, 0x00000004, 0x00000005

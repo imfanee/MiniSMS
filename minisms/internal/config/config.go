@@ -30,7 +30,7 @@ type Config struct {
 	CSRFSigningKey             []byte
 	SessionIdle                time.Duration
 	CarrierDispatchTimeoutSecs   int
-	HTTPCarrierInsecureTLS       bool // skip TLS verify for outbound HTTP carriers (self-signed Kamex, etc.)
+	HTTPCarrierInsecureTLS       bool // skip TLS verify for outbound HTTP carriers (self-signed Gateway, etc.)
 	SMPPServerEnabled          bool
 	SMPPListenAddr             string
 	SMPPSystemID               string

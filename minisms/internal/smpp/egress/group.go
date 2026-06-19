@@ -11,7 +11,7 @@ import (
 
 // sessionGroup supervises N parallel SMPP ESME sessions for one carrier and
 // load-balances submit_sm across the ready sessions (round-robin). Several
-// carriers (for example Airtel DRC) advise multiple parallel transceiver binds
+// carriers advise multiple parallel transceiver binds
 // for throughput and to let the SMSC distribute delivery receipts. A deliver_sm
 // may arrive on any of the sessions; correlation is carrier-wide (by
 // carrier_message_id via dlr.HandleCarrierSMPP), so every session feeds the same

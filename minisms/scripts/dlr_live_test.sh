@@ -4,7 +4,7 @@
 # One-shot live DLR test: sends the 5 handover test messages through MiniSMS
 # (POST /api/v1/sms/send), then polls delivery-receipt status for each.
 #
-# This sends REAL, billable SMS through the live carrier/Kamex gateway. Run it
+# This sends REAL, billable SMS through the live carrier/HTTP gateway gateway. Run it
 # only against a host you intend to bill, with real credentials supplied via env.
 #
 # Requirements: bash, curl, jq.
@@ -17,13 +17,13 @@ set -euo pipefail
 : "${MINISMS_BASE_URL:?set MINISMS_BASE_URL, e.g. https://minisms.example.com}"
 : "${MINISMS_API_KEY:?set MINISMS_API_KEY to a client API key}"
 
-DEST_PRIMARY="+243993873999"
-DEST_SECONDARY="+243982821454"
+DEST_PRIMARY="+10000000001"
+DEST_SECONDARY="+10000000002"
 
 # from|to per the handover test matrix
 TESTS=(
   "ACME|${DEST_PRIMARY}"
-  "+17725216279|${DEST_PRIMARY}"
+  "+10000000003|${DEST_PRIMARY}"
   "+17865865545|${DEST_PRIMARY}"
   "Zaz.Bet|${DEST_PRIMARY}"
   "ACME|${DEST_SECONDARY}"

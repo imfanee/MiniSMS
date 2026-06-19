@@ -3,7 +3,7 @@ package dlr
 
 import "testing"
 
-// Kamex/Kannel bitmask status codes (doc/dlr.md).
+// Gateway/Kannel bitmask status codes (doc/dlr.md).
 var kamexStatusMap = map[string]string{
 	"1":  "delivered",
 	"2":  "undelivered",
@@ -12,7 +12,7 @@ var kamexStatusMap = map[string]string{
 	"16": "undelivered",
 }
 
-func TestNormalizeFromFields_KamexNumericStatus(t *testing.T) {
+func TestNormalizeFromFields_GatewayNumericStatus(t *testing.T) {
 	field := "status"
 	got := NormalizeFromFields(map[string]string{"status": "1"}, &field, kamexStatusMap)
 	if got != "delivered" {
@@ -24,7 +24,7 @@ func TestNormalizeFromFields_KamexNumericStatus(t *testing.T) {
 	}
 }
 
-func TestNormalizeFromFields_KamexAnswerFallback(t *testing.T) {
+func TestNormalizeFromFields_GatewayAnswerFallback(t *testing.T) {
 	field := "status"
 	got := NormalizeFromFields(map[string]string{"answer": "DELIVRD"}, &field, kamexStatusMap)
 	if got != "delivered" {
@@ -32,7 +32,7 @@ func TestNormalizeFromFields_KamexAnswerFallback(t *testing.T) {
 	}
 }
 
-func TestNormalizeFromFields_EmptyQueryLikeKamexBareURL(t *testing.T) {
+func TestNormalizeFromFields_EmptyQueryLikeGatewayBareURL(t *testing.T) {
 	field := "status"
 	got := NormalizeFromFields(map[string]string{}, &field, kamexStatusMap)
 	if got != "unknown" {

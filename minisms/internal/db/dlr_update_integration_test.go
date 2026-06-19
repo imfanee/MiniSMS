@@ -29,7 +29,7 @@ func TestUpdateDLRReceived_FinalNotOverwritten(t *testing.T) {
 	}
 	msgID, err := CreateSMSLog(ctx, tx, SMSLog{
 		ClientID:       clientID,
-		ToNumber:       "+243993873999",
+		ToNumber:       "+14155550102",
 		MessageBody:    "hi",
 		MessageLength:  2,
 		Segments:       1,
@@ -49,7 +49,7 @@ func TestUpdateDLRReceived_FinalNotOverwritten(t *testing.T) {
 	}
 	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM sms_logs WHERE message_id=$1::uuid`, msgID) })
 
-	// Intermediate receipt (Kamex SMSC ACK normalizes to unknown) applies.
+	// Intermediate receipt (Gateway SMSC ACK normalizes to unknown) applies.
 	if applied, err := UpdateDLRReceived(ctx, pool, msgID, "unknown"); err != nil || !applied {
 		t.Fatalf("intermediate receipt: applied=%v err=%v, want applied=true", applied, err)
 	}

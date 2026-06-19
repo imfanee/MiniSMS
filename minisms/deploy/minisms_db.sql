@@ -1347,7 +1347,7 @@ VALUES (
 ON CONFLICT (key) DO NOTHING;
 
 -- >>> 007_sender_id_any_pattern_spaces.up.sql <<<
--- Allow spaces in "Any" sender IDs (e.g. "IZ tech").
+-- Allow spaces in "Any" sender IDs (e.g. "My Brand").
 UPDATE system_settings
 SET value = '^[A-Za-z0-9 .-]{1,15}$',
     description = 'Regex for sender IDs when client policy is Any (letters, digits, space, dot, hyphen; max 15 chars)'

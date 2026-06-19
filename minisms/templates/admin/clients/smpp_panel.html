@@ -12,6 +12,30 @@
       <div class="form-text">Requires <code>SMPP_SERVER_ENABLED=true</code> on the host and firewall to <code>:2775</code>.</div>
     </div>
     <div class="col-md-4">
+      <label class="form-label">Session status</label>
+      <input class="form-control font-monospace" readonly value="{{if .BindsKnown}}{{.BindsConnected}} bind(s) connected{{else}}ingress server disabled{{end}}" />
+      <div class="form-text">Live count of bound ESME sessions (read-only).</div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label d-block">Connection logs</label>
+      <button type="button" class="btn btn-outline-info"
+        @click="window.open('/admin/clients/{{.ClientID}}/smpp-logs','smpplogs_{{.ClientID}}','width=960,height=640,resizable=yes,scrollbars=yes')">
+        Open SMPP logs
+      </button>
+      <div class="form-text">Live bind / submit_sm / DLR / error stream; connects only while open.</div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label d-block">Restart sessions</label>
+      <button type="button" class="btn btn-outline-warning"
+        hx-post="/admin/clients/{{.ClientID}}/smpp-restart"
+        hx-headers='{"X-CSRF-Token": "{{.CSRFToken}}"}'
+        hx-target="#client-smpp-panel" hx-swap="outerHTML"
+        hx-confirm="Disconnect all SMPP sessions for this client now? They will reconnect.">
+        Restart SMPP
+      </button>
+      <div class="form-text">Force-disconnects the client's binds (troubleshooting).</div>
+    </div>
+    <div class="col-md-4">
       <label class="form-label">System ID</label>
       <input class="form-control font-monospace {{if index .Errors "smpp_system_id"}}is-invalid{{end}}" name="smpp_system_id" value="{{if .Client.SMPPSystemID}}{{.Client.SMPPSystemID}}{{end}}" />
       {{if index .Errors "smpp_system_id"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_system_id"}}</div>{{end}}
@@ -19,10 +43,10 @@
     <div class="col-md-4">
       <label class="form-label">Password</label>
       <div class="input-group">
-        <input :type="showPassword ? 'text' : 'password'" class="form-control {{if index .Errors "smpp_password"}}is-invalid{{end}}" name="smpp_password" placeholder="leave blank to keep current" />
+        <input :type="showPassword ? 'text' : 'password'" class="form-control {{if index .Errors "smpp_password"}}is-invalid{{end}}" name="smpp_password" autocomplete="off" value="{{.CurrentPassword}}" placeholder="leave blank to keep current" />
         <button type="button" class="btn btn-outline-secondary" @click="showPassword = !showPassword"><span x-text="showPassword ? 'Hide' : 'Show'"></span></button>
       </div>
-      {{if .MaskedPassword}}<div class="form-text">Saved: {{.MaskedPassword}}</div>{{end}}
+      {{if .CurrentPassword}}<div class="form-text">Current password shown above (click Show to reveal). Edit to change.</div>{{end}}
       {{if index .Errors "smpp_password"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_password"}}</div>{{end}}
     </div>
     <div class="col-md-4">

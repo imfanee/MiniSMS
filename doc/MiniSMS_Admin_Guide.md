@@ -709,6 +709,18 @@ You see columns for identity, status, currency, and balance context. Use this pa
 
 > **Warning (Margin risk):** If you enable in-loss delivery broadly, high-volume traffic can produce sustained losses.
 
+### 8.3.1 SMPP Ingress tab
+
+Lets a client bind to MiniSMS as an ESME (MiniSMS acts as the SMSC) and send via `submit_sm` instead of the REST API. Requires `SMPP_SERVER_ENABLED=true` on the host; the listener is `SMPP_LISTEN_ADDR` (default `:2775`), which is not behind nginx and must be firewalled to trusted client IPs.
+
+- **SMPP ingress enabled**, **System ID**, **Password**: the client's bind credentials. The current password is shown in the field (click **Show** to reveal); edit it to change. The password is stored encrypted (AES-256-GCM).
+- **Allowed client IPs (CIDR)**: bind is rejected unless the source IP matches. Empty means allow any (not recommended).
+- **Max binds**: cap on concurrent sessions for this client; **Throughput (/s)** rate-limits `submit_sm`.
+- **DLR delivery mode**: `http` (webhook only), `smpp` (`deliver_sm` only), or `both` (SMPP when a session is bound, else HTTP). With `smpp`/`both`, a delivery receipt for a message the client submitted is sent back as `deliver_sm` to a bound RX/TRX session.
+- **Session status** shows the live count of bound ESME sessions.
+- **Open SMPP logs** launches the same resizable, live-tailing popup as carriers, scoped to this client (bind accepted/rejected, `submit_sm`, `deliver_sm` DLR, errors). Read-only, gated by the clients-view permission; connects only while open.
+- **Restart SMPP** force-disconnects the client's bound sessions (a well-behaved client reconnects). Requires the clients-edit permission, is CSRF-protected, and writes a `client.smpp_restart` audit entry. If the log popup is open, the disconnect and the client's fresh binds appear in it live.
+
 ### 8.4 Sender IDs tab
 
 1. Add allowed sender IDs for client.

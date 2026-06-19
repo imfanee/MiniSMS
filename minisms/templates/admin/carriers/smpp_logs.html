@@ -1,10 +1,10 @@
 {/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
-{{define "carrier_smpp_logs"}}<!doctype html>
+{{define "smpp_logs"}}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SMPP logs - {{.CarrierName}}</title>
+  <title>SMPP logs - {{.Title}}</title>
   <style nonce="{{.Nonce}}">
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -31,7 +31,7 @@
 </head>
 <body>
   <header>
-    <span class="title">SMPP &middot; {{.CarrierName}}</span>
+    <span class="title">SMPP &middot; {{.Title}}</span>
     <span id="status" class="badge off">connecting</span>
     <span id="count" class="count">0 lines</span>
     <label class="toggle"><input type="checkbox" id="autoscroll" checked /> auto-scroll</label>
@@ -45,8 +45,8 @@
   </main>
   <script nonce="{{.Nonce}}">
     (function () {
-      var streamURL = {{ printf "/admin/carriers/%s/smpp-logs/stream" .CarrierID }};
-      var restartURL = {{ printf "/admin/carriers/%s/smpp-restart" .CarrierID }};
+      var streamURL = {{ .StreamURL }};
+      var restartURL = {{ .RestartURL }};
       var csrfToken = {{ .CSRFToken }};
       var logEl = document.getElementById('log');
       var scroller = document.getElementById('scroller');

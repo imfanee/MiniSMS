@@ -54,10 +54,10 @@
     <div class="col-md-4">
       <label class="form-label">Password</label>
       <div class="input-group">
-        <input :type="showPassword ? 'text' : 'password'" class="form-control {{if index .Errors "smpp_password"}}is-invalid{{end}}" name="smpp_password" placeholder="leave blank to keep current" />
+        <input :type="showPassword ? 'text' : 'password'" class="form-control {{if index .Errors "smpp_password"}}is-invalid{{end}}" name="smpp_password" autocomplete="off" value="{{.CurrentPassword}}" placeholder="leave blank to keep current" />
         <button type="button" class="btn btn-outline-secondary" @click="showPassword = !showPassword"><span x-text="showPassword ? 'Hide' : 'Show'"></span></button>
       </div>
-      {{if .MaskedPassword}}<div class="form-text">Saved: {{.MaskedPassword}}</div>{{end}}
+      {{if .CurrentPassword}}<div class="form-text">Current password shown above (click Show to reveal). Edit to change.</div>{{end}}
       {{if index .Errors "smpp_password"}}<div class="invalid-feedback d-block">{{index .Errors "smpp_password"}}</div>{{end}}
     </div>
     <div class="col-md-4">

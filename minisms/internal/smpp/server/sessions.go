@@ -65,11 +65,13 @@ func (r *sessionRegistry) add(s *session) {
 	}
 }
 
-func (r *sessionRegistry) remove(s *session) {
+// remove drops a session and reports whether it was present (so callers log the
+// lifecycle event exactly once even if remove races with another path).
+func (r *sessionRegistry) remove(s *session) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.sessions[s]; !ok {
-		return
+		return false
 	}
 	delete(r.sessions, s)
 	if r.byClient[s.clientID] > 0 {
@@ -87,6 +89,23 @@ func (r *sessionRegistry) remove(s *session) {
 	}
 	if len(r.deliver[s.clientID]) == 0 {
 		delete(r.deliver, s.clientID)
+	}
+	return true
+}
+
+// closeClient closes every connection bound for a client. The handleConn loops
+// then exit on read error and remove their own sessions via the disconnect path.
+func (r *sessionRegistry) closeClient(clientID string) {
+	r.mu.Lock()
+	var conns []*conn
+	for s := range r.sessions {
+		if s.clientID == clientID && s.conn != nil {
+			conns = append(conns, s.conn)
+		}
+	}
+	r.mu.Unlock()
+	for _, c := range conns {
+		_ = c.Close()
 	}
 }
 

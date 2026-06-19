@@ -15,10 +15,13 @@ import (
 type clientSMPPPanelData struct {
 	ClientID       string
 	CSRFToken      string
-	Client         *db.Client
-	MaskedPassword string
-	Success        string
-	Errors         map[string]string
+	Client          *db.Client
+	MaskedPassword  string
+	CurrentPassword string
+	Success         string
+	Errors          map[string]string
+	BindsKnown      bool
+	BindsConnected  int
 }
 
 func (h *Handlers) GetClientSMPPSettings() http.HandlerFunc {
@@ -136,21 +139,29 @@ func (h *Handlers) SaveClientSMPPSettings() http.HandlerFunc {
 
 func (h *Handlers) clientSMPPPanelData(r *http.Request, c *db.Client, success string, errs map[string]string) clientSMPPPanelData {
 	masked := ""
+	current := ""
 	if c != nil && c.SMPPPasswordEnc != nil && strings.TrimSpace(*c.SMPPPasswordEnc) != "" {
 		if dec, err := db.DecryptValue(h.Config.SecretKey, *c.SMPPPasswordEnc); err == nil {
 			masked = maskTail(dec)
+			current = dec
 		}
 	}
 	cid := ""
 	if c != nil {
 		cid = c.ClientID
 	}
-	return clientSMPPPanelData{
-		ClientID:       cid,
-		CSRFToken:      csrf.Token(r),
-		Client:         c,
-		MaskedPassword: masked,
-		Success:        success,
-		Errors:         errs,
+	data := clientSMPPPanelData{
+		ClientID:        cid,
+		CSRFToken:       csrf.Token(r),
+		Client:          c,
+		MaskedPassword:  masked,
+		CurrentPassword: current,
+		Success:         success,
+		Errors:          errs,
 	}
+	if h.SMPPIngress != nil && cid != "" {
+		data.BindsKnown = true
+		data.BindsConnected = h.SMPPIngress.BindCount(cid)
+	}
+	return data
 }

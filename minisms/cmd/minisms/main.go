@@ -381,7 +381,7 @@ func main() {
 		CarrListT:     carrierListT,
 		CarrDetT:      carrierDetT,
 		CarrFragT:     carrierFragT,
-		CarrSMPPLogsT: carrierSMPPLogsT,
+		SMPPLogsT:     carrierSMPPLogsT,
 		RGListT:       rateGroupListT,
 		RGDetT:        rateGroupDetT,
 		RGFragT:       rateGroupFragT,
@@ -414,6 +414,10 @@ func main() {
 	if app.Egress != nil {
 		h.SMPPLogHub = app.Egress.LogHub()
 		h.SMPPCtl = app.Egress
+	}
+	if app.SMPPServer != nil {
+		h.SMPPIngress = app.SMPPServer
+		h.SMPPIngressLogHub = app.SMPPServer.LogHub()
 	}
 
 	apiHandlers := api.NewHandlers(pool, cfg, app.Egress, app.Send)

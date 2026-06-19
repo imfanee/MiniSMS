@@ -15,9 +15,10 @@ import (
 type carrierSMPPPanelData struct {
 	CarrierID      string
 	CSRFToken      string
-	Carrier        *db.CarrierFull
-	MaskedPassword string
-	Success        string
+	Carrier         *db.CarrierFull
+	MaskedPassword  string
+	CurrentPassword string
+	Success         string
 	Errors         map[string]string
 	BindsKnown     bool
 	BindsReady     int
@@ -155,18 +156,21 @@ func (h *Handlers) carrierSMPPPanelData(r *http.Request, c *db.CarrierFull, succ
 		cid = c.CarrierID
 	}
 	masked := ""
+	current := ""
 	if c != nil && c.SMPPPasswordEnc != nil && strings.TrimSpace(*c.SMPPPasswordEnc) != "" {
 		if dec, err := db.DecryptValue(h.Config.SecretKey, *c.SMPPPasswordEnc); err == nil {
 			masked = maskTail(dec)
+			current = dec
 		}
 	}
 	data := carrierSMPPPanelData{
-		CarrierID:      cid,
-		CSRFToken:      csrf.Token(r),
-		Carrier:        c,
-		MaskedPassword: masked,
-		Success:        success,
-		Errors:         errs,
+		CarrierID:       cid,
+		CSRFToken:       csrf.Token(r),
+		Carrier:         c,
+		MaskedPassword:  masked,
+		CurrentPassword: current,
+		Success:         success,
+		Errors:          errs,
 	}
 	if h.SMPPCtl != nil {
 		if ready, total, present := h.SMPPCtl.BindStatus(cid); present {

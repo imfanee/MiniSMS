@@ -26,7 +26,7 @@
 | Service | `minisms.service` **active** | `minisms-staging.service` **inactive** |
 | Database | `minisms` | `minisms_test` |
 | App bind | `127.0.0.1:8080` | `127.0.0.1:18081` |
-| SMPP ingress | disabled | disabled |
+| SMPP ingress | **enabled** on `127.0.0.1:2775` (localhost-only; widen + firewall for real clients) | disabled |
 
 **Credentials:** Never commit `/etc/minisms/*.env`, API keys, or database passwords. Docs use placeholders only.
 
@@ -173,7 +173,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/healthz
 
 - HTTP/API/DLR: nginx → `:8080`
 - Client ESME: TCP `:2775` (not behind nginx); firewall to trusted IPs
-- Start with `SMPP_SERVER_ENABLED=false` until clients ready
+- SMPP ingress is currently **enabled** but bound to `127.0.0.1:2775` (`SMPP_SERVER_ENABLED=true`, `SMPP_LISTEN_ADDR=127.0.0.1:2775` in the env). This is safe (no public exposure) and was used to validate the client-ingress path end-to-end (bind, `submit_sm` to Airtel, `deliver_sm` DLR back) with `minisms/scripts/smpp_ingress_demo.py`. To onboard a real remote client, change `SMPP_LISTEN_ADDR` to a reachable interface, firewall `:2775` to the client's IPs, and set the client's `smpp_allowed_cidrs`. A localhost-only `SMPP Ingress Test` client (system_id `ingresstest`) exists for testing; remove or rotate it before exposing the port.
 
 ### Carrier SMPP egress: Airtel DRC direct interconnect (2026-06-18)
 

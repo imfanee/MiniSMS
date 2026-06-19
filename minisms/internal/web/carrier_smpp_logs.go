@@ -27,11 +27,13 @@ type SMPPController interface {
 
 var errSMPPControllerUnavailable = errors.New("smpp controller unavailable")
 
-type carrierSMPPLogsPage struct {
-	CarrierID   string
-	CarrierName string
-	CSRFToken   string
-	Nonce       string
+// smppLogsPage drives the shared (carrier or client) SMPP log popup template.
+type smppLogsPage struct {
+	Title      string
+	StreamURL  string
+	RestartURL string
+	CSRFToken  string
+	Nonce      string
 }
 
 // GetCarrierSMPPLogsView serves the standalone (popup) SMPP connection-log viewer
@@ -55,11 +57,12 @@ func (h *Handlers) GetCarrierSMPPLogsView() http.HandlerFunc {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Cache-Control", "no-store")
-		if err := execT(w, h.CarrSMPPLogsT, "carrier_smpp_logs", carrierSMPPLogsPage{
-			CarrierID:   c.CarrierID,
-			CarrierName: c.Name,
-			CSRFToken:   csrf.Token(r),
-			Nonce:       nonce,
+		if err := execT(w, h.SMPPLogsT, "smpp_logs", smppLogsPage{
+			Title:      c.Name,
+			StreamURL:  "/admin/carriers/" + c.CarrierID + "/smpp-logs/stream",
+			RestartURL: "/admin/carriers/" + c.CarrierID + "/smpp-restart",
+			CSRFToken:  csrf.Token(r),
+			Nonce:      nonce,
 		}); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/sending"
+	"github.com/minisms/minisms/internal/smpp/egresslog"
 	"golang.org/x/time/rate"
 )
 
@@ -37,6 +39,7 @@ type Server struct {
 	TLSKey     string
 
 	sessions *sessionRegistry
+	logHub   *egresslog.Hub
 
 	mu     sync.Mutex
 	ln     net.Listener
@@ -58,7 +61,35 @@ func New(pool *pgxpool.Pool, cfg *config.Config, send *sending.Service) *Server 
 		TLSCert:    cfg.SMPPTLSCertFile,
 		TLSKey:     cfg.SMPPTLSKeyFile,
 		sessions:   newSessionRegistry(),
+		logHub:     egresslog.NewHub(),
 	}
+}
+
+// LogHub returns the per-client SMPP ingress session log hub for live admin tailing.
+func (s *Server) LogHub() *egresslog.Hub { return s.logHub }
+
+// BindCount reports how many ESME sessions are currently bound for a client.
+func (s *Server) BindCount(clientID string) int { return s.sessions.bindCount(clientID) }
+
+// RestartClient force-disconnects all of a client's bound ESME sessions; a
+// well-behaved client reconnects. Used for troubleshooting from the admin UI.
+func (s *Server) RestartClient(clientID string) {
+	s.logHub.Event(clientID, "WARN", "restart requested via admin")
+	s.sessions.closeClient(clientID)
+}
+
+func (s *Server) logEvent(clientID, level, msg string, kv ...string) {
+	if s.logHub == nil || clientID == "" {
+		return
+	}
+	s.logHub.Event(clientID, level, msg, kv...)
+}
+
+func hostStr(addr net.Addr) string {
+	if h := remoteHost(addr); h != nil {
+		return *h
+	}
+	return ""
 }
 
 // Start listens for ESME connections until Stop is called.
@@ -134,6 +165,13 @@ func (s *Server) handleConn(ctx context.Context, c *conn) {
 	defer s.sessions.untrackConn()
 	_ = c.rwc.SetReadDeadline(time.Now().Add(unboundReadDeadline))
 	var sess *session
+	// On disconnect (read error / server stop), drop the session so bind counts
+	// stay accurate. Explicit unbind sets sess=nil first, so this is a no-op then.
+	defer func() {
+		if sess != nil {
+			s.endSession(sess, "disconnect")
+		}
+	}()
 	for {
 		p, err := c.Read()
 		if err != nil {
@@ -170,7 +208,7 @@ func (s *Server) handleConn(ctx context.Context, c *conn) {
 			resp.Header().Seq = p.Header().Seq
 			_ = c.Write(resp)
 			if sess != nil {
-				s.unregisterSession(ctx, sess)
+				s.endSession(sess, "unbind")
 				sess = nil
 			}
 			return
@@ -230,23 +268,27 @@ func (s *Server) handleBind(ctx context.Context, c *conn, p pdu.Body) *session {
 	if profile.Status != "active" {
 		markBindFailure(throttleKey, now)
 		s.writeBindResp(c, p, StatusRBindFail)
+		s.logEvent(profile.ClientID, "ERROR", "bind rejected", "mode", mode.String(), "remote", hostStr(c.remote), "reason", "client not active")
 		_ = db.InsertSMPPBindEvent(ctx, s.Pool, profile.ClientID, "bind_fail", mode.String(), remoteHost(c.remote), intPtr(int(StatusRBindFail)), "client not active")
 		return nil
 	}
 	if !cidrAllowed(c.remote, profile.SMPPAllowedCIDRs) {
 		markBindFailure(throttleKey, now)
 		s.writeBindResp(c, p, StatusRBindFail)
+		s.logEvent(profile.ClientID, "ERROR", "bind rejected", "mode", mode.String(), "remote", hostStr(c.remote), "reason", "cidr denied")
 		_ = db.InsertSMPPBindEvent(ctx, s.Pool, profile.ClientID, "bind_fail", mode.String(), remoteHost(c.remote), intPtr(int(StatusRBindFail)), "cidr denied")
 		return nil
 	}
 	if !db.VerifyClientSMPPPassword(s.Config.SecretKey, profile.SMPPPasswordEnc, password) {
 		markBindFailure(throttleKey, now)
 		s.writeBindResp(c, p, StatusRBindFail)
+		s.logEvent(profile.ClientID, "ERROR", "bind rejected", "mode", mode.String(), "remote", hostStr(c.remote), "reason", "bad password")
 		_ = db.InsertSMPPBindEvent(ctx, s.Pool, profile.ClientID, "bind_fail", mode.String(), remoteHost(c.remote), intPtr(int(StatusRBindFail)), "bad password")
 		return nil
 	}
 	if profile.SMPPMaxBinds > 0 && s.sessions.bindCount(profile.ClientID) >= profile.SMPPMaxBinds {
 		s.writeBindResp(c, p, StatusRThrottled)
+		s.logEvent(profile.ClientID, "ERROR", "bind rejected", "mode", mode.String(), "remote", hostStr(c.remote), "reason", "max binds reached")
 		_ = db.InsertSMPPBindEvent(ctx, s.Pool, profile.ClientID, "bind_fail", mode.String(), remoteHost(c.remote), intPtr(int(StatusRThrottled)), "max binds")
 		return nil
 	}
@@ -258,14 +300,21 @@ func (s *Server) handleBind(ctx context.Context, c *conn, p pdu.Body) *session {
 	lim := rate.NewLimiter(rate.Limit(perS), perS)
 	sess := &session{clientID: profile.ClientID, mode: mode, remote: c.remote, conn: c, limiter: lim}
 	s.sessions.add(sess)
+	s.logEvent(profile.ClientID, "INFO", "bind accepted", "mode", mode.String(), "remote", hostStr(c.remote), "binds", strconv.Itoa(s.sessions.bindCount(profile.ClientID)))
 	_ = db.InsertSMPPBindEvent(ctx, s.Pool, profile.ClientID, "bind_ok", mode.String(), remoteHost(c.remote), intPtr(0), "")
 	s.writeBindResp(c, p, StatusROK)
 	return sess
 }
 
-func (s *Server) unregisterSession(ctx context.Context, sess *session) {
-	s.sessions.remove(sess)
-	_ = db.InsertSMPPBindEvent(ctx, s.Pool, sess.clientID, "unbind", sess.mode.String(), remoteHost(sess.remote), nil, "")
+// endSession removes a session from the registry and records the lifecycle event
+// ("unbind" or "disconnect") to both the live log hub and the bind-event audit
+// table. A fresh context is used so shutdown-time cancellation does not drop the
+// audit row.
+func (s *Server) endSession(sess *session, evt string) {
+	if s.sessions.remove(sess) {
+		s.logEvent(sess.clientID, "INFO", "session "+evt, "mode", sess.mode.String(), "remote", hostStr(sess.remote))
+	}
+	_ = db.InsertSMPPBindEvent(context.Background(), s.Pool, sess.clientID, evt, sess.mode.String(), remoteHost(sess.remote), nil, "")
 }
 
 func (s *Server) handleSubmit(ctx context.Context, c *conn, sess *session, p pdu.Body) {
@@ -319,6 +368,9 @@ func (s *Server) handleSubmit(ctx context.Context, c *conn, sess *session, p pdu
 	resp.Header().Status = st
 	if out.Kind == sending.OutcomeAccepted && out.Accepted != nil {
 		_ = resp.Fields().Set(pdufield.MessageID, out.Accepted.MessageID)
+		s.logEvent(sess.clientID, "INFO", "submit_sm accepted", "to", dec.To, "from", from, "message_id", out.Accepted.MessageID)
+	} else {
+		s.logEvent(sess.clientID, "ERROR", "submit_sm rejected", "to", dec.To, "from", from, "command_status", "0x"+strconv.FormatUint(uint64(st), 16))
 	}
 	_ = c.Write(resp)
 }

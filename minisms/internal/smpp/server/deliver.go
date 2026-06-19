@@ -34,6 +34,7 @@ func buildDeliveryReceipt(messageID, stat string) string {
 func (s *Server) DeliverDLR(clientID, messageID, dlrStatus string) bool {
 	sess := s.sessions.pickDeliver(clientID)
 	if sess == nil || sess.conn == nil {
+		s.logEvent(clientID, "WARN", "deliver_sm not sent", "message_id", messageID, "reason", "no bound rx/trx session")
 		return false
 	}
 	stat := receiptStat(dlrStatus)
@@ -46,7 +47,9 @@ func (s *Server) DeliverDLR(clientID, messageID, dlrStatus string) bool {
 	_ = f.Set(pdufield.ESMClass, uint8(0x04)) // delivery receipt indicator
 	_ = f.Set(pdufield.DataCoding, uint8(pdutext.DefaultType))
 	if err := sess.conn.Write(p); err != nil {
+		s.logEvent(clientID, "ERROR", "deliver_sm write failed", "message_id", messageID, "error", err.Error())
 		return false
 	}
+	s.logEvent(clientID, "INFO", "deliver_sm DLR sent", "message_id", messageID, "stat", stat)
 	return true
 }

@@ -16,6 +16,10 @@ type RouteEntry struct {
 	PrimaryCarrierID   string
 	Failover1CarrierID *string
 	Failover2CarrierID *string
+	DistributionMode   string
+	PrimaryWeight      int
+	Failover1Weight    int
+	Failover2Weight    int
 }
 
 func (s *Service) lookupRouteEntry(ctx context.Context, routingGroupID *string, to string) (*RouteEntry, error) {
@@ -30,6 +34,10 @@ func (s *Service) lookupRouteEntry(ctx context.Context, routingGroupID *string, 
 				PrimaryCarrierID:   re.PrimaryCarrierID,
 				Failover1CarrierID: re.Failover1CarrierID,
 				Failover2CarrierID: re.Failover2CarrierID,
+				DistributionMode:   re.DistributionMode,
+				PrimaryWeight:      re.PrimaryWeight,
+				Failover1Weight:    re.Failover1Weight,
+				Failover2Weight:    re.Failover2Weight,
 			}, nil
 		}
 		return nil, pgx.ErrNoRows
@@ -42,7 +50,8 @@ func lookupRouteEntryDB(ctx context.Context, pool *pgxpool.Pool, routingGroupID 
 		return nil, pgx.ErrNoRows
 	}
 	rows, err := pool.Query(ctx, `
-		SELECT route_entry_id::text, prefix, primary_carrier_id::text, failover1_carrier_id::text, failover2_carrier_id::text
+		SELECT route_entry_id::text, prefix, primary_carrier_id::text, failover1_carrier_id::text, failover2_carrier_id::text,
+			distribution_mode, primary_weight, failover1_weight, failover2_weight
 		FROM route_entries
 		WHERE routing_group_id = $1::uuid AND status='active'`, *routingGroupID)
 	if err != nil {
@@ -52,7 +61,8 @@ func lookupRouteEntryDB(ctx context.Context, pool *pgxpool.Pool, routingGroupID 
 	var entries []RouteEntry
 	for rows.Next() {
 		var e RouteEntry
-		if err := rows.Scan(&e.RouteEntryID, &e.Prefix, &e.PrimaryCarrierID, &e.Failover1CarrierID, &e.Failover2CarrierID); err != nil {
+		if err := rows.Scan(&e.RouteEntryID, &e.Prefix, &e.PrimaryCarrierID, &e.Failover1CarrierID, &e.Failover2CarrierID,
+			&e.DistributionMode, &e.PrimaryWeight, &e.Failover1Weight, &e.Failover2Weight); err != nil {
 			return nil, err
 		}
 		entries = append(entries, e)

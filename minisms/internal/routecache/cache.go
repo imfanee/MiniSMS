@@ -16,6 +16,10 @@ type RouteEntry struct {
 	PrimaryCarrierID   string
 	Failover1CarrierID *string
 	Failover2CarrierID *string
+	DistributionMode   string
+	PrimaryWeight      int
+	Failover1Weight    int
+	Failover2Weight    int
 }
 
 // CarrierProfile is dispatch-relevant carrier configuration kept in RAM.
@@ -70,7 +74,8 @@ func (c *Cache) Reload(ctx context.Context, pool *pgxpool.Pool) error {
 func loadRoutes(ctx context.Context, pool *pgxpool.Pool) (map[string][]RouteEntry, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT routing_group_id::text, route_entry_id::text, prefix,
-			primary_carrier_id::text, failover1_carrier_id::text, failover2_carrier_id::text
+			primary_carrier_id::text, failover1_carrier_id::text, failover2_carrier_id::text,
+			distribution_mode, primary_weight, failover1_weight, failover2_weight
 		FROM route_entries
 		WHERE status = 'active'`)
 	if err != nil {
@@ -81,7 +86,8 @@ func loadRoutes(ctx context.Context, pool *pgxpool.Pool) (map[string][]RouteEntr
 	for rows.Next() {
 		var gid string
 		var e RouteEntry
-		if err := rows.Scan(&gid, &e.RouteEntryID, &e.Prefix, &e.PrimaryCarrierID, &e.Failover1CarrierID, &e.Failover2CarrierID); err != nil {
+		if err := rows.Scan(&gid, &e.RouteEntryID, &e.Prefix, &e.PrimaryCarrierID, &e.Failover1CarrierID, &e.Failover2CarrierID,
+			&e.DistributionMode, &e.PrimaryWeight, &e.Failover1Weight, &e.Failover2Weight); err != nil {
 			return nil, err
 		}
 		out[gid] = append(out[gid], e)

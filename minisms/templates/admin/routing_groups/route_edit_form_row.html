@@ -1,6 +1,6 @@
 {/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "route_edit_form_row"}}
-<tr class="table-info" id="route-row-{{.RouteID}}" x-data="{primary:'{{.PrimaryCarrierID}}', f1:'{{.Failover1CarrierID}}', f2:'{{.Failover2CarrierID}}', primarySet: '{{.PrimaryCarrierID}}' !== '', failover1Set: '{{.Failover1CarrierID}}' !== ''}">
+<tr class="table-info" id="route-row-{{.RouteID}}" x-data="{primary:'{{.PrimaryCarrierID}}', f1:'{{.Failover1CarrierID}}', f2:'{{.Failover2CarrierID}}', primarySet: '{{.PrimaryCarrierID}}' !== '', failover1Set: '{{.Failover1CarrierID}}' !== '', dist:'{{.DistributionMode}}'}">
 	<td colspan="8">
 		<form class="row g-2" hx-put="/admin/routing-groups/{{.RoutingGroupID}}/routes/{{.RouteID}}" hx-target="closest tr" hx-swap="outerHTML">
 			<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
@@ -29,6 +29,18 @@
 			</div>
 			<div class="col-md-1"><label class="form-label">Status</label><select class="form-select form-select-sm" name="status"><option value="active" {{if eq .Status "active"}}selected{{end}}>active</option><option value="inactive" {{if eq .Status "inactive"}}selected{{end}}>inactive</option></select></div>
 			<div class="col-md-2"><label class="form-label">Description</label><input class="form-control form-control-sm" name="description" value="{{.Description}}" /></div>
+			<div class="col-md-2" x-show="failover1Set">
+				<label class="form-label">Distribution</label>
+				<select class="form-select form-select-sm" name="distribution_mode" x-model="dist">
+					<option value="failover" {{if eq .DistributionMode "failover"}}selected{{end}}>failover</option>
+					<option value="loadbalance" {{if eq .DistributionMode "loadbalance"}}selected{{end}}>loadbalance</option>
+					<option value="overflow" {{if eq .DistributionMode "overflow"}}selected{{end}}>overflow</option>
+				</select>
+			</div>
+			<div class="col-12" x-show="failover1Set && dist==='loadbalance'"><small class="text-secondary">Weights (share of traffic per carrier; failover still applies within a message):</small></div>
+			<div class="col-md-2" x-show="failover1Set && dist==='loadbalance'"><label class="form-label">Primary wt</label><input class="form-control form-control-sm" name="primary_weight" type="number" min="0" max="1000" value="{{.PrimaryWeight}}" /></div>
+			<div class="col-md-2" x-show="failover1Set && dist==='loadbalance'"><label class="form-label">Failover 1 wt</label><input class="form-control form-control-sm" name="failover1_weight" type="number" min="0" max="1000" value="{{.Failover1Weight}}" /></div>
+			<div class="col-md-2" x-show="failover1Set && f2!=='' && dist==='loadbalance'"><label class="form-label">Failover 2 wt</label><input class="form-control form-control-sm" name="failover2_weight" type="number" min="0" max="1000" value="{{.Failover2Weight}}" /></div>
 			<div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary" type="submit">Save</button><button class="btn btn-sm btn-secondary" type="button" hx-get="/admin/routing-groups/{{.RoutingGroupID}}/routes/{{.RouteID}}/row" hx-target="closest tr" hx-swap="outerHTML">Cancel</button></div>
 		</form>
 	</td>

@@ -1508,3 +1508,22 @@ CREATE INDEX IF NOT EXISTS idx_sms_logs_queue
 CREATE INDEX IF NOT EXISTS idx_sms_logs_sending
     ON sms_logs (claimed_at)
     WHERE status = 'sending';
+
+-- >>> 016_route_distribution.up.sql <<<
+-- Per-route carrier distribution for parallel fan-out. Additive.
+-- failover (default): try primary then failovers in order, advance only on failure.
+-- loadbalance: weighted split across the route's carriers (per-message failover kept).
+-- overflow: prefer higher-priority ready carriers, spill to the next when unavailable.
+ALTER TABLE route_entries
+    ADD COLUMN IF NOT EXISTS distribution_mode TEXT NOT NULL DEFAULT 'failover',
+    ADD COLUMN IF NOT EXISTS primary_weight    INT  NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS failover1_weight  INT  NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS failover2_weight  INT  NOT NULL DEFAULT 1;
+
+ALTER TABLE route_entries
+    DROP CONSTRAINT IF EXISTS chk_route_entries_distribution_mode,
+    ADD  CONSTRAINT chk_route_entries_distribution_mode
+        CHECK (distribution_mode IN ('failover','loadbalance','overflow')),
+    DROP CONSTRAINT IF EXISTS chk_route_entries_weights,
+    ADD  CONSTRAINT chk_route_entries_weights
+        CHECK (primary_weight BETWEEN 0 AND 1000 AND failover1_weight BETWEEN 0 AND 1000 AND failover2_weight BETWEEN 0 AND 1000);

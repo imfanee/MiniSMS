@@ -30,7 +30,7 @@ func (s *Service) dispatchWithFailover(
 	timeout time.Duration,
 ) (*dispatchOutcome, error) {
 	failoverOn := strings.EqualFold(db.Setting(ctx, s.Pool, "failover_enabled", "true"), "true")
-	carriers := buildFailoverCarriers(route, failoverOn)
+	carriers := s.orderCarriers(ctx, route, failoverOn)
 	out := &dispatchOutcome{}
 	encoding, segments := billing.SegmentInfo(msg.Body)
 
@@ -351,6 +351,7 @@ type Service struct {
 	Egress    *egress.Manager
 	Routes    *routecache.Cache
 	Transport CarrierTransport // legacy default HTTP when Egress nil; unused when Egress set
+	rr        *routeRR         // per-route weighted round-robin counters (load balance)
 }
 
 func New(pool *pgxpool.Pool, cfg *config.Config) *Service {
@@ -358,6 +359,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Service {
 		Pool:      pool,
 		Config:    cfg,
 		Transport: HTTPTransport{},
+		rr:        newRouteRR(),
 	}
 }
 
@@ -368,5 +370,6 @@ func NewWithEgress(pool *pgxpool.Pool, cfg *config.Config, eg *egress.Manager, r
 		Egress:    eg,
 		Routes:    routes,
 		Transport: HTTPTransport{},
+		rr:        newRouteRR(),
 	}
 }

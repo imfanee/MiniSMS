@@ -46,6 +46,10 @@ type UpsertRouteEntryParams struct {
 	PrimaryCarrierID   string
 	Failover1CarrierID *string
 	Failover2CarrierID *string
+	DistributionMode   string
+	PrimaryWeight      int
+	Failover1Weight    int
+	Failover2Weight    int
 }
 
 var ErrDuplicateRoutePrefix = errors.New("duplicate route prefix")
@@ -97,6 +101,16 @@ func ExistsRoutePrefix(ctx context.Context, pool *pgxpool.Pool, routingGroupID, 
 		return false, nil
 	}
 	return err == nil, err
+}
+
+// GetRouteDistribution returns a route's distribution mode and per-carrier
+// weights (read from the table so the edit form can pre-populate them).
+func GetRouteDistribution(ctx context.Context, pool *pgxpool.Pool, routingGroupID, routeEntryID string) (mode string, w0, w1, w2 int, err error) {
+	err = pool.QueryRow(ctx, `
+		SELECT distribution_mode, primary_weight, failover1_weight, failover2_weight
+		FROM route_entries WHERE routing_group_id=$1::uuid AND route_entry_id=$2::uuid`,
+		routingGroupID, routeEntryID).Scan(&mode, &w0, &w1, &w2)
+	return
 }
 
 func ListRouteEntries(ctx context.Context, pool *pgxpool.Pool, routingGroupID string) ([]RouteEntryDetail, error) {
@@ -154,10 +168,12 @@ func CreateRouteEntry(ctx context.Context, pool *pgxpool.Pool, routingGroupID st
 	var id string
 	err := pool.QueryRow(ctx, `
 		INSERT INTO route_entries (
-			routing_group_id, prefix, description, priority, status, primary_carrier_id, failover1_carrier_id, failover2_carrier_id
-		) VALUES ($1::uuid,$2,$3,$4,$5,$6::uuid,$7::uuid,$8::uuid)
+			routing_group_id, prefix, description, priority, status, primary_carrier_id, failover1_carrier_id, failover2_carrier_id,
+			distribution_mode, primary_weight, failover1_weight, failover2_weight
+		) VALUES ($1::uuid,$2,$3,$4,$5,$6::uuid,$7::uuid,$8::uuid,$9,$10,$11,$12)
 		RETURNING route_entry_id::text`,
 		routingGroupID, p.Prefix, p.Description, p.Priority, p.Status, p.PrimaryCarrierID, p.Failover1CarrierID, p.Failover2CarrierID,
+		p.DistributionMode, p.PrimaryWeight, p.Failover1Weight, p.Failover2Weight,
 	).Scan(&id)
 	if err == nil {
 		return id, nil
@@ -172,9 +188,11 @@ func CreateRouteEntry(ctx context.Context, pool *pgxpool.Pool, routingGroupID st
 func UpdateRouteEntry(ctx context.Context, pool *pgxpool.Pool, routingGroupID, routeEntryID string, p UpsertRouteEntryParams) error {
 	ct, err := pool.Exec(ctx, `
 		UPDATE route_entries
-		SET prefix=$1, description=$2, priority=$3, status=$4, primary_carrier_id=$5::uuid, failover1_carrier_id=$6::uuid, failover2_carrier_id=$7::uuid, updated_at=now()
+		SET prefix=$1, description=$2, priority=$3, status=$4, primary_carrier_id=$5::uuid, failover1_carrier_id=$6::uuid, failover2_carrier_id=$7::uuid,
+			distribution_mode=$10, primary_weight=$11, failover1_weight=$12, failover2_weight=$13, updated_at=now()
 		WHERE routing_group_id=$8::uuid AND route_entry_id=$9::uuid`,
 		p.Prefix, p.Description, p.Priority, p.Status, p.PrimaryCarrierID, p.Failover1CarrierID, p.Failover2CarrierID, routingGroupID, routeEntryID,
+		p.DistributionMode, p.PrimaryWeight, p.Failover1Weight, p.Failover2Weight,
 	)
 	if err != nil {
 		var pe *pgconn.PgError

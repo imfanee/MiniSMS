@@ -358,6 +358,41 @@ func validateRouteEntryForm(prefix, status string, priority int, primary string,
 	return m
 }
 
+// routeFormData drives both the add and edit route-entry inline forms (RouteID is
+// empty for the add form). Weights are carried as strings for template rendering.
+type routeFormData struct {
+	RoutingGroupID, RouteID, CSRFToken, Prefix, Description, Priority, Status string
+	PrimaryCarrierID, Failover1CarrierID, Failover2CarrierID                  string
+	DistributionMode, PrimaryWeight, Failover1Weight, Failover2Weight         string
+	Carriers                                                                  []db.CarrierChoice
+	Errors                                                                    map[string]string
+}
+
+// parseRouteDistribution reads the distribution mode + per-carrier weights with
+// safe defaults (failover, weight 1) and validates the mode.
+func parseRouteDistribution(r *http.Request) (mode string, w0, w1, w2 int, errs map[string]string) {
+	errs = map[string]string{}
+	mode = strings.TrimSpace(r.FormValue("distribution_mode"))
+	if mode == "" {
+		mode = "failover"
+	}
+	if mode != "failover" && mode != "loadbalance" && mode != "overflow" {
+		errs["distribution_mode"] = "Invalid distribution mode"
+	}
+	return mode, parseWeight(r.FormValue("primary_weight")), parseWeight(r.FormValue("failover1_weight")), parseWeight(r.FormValue("failover2_weight")), errs
+}
+
+func parseWeight(s string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil || n < 0 {
+		return 1
+	}
+	if n > 1000 {
+		return 1000
+	}
+	return n
+}
+
 func (h *Handlers) ShowAddRouteForm() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -370,11 +405,11 @@ func (h *Handlers) ShowAddRouteForm() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
-		_ = execT(w, h.ROGFragT, "route_add_form_row", struct {
-			RoutingGroupID, CSRFToken, Prefix, Description, Priority, Status, PrimaryCarrierID, Failover1CarrierID, Failover2CarrierID string
-			Carriers                                                                                                                   []db.CarrierChoice
-			Errors                                                                                                                     map[string]string
-		}{id, csrf.Token(r), "", "", "100", "active", "", "", "", carriers, nil})
+		_ = execT(w, h.ROGFragT, "route_add_form_row", routeFormData{
+			RoutingGroupID: id, CSRFToken: csrf.Token(r), Priority: "100", Status: "active",
+			DistributionMode: "failover", PrimaryWeight: "1", Failover1Weight: "1", Failover2Weight: "1",
+			Carriers: carriers,
+		})
 	}
 }
 
@@ -394,7 +429,11 @@ func (h *Handlers) CreateRouteEntry() http.HandlerFunc {
 			f2 = &s
 		}
 		p, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("priority")))
+		mode, w0, w1, w2, dErrs := parseRouteDistribution(r)
 		errs := validateRouteEntryForm(prefix, status, p, primary, f1, f2)
+		for k, v := range dErrs {
+			errs[k] = v
+		}
 		if len(errs) == 0 {
 			if c, e := db.GetCarrierByID(r.Context(), h.Pool, primary); e != nil || c.Status != "active" {
 				errs["primary_carrier_id"] = "Primary carrier must exist and be active"
@@ -416,25 +455,28 @@ func (h *Handlers) CreateRouteEntry() http.HandlerFunc {
 		if len(errs) > 0 {
 			carriers, _ := db.ListCarrierChoices(r.Context(), h.Pool)
 			w.WriteHeader(http.StatusUnprocessableEntity)
-			_ = execT(w, h.ROGFragT, "route_add_form_row", struct {
-				RoutingGroupID, CSRFToken, Prefix, Description, Priority, Status, PrimaryCarrierID, Failover1CarrierID, Failover2CarrierID string
-				Carriers                                                                                                                   []db.CarrierChoice
-				Errors                                                                                                                     map[string]string
-			}{id, csrf.Token(r), prefix, desc, r.FormValue("priority"), status, primary, r.FormValue("failover1_carrier_id"), r.FormValue("failover2_carrier_id"), carriers, errs})
+			_ = execT(w, h.ROGFragT, "route_add_form_row", routeFormData{
+				RoutingGroupID: id, CSRFToken: csrf.Token(r), Prefix: prefix, Description: desc, Priority: r.FormValue("priority"), Status: status,
+				PrimaryCarrierID: primary, Failover1CarrierID: r.FormValue("failover1_carrier_id"), Failover2CarrierID: r.FormValue("failover2_carrier_id"),
+				DistributionMode: mode, PrimaryWeight: r.FormValue("primary_weight"), Failover1Weight: r.FormValue("failover1_weight"), Failover2Weight: r.FormValue("failover2_weight"),
+				Carriers: carriers, Errors: errs,
+			})
 			return
 		}
 		routeID, err := db.CreateRouteEntry(r.Context(), h.Pool, id, db.UpsertRouteEntryParams{
 			Prefix: prefix, Description: strPtr(desc), Priority: p, Status: status, PrimaryCarrierID: primary, Failover1CarrierID: f1, Failover2CarrierID: f2,
+			DistributionMode: mode, PrimaryWeight: w0, Failover1Weight: w1, Failover2Weight: w2,
 		})
 		if err != nil {
 			if errors.Is(err, db.ErrDuplicateRoutePrefix) {
 				carriers, _ := db.ListCarrierChoices(r.Context(), h.Pool)
 				w.WriteHeader(http.StatusUnprocessableEntity)
-				_ = execT(w, h.ROGFragT, "route_add_form_row", struct {
-					RoutingGroupID, CSRFToken, Prefix, Description, Priority, Status, PrimaryCarrierID, Failover1CarrierID, Failover2CarrierID string
-					Carriers                                                                                                                   []db.CarrierChoice
-					Errors                                                                                                                     map[string]string
-				}{id, csrf.Token(r), prefix, desc, r.FormValue("priority"), status, primary, r.FormValue("failover1_carrier_id"), r.FormValue("failover2_carrier_id"), carriers, map[string]string{"prefix": "A route for this prefix already exists"}})
+				_ = execT(w, h.ROGFragT, "route_add_form_row", routeFormData{
+					RoutingGroupID: id, CSRFToken: csrf.Token(r), Prefix: prefix, Description: desc, Priority: r.FormValue("priority"), Status: status,
+					PrimaryCarrierID: primary, Failover1CarrierID: r.FormValue("failover1_carrier_id"), Failover2CarrierID: r.FormValue("failover2_carrier_id"),
+					DistributionMode: mode, PrimaryWeight: r.FormValue("primary_weight"), Failover1Weight: r.FormValue("failover1_weight"), Failover2Weight: r.FormValue("failover2_weight"),
+					Carriers: carriers, Errors: map[string]string{"prefix": "A route for this prefix already exists"},
+				})
 				return
 			}
 			ServerError(w, r, err, h.Log, h.T500)
@@ -483,11 +525,16 @@ func (h *Handlers) ShowEditRouteForm() http.HandlerFunc {
 		if row.Failover2CarrierID != nil {
 			f2 = *row.Failover2CarrierID
 		}
-		_ = execT(w, h.ROGFragT, "route_edit_form_row", struct {
-			RoutingGroupID, RouteID, CSRFToken, Prefix, Description, Priority, Status, PrimaryCarrierID, Failover1CarrierID, Failover2CarrierID string
-			Carriers                                                                                                                            []db.CarrierChoice
-			Errors                                                                                                                              map[string]string
-		}{id, routeID, csrf.Token(r), row.Prefix, desc, strconv.Itoa(row.Priority), row.Status, row.PrimaryCarrierID, f1, f2, carriers, nil})
+		dmode, dw0, dw1, dw2, _ := db.GetRouteDistribution(r.Context(), h.Pool, id, routeID)
+		if dmode == "" {
+			dmode = "failover"
+		}
+		_ = execT(w, h.ROGFragT, "route_edit_form_row", routeFormData{
+			RoutingGroupID: id, RouteID: routeID, CSRFToken: csrf.Token(r), Prefix: row.Prefix, Description: desc,
+			Priority: strconv.Itoa(row.Priority), Status: row.Status, PrimaryCarrierID: row.PrimaryCarrierID, Failover1CarrierID: f1, Failover2CarrierID: f2,
+			DistributionMode: dmode, PrimaryWeight: strconv.Itoa(dw0), Failover1Weight: strconv.Itoa(dw1), Failover2Weight: strconv.Itoa(dw2),
+			Carriers: carriers,
+		})
 	}
 }
 
@@ -525,7 +572,11 @@ func (h *Handlers) UpdateRouteEntry() http.HandlerFunc {
 			f2 = &s
 		}
 		p, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("priority")))
+		mode, w0, w1, w2, dErrs := parseRouteDistribution(r)
 		errs := validateRouteEntryForm(prefix, status, p, primary, f1, f2)
+		for k, v := range dErrs {
+			errs[k] = v
+		}
 		if len(errs) == 0 {
 			if c, e := db.GetCarrierByID(r.Context(), h.Pool, primary); e != nil || c.Status != "active" {
 				errs["primary_carrier_id"] = "Primary carrier must exist and be active"
@@ -537,15 +588,17 @@ func (h *Handlers) UpdateRouteEntry() http.HandlerFunc {
 		if len(errs) > 0 {
 			carriers, _ := db.ListCarrierChoices(r.Context(), h.Pool)
 			w.WriteHeader(http.StatusUnprocessableEntity)
-			_ = execT(w, h.ROGFragT, "route_edit_form_row", struct {
-				RoutingGroupID, RouteID, CSRFToken, Prefix, Description, Priority, Status, PrimaryCarrierID, Failover1CarrierID, Failover2CarrierID string
-				Carriers                                                                                                                            []db.CarrierChoice
-				Errors                                                                                                                              map[string]string
-			}{id, routeID, csrf.Token(r), prefix, desc, r.FormValue("priority"), status, primary, r.FormValue("failover1_carrier_id"), r.FormValue("failover2_carrier_id"), carriers, errs})
+			_ = execT(w, h.ROGFragT, "route_edit_form_row", routeFormData{
+				RoutingGroupID: id, RouteID: routeID, CSRFToken: csrf.Token(r), Prefix: prefix, Description: desc, Priority: r.FormValue("priority"), Status: status,
+				PrimaryCarrierID: primary, Failover1CarrierID: r.FormValue("failover1_carrier_id"), Failover2CarrierID: r.FormValue("failover2_carrier_id"),
+				DistributionMode: mode, PrimaryWeight: r.FormValue("primary_weight"), Failover1Weight: r.FormValue("failover1_weight"), Failover2Weight: r.FormValue("failover2_weight"),
+				Carriers: carriers, Errors: errs,
+			})
 			return
 		}
 		err := db.UpdateRouteEntry(r.Context(), h.Pool, id, routeID, db.UpsertRouteEntryParams{
 			Prefix: prefix, Description: strPtr(desc), Priority: p, Status: status, PrimaryCarrierID: primary, Failover1CarrierID: f1, Failover2CarrierID: f2,
+			DistributionMode: mode, PrimaryWeight: w0, Failover1Weight: w1, Failover2Weight: w2,
 		})
 		if err == pgx.ErrNoRows {
 			http.NotFound(w, r)

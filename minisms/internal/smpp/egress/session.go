@@ -27,6 +27,11 @@ const (
 	minReconnect     = 3 * time.Second
 	maxReconnect     = 60 * time.Second
 	stableResetAfter = 45 * time.Second
+	// When the SMSC explicitly rejects the bind (RBINDFAIL / BindFailed) it is at
+	// its concurrent-bind cap or still holding our stale sessions. Back off much
+	// longer so it can reap them before we retry, instead of storming the cap.
+	capRejectBackoff = 45 * time.Second
+	maxCapBackoff    = 5 * time.Minute
 )
 
 type liveSession struct {
@@ -82,14 +87,26 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		}
 		onStatus("binding")
 		s.logEvent("INFO", "bind attempt", "addr", s.cfg.Addr, "mode", s.cfg.BindMode)
-		if err := s.bind(ctx); err != nil {
-			slog.Warn("smpp egress bind failed", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "error", err)
-			s.logEvent("ERROR", "bind failed", "error", err.Error(), "retry_in", backoff.String())
+		if rejected, err := s.bind(ctx); err != nil {
+			ceiling := maxReconnect
+			label := "bind failed"
+			if rejected {
+				// SMSC answered and refused the bind: it is at its concurrent-bind
+				// cap or still holding our stale sessions. Hold a long floor so it
+				// can reap them, and escalate toward a multi-minute ceiling.
+				ceiling = maxCapBackoff
+				if backoff < capRejectBackoff {
+					backoff = capRejectBackoff
+				}
+				label = "bind rejected by SMSC (cap/session limit)"
+			}
+			slog.Warn("smpp egress bind failed", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "rejected", rejected, "error", err)
+			s.logEvent("ERROR", label, "error", err.Error(), "retry_in", backoff.String())
 			onStatus("down")
 			if !sleepCtx(ctx, jitter(backoff)) {
 				return
 			}
-			backoff = nextBackoff(backoff)
+			backoff = nextBackoff(backoff, ceiling)
 			continue
 		}
 		s.logEvent("INFO", "bind established", "addr", s.cfg.Addr)
@@ -128,7 +145,7 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		if uptime >= stableResetAfter {
 			backoff = minReconnect
 		} else {
-			backoff = nextBackoff(backoff)
+			backoff = nextBackoff(backoff, maxReconnect)
 		}
 		s.logEvent("WARN", "session disconnected", "uptime", uptime.Truncate(time.Second).String(), "reconnect_in", backoff.String())
 		onStatus("down")
@@ -153,11 +170,11 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 	}
 }
 
-// nextBackoff doubles the delay, clamped to [minReconnect, maxReconnect].
-func nextBackoff(cur time.Duration) time.Duration {
+// nextBackoff doubles the delay, clamped to [minReconnect, ceiling].
+func nextBackoff(cur, ceiling time.Duration) time.Duration {
 	next := cur * 2
-	if next > maxReconnect {
-		next = maxReconnect
+	if next > ceiling {
+		next = ceiling
 	}
 	if next < minReconnect {
 		next = minReconnect
@@ -185,7 +202,12 @@ func startupStagger(idx int) time.Duration {
 	return jitter(time.Duration(idx-1) * 400 * time.Millisecond)
 }
 
-func (s *liveSession) bind(ctx context.Context) error {
+// bind opens one ESME session. It returns rejected=true when the SMSC answered
+// and refused the bind (BindFailed / RBINDFAIL) so the caller can apply a long,
+// cap-aware backoff. It ALWAYS tears down a failed client: the go-smpp Bind()
+// spawns a self-reconnecting goroutine, so returning without Close() would orphan
+// it and it would keep re-binding to the SMSC forever, piling up ghost sessions.
+func (s *liveSession) bind(ctx context.Context) (rejected bool, err error) {
 	s.closeClient()
 	respTimeout := 5 * time.Second
 	enquire := s.cfg.EnquireLink
@@ -218,21 +240,20 @@ func (s *liveSession) bind(ctx context.Context) error {
 		}
 		status := trx.Bind()
 		st := <-status
-		if st.Error() != nil {
-			return st.Error()
-		}
 		if st.Status() != smpp.Connected {
-			if st.Error() != nil {
-				return st.Error()
+			rej := st.Status() == smpp.BindFailed
+			_ = trx.Close() // stop the library's self-reconnect goroutine + unbind
+			if e := st.Error(); e != nil {
+				return rej, e
 			}
-			return smpp.ErrNotBound
+			return rej, smpp.ErrNotBound
 		}
 		s.mu.Lock()
 		s.trx = trx
 		s.tx = nil
 		s.status = status
 		s.mu.Unlock()
-		return nil
+		return false, nil
 	default:
 		tx := &smpp.Transmitter{
 			Addr:        s.cfg.Addr,
@@ -247,18 +268,20 @@ func (s *liveSession) bind(ctx context.Context) error {
 		}
 		status := tx.Bind()
 		st := <-status
-		if st.Error() != nil {
-			return st.Error()
-		}
 		if st.Status() != smpp.Connected {
-			return st.Error()
+			rej := st.Status() == smpp.BindFailed
+			_ = tx.Close() // stop the library's self-reconnect goroutine + unbind
+			if e := st.Error(); e != nil {
+				return rej, e
+			}
+			return rej, smpp.ErrNotBound
 		}
 		s.mu.Lock()
 		s.tx = tx
 		s.trx = nil
 		s.status = status
 		s.mu.Unlock()
-		return nil
+		return false, nil
 	}
 }
 

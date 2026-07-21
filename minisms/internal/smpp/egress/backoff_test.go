@@ -8,18 +8,26 @@ import (
 
 func TestNextBackoff_EscalatesAndClamps(t *testing.T) {
 	// Doubles from the floor, never below floor, never above ceiling.
-	if got := nextBackoff(minReconnect); got != 2*minReconnect {
+	if got := nextBackoff(minReconnect, maxReconnect); got != 2*minReconnect {
 		t.Fatalf("nextBackoff(min)=%v want %v", got, 2*minReconnect)
 	}
-	if got := nextBackoff(0); got != minReconnect {
+	if got := nextBackoff(0, maxReconnect); got != minReconnect {
 		t.Fatalf("nextBackoff(0)=%v want floor %v", got, minReconnect)
 	}
 	d := minReconnect
 	for i := 0; i < 20; i++ {
-		d = nextBackoff(d)
+		d = nextBackoff(d, maxReconnect)
 	}
 	if d != maxReconnect {
-		t.Fatalf("backoff did not clamp to max: got %v want %v", d, maxReconnect)
+		t.Fatalf("backoff did not clamp to transport max: got %v want %v", d, maxReconnect)
+	}
+	// Cap-rejection backoff escalates toward the longer cap ceiling.
+	d = capRejectBackoff
+	for i := 0; i < 20; i++ {
+		d = nextBackoff(d, maxCapBackoff)
+	}
+	if d != maxCapBackoff {
+		t.Fatalf("cap backoff did not clamp to maxCapBackoff: got %v want %v", d, maxCapBackoff)
 	}
 }
 

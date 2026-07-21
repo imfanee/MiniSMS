@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"log/slog"
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -15,6 +16,17 @@ import (
 	"github.com/minisms/minisms/internal/dlr"
 	"github.com/minisms/minisms/internal/smpp/egresslog"
 	"golang.org/x/time/rate"
+)
+
+// Reconnect pacing. A carrier SMSC may cap concurrent binds and reap dropped
+// sessions slowly, so a fast lock-step reconnect loop piles up ghost sessions
+// that count against that cap and cause ESME_RBINDFAIL cascades. We therefore
+// use a higher floor, exponential backoff that does NOT reset on a fast flap,
+// and per-bind jitter so parallel binds do not stampede the SMSC together.
+const (
+	minReconnect     = 3 * time.Second
+	maxReconnect     = 60 * time.Second
+	stableResetAfter = 45 * time.Second
 )
 
 type liveSession struct {
@@ -55,9 +67,15 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 	s.cancel = cancel
 	defer cancel()
 
-	backoff := time.Second
-	const maxBackoff = 60 * time.Second
+	// Stagger parallel binds at startup so a session group does not open all N
+	// binds in the same instant (a thundering herd against a concurrent-bind cap).
+	if d := startupStagger(s.idx); d > 0 {
+		if !sleepCtx(ctx, d) {
+			return
+		}
+	}
 
+	backoff := minReconnect
 	for {
 		if ctx.Err() != nil {
 			return
@@ -66,24 +84,17 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		s.logEvent("INFO", "bind attempt", "addr", s.cfg.Addr, "mode", s.cfg.BindMode)
 		if err := s.bind(ctx); err != nil {
 			slog.Warn("smpp egress bind failed", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "error", err)
-			s.logEvent("ERROR", "bind failed", "error", err.Error())
+			s.logEvent("ERROR", "bind failed", "error", err.Error(), "retry_in", backoff.String())
 			onStatus("down")
-			select {
-			case <-ctx.Done():
+			if !sleepCtx(ctx, jitter(backoff)) {
 				return
-			case <-time.After(backoff):
 			}
-			if backoff < maxBackoff {
-				backoff *= 2
-				if backoff > maxBackoff {
-					backoff = maxBackoff
-				}
-			}
+			backoff = nextBackoff(backoff)
 			continue
 		}
-		backoff = time.Second
 		s.logEvent("INFO", "bind established", "addr", s.cfg.Addr)
 		onStatus("up")
+		upSince := time.Now()
 		s.mu.Lock()
 		s.ready = true
 		st := s.status
@@ -93,7 +104,7 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		for !disconnected {
 			select {
 			case <-ctx.Done():
-				s.closeClient()
+				s.closeClient() // library Close() sends a clean unbind first
 				return
 			case c, ok := <-st:
 				if !ok {
@@ -108,15 +119,70 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		s.mu.Lock()
 		s.ready = false
 		s.mu.Unlock()
-		s.closeClient()
-		s.logEvent("WARN", "session disconnected", "reconnect_in", backoff.String())
+		s.closeClient() // attempt graceful unbind before reconnecting
+
+		// Only reset the backoff floor when the session stayed up long enough to
+		// count as stable. A fast flap keeps escalating the delay so we do not
+		// hammer the SMSC and pile up ghost sessions it has not yet reaped.
+		uptime := time.Since(upSince)
+		if uptime >= stableResetAfter {
+			backoff = minReconnect
+		} else {
+			backoff = nextBackoff(backoff)
+		}
+		s.logEvent("WARN", "session disconnected", "uptime", uptime.Truncate(time.Second).String(), "reconnect_in", backoff.String())
 		onStatus("down")
-		select {
-		case <-ctx.Done():
+		if !sleepCtx(ctx, jitter(backoff)) {
 			return
-		case <-time.After(backoff):
 		}
 	}
+}
+
+// sleepCtx waits for d or until ctx is cancelled. Returns false if cancelled.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
+// nextBackoff doubles the delay, clamped to [minReconnect, maxReconnect].
+func nextBackoff(cur time.Duration) time.Duration {
+	next := cur * 2
+	if next > maxReconnect {
+		next = maxReconnect
+	}
+	if next < minReconnect {
+		next = minReconnect
+	}
+	return next
+}
+
+// jitter returns d +/- up to 25% so parallel binds do not reconnect in lock-step.
+func jitter(d time.Duration) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	span := int64(d) / 4
+	if span <= 0 {
+		return d
+	}
+	return d + time.Duration(rand.Int63n(2*span)-span)
+}
+
+// startupStagger spreads binds #2, #3, ... over a short jittered window.
+func startupStagger(idx int) time.Duration {
+	if idx <= 1 {
+		return 0
+	}
+	return jitter(time.Duration(idx-1) * 400 * time.Millisecond)
 }
 
 func (s *liveSession) bind(ctx context.Context) error {

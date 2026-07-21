@@ -660,14 +660,26 @@ Routing Groups decide which carriers are tried for each destination prefix.
 - primary carrier
 - failover 1
 - failover 2
+- distribution (how traffic is spread across the carriers above)
+- weights (per-carrier share, used in load-balance)
 
 Carrier choices must be distinct in one route path.
 
+### Distribution modes (parallel fan-out)
+
+Each route chooses how messages are spread across its carriers. **Per-message failover is always available** regardless of the mode: if the chosen carrier fails, the others are tried.
+
+- **failover** (default): always start at the primary; only move to a failover carrier on failure. Use for a single-carrier route or a strict primary/backup setup.
+- **loadbalance**: distribute messages across the route's carriers by **weight** (for example primary 70, failover 1 30), so aggregate throughput is the sum of the carriers' rates. The weights set each carrier's share; the others remain that message's failover. Use to fan out volume across multiple carriers of similar or different capacity.
+- **overflow**: prefer higher-priority carriers that are currently **ready** (bound/reachable); when a higher carrier is unavailable, traffic spills to the next ready one. Use to keep a primary saturated and overflow to a secondary only when needed.
+
+Set the mode and weights on the route add/edit form. Load-balance and overflow only change behaviour once a **failover carrier** is added to the route (with a single carrier there is nothing to distribute across). Real sustained throughput above one carrier's rate requires genuinely separate carrier capacity.
+
 ### Failover behavior
 
-1. MiniSMS tries primary carrier.
-2. If skipped/failed, it tries failover 1.
-3. If needed, it tries failover 2.
+1. MiniSMS tries the first carrier (primary in failover mode; the weighted/ready pick in load-balance/overflow).
+2. If skipped/failed, it tries the next carrier in the route.
+3. If needed, it tries the third.
 4. Selected attempt index is stored as failover sequence.
 
 Skipped vs failed:
@@ -818,6 +830,15 @@ Common columns include:
 
 Message lifecycle status (send pipeline) is separate from DLR status.
 
+Message lifecycle status values:
+
+- **pending** / **accepted** / **sent** - progressing through / delivered to the carrier.
+- **queued** - accepted and charge reserved; waiting for an async-queue worker to dispatch (only when the send queue is enabled; see 9.7).
+- **sending** - claimed by a worker and being dispatched right now.
+- **delivered** - carrier confirmed delivery (final DLR).
+- **failed** / **rejected** - the carrier attempt failed or was rejected.
+- **undelivered** - could not be delivered within its validity window; the client charge is refunded and a failure DLR is sent (async queue).
+
 DLR status values:
 
 - delivered
@@ -858,6 +879,16 @@ You can inspect:
 - `dlr_forward_status=failed` -> client webhook endpoint issue
 - `dlr_forward_status=no_url` -> DLR requested but no webhook URL resolved
 - `dlr_status` empty/null -> carrier callback has not arrived yet
+
+### 9.7 Async send queue
+
+When the async send queue is enabled (`SEND_QUEUE_ENABLED=true`), a message is not dispatched to the carrier inside the request/bind thread. Instead MiniSMS:
+
+1. Validates the request, checks the client balance, and **reserves the charge** under a row lock (so it can never oversell).
+2. Writes the message as **queued** with a validity/expiry (`SEND_MESSAGE_TTL_S`, default 1 hour) and returns success immediately (REST 202 with `carrier: "queued"`; SMPP `submit_sm_resp` with the message id).
+3. A pool of background workers picks up queued messages and dispatches them to the carrier. On carrier acceptance the message becomes **accepted** (then **delivered** when the DLR arrives). Transient failures (for example a carrier link that is momentarily rebinding) are **retried** until the validity expires; on expiry the message is marked **undelivered**, the reserved charge is **refunded**, and a failure DLR is sent.
+
+Operator effect: a brief carrier outage or SMPP rebind no longer rejects inbound traffic. Messages are accepted, buffered, and delivered when the link recovers. The queue absorbs bursts but drains to the carrier at the carrier's allowed rate. Queue behaviour is configured by the `SEND_QUEUE_*` and `SEND_MESSAGE_TTL_S` environment variables (see the DevOps guide). When the flag is off, MiniSMS dispatches synchronously as before.
 
 ---
 

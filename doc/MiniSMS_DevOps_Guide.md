@@ -205,6 +205,17 @@ MiniSMS reads environment using `godotenv` (`.env` for local/dev).
 | `APP_ENV` | No | `development/production` | `production` |
 | `SESSION_IDLE_MINUTES` | No | int (1..259200) | `240` |
 | `CARRIER_DISPATCH_TIMEOUT_S` | No | int (1..3600) | `10` |
+| `SMPP_ENQUIRE_LINK_S` | No | int (5..3600) | `30` |
+| `SMPP_WINDOW_SIZE` | No | int (1..1000) | `10` |
+| `SMPP_THROUGHPUT_PER_S` | No | int (1..10000) | `50` |
+| `SEND_QUEUE_ENABLED` | No | bool | `false` |
+| `SEND_QUEUE_WORKERS` | No | int (1..512) | `16` |
+| `SEND_QUEUE_BATCH` | No | int (1..5000) | `100` |
+| `SEND_MESSAGE_TTL_S` | No | int (30..604800) | `3600` |
+| `SEND_RETRY_BACKOFF_S` | No | int (1..3600) | `5` |
+| `SEND_STUCK_S` | No | int (30..3600) | `120` |
+
+**Async send queue (`SEND_QUEUE_*`):** when `SEND_QUEUE_ENABLED=true`, sends are accepted, the client charge is reserved, and delivery is handled by a background worker pool (retry until `SEND_MESSAGE_TTL_S`, then refund + failure DLR) rather than dispatched synchronously. See Admin Guide 9.7. Size the worker pool and the pgx pool together when scaling: keep DB pool connections >= workers + margin. `SEND_STUCK_S` is how long a row may sit `sending` (dead worker) before a reaper reclaims it.
 
 ### 4.2 Generate required secrets
 

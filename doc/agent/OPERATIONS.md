@@ -27,8 +27,15 @@
 | Database | `minisms` | `minisms_test` |
 | App bind | `127.0.0.1:8080` | `127.0.0.1:18081` |
 | SMPP ingress | enabled (`SMPP_LISTEN_ADDR` per env). Restrict `:2775` with a firewall to known client IPs and set each client's `smpp_allowed_cidrs`. | disabled |
+| Async send queue | **enabled** (`SEND_QUEUE_ENABLED=true`): sends are reserved + queued + dispatched by a worker pool (retry to `SEND_MESSAGE_TTL_S`=1h, then refund + failure DLR). A transient egress rebind no longer rejects ingress SMS. | default off |
 
 **Credentials:** Never commit `/etc/minisms/*.env`, API keys, or database passwords. Docs use placeholders only.
+
+### Throughput and scaling (measured 2026-07-21)
+
+- The **carrier SMPP rate is the ceiling**: per-bind rate x bind count (e.g. 1/s x 8 binds = 8/s = ~480/min). Raising it needs more binds (if the carrier allows), a higher per-bind rate, or additional carriers via the route distribution modes (Admin Guide 7).
+- With the carrier limit removed, this host (4 vCPU / 7.6 GB, SSD, PG 15) is **DB-commit bound**. Measured with pgbench: ~5,300 write-TPS peak; one SMS+DLR costs ~2.5-3 durable transactions, so **~50,000 SMS/min (~800/s) stable**, with CPU/RAM/network idle underneath.
+- When scaling the queue: raise `SEND_QUEUE_WORKERS` and the pgx pool together (pool connections >= workers + margin), and tune PostgreSQL (`shared_buffers` is at the 128 MB default; raise it, tune WAL, consider pgbouncer). Add an `sms_logs` retention/archival job at high volume (~0.13 x rate GB/day).
 
 ---
 

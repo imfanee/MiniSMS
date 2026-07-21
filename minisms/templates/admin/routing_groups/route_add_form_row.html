@@ -29,13 +29,14 @@
 			</div>
 			<div class="col-md-1"><label class="form-label">Status</label><select class="form-select form-select-sm" name="status"><option value="active" {{if eq .Status "active"}}selected{{end}}>active</option><option value="inactive" {{if eq .Status "inactive"}}selected{{end}}>inactive</option></select></div>
 			<div class="col-md-2"><label class="form-label">Description</label><input class="form-control form-control-sm" name="description" value="{{.Description}}" /></div>
-			<div class="col-md-2" x-show="failover1Set">
+			<div class="col-md-2">
 				<label class="form-label">Distribution</label>
 				<select class="form-select form-select-sm" name="distribution_mode" x-model="dist">
 					<option value="failover" {{if eq .DistributionMode "failover"}}selected{{end}}>failover</option>
 					<option value="loadbalance" {{if eq .DistributionMode "loadbalance"}}selected{{end}}>loadbalance</option>
 					<option value="overflow" {{if eq .DistributionMode "overflow"}}selected{{end}}>overflow</option>
 				</select>
+				<small class="text-secondary" x-show="!failover1Set && dist!=='failover'">Add a Failover carrier to fan out across carriers.</small>
 			</div>
 			<div class="col-12" x-show="failover1Set && dist==='loadbalance'"><small class="text-secondary">Weights (share of traffic per carrier; failover still applies within a message):</small></div>
 			<div class="col-md-2" x-show="failover1Set && dist==='loadbalance'"><label class="form-label">Primary wt</label><input class="form-control form-control-sm" name="primary_weight" type="number" min="0" max="1000" value="{{.PrimaryWeight}}" /></div>

@@ -22,6 +22,7 @@ import (
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/sending"
 	"github.com/minisms/minisms/internal/smpp/egresslog"
+	"github.com/minisms/minisms/internal/smpp/smppstatus"
 	"golang.org/x/time/rate"
 )
 
@@ -83,6 +84,15 @@ func (s *Server) logEvent(clientID, level, msg string, kv ...string) {
 		return
 	}
 	s.logHub.Event(clientID, level, msg, kv...)
+}
+
+// logDebug emits a verbose event only while an operator has turned on deep
+// logging for this client in the SMPP log viewer.
+func (s *Server) logDebug(clientID, msg string, kv ...string) {
+	if s.logHub == nil || clientID == "" || !s.logHub.Debug(clientID) {
+		return
+	}
+	s.logHub.Event(clientID, "DEBUG", msg, kv...)
 }
 
 func hostStr(addr net.Addr) string {
@@ -369,8 +379,12 @@ func (s *Server) handleSubmit(ctx context.Context, c *conn, sess *session, p pdu
 	if out.Kind == sending.OutcomeAccepted && out.Accepted != nil {
 		_ = resp.Fields().Set(pdufield.MessageID, out.Accepted.MessageID)
 		s.logEvent(sess.clientID, "INFO", "submit_sm accepted", "to", dec.To, "from", from, "message_id", out.Accepted.MessageID)
+		s.logDebug(sess.clientID, "submit_sm detail", "to", dec.To, "from", from, "segments", strconv.Itoa(out.Accepted.Segments),
+			"command_status", "0x00000000 ESME_ROK", "message_id", out.Accepted.MessageID)
 	} else {
-		s.logEvent(sess.clientID, "ERROR", "submit_sm rejected", "to", dec.To, "from", from, "command_status", "0x"+strconv.FormatUint(uint64(st), 16))
+		name, desc := smppstatus.Describe(int(st))
+		s.logEvent(sess.clientID, "ERROR", "submit_sm rejected", "to", dec.To, "from", from,
+			"command_status", fmt.Sprintf("0x%08X", uint32(st)), "code", name, "detail", desc)
 	}
 	_ = c.Write(resp)
 }

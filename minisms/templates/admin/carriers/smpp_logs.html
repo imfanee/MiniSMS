@@ -27,6 +27,7 @@
     .ln-ERROR { color: #ff7b72; }
     .ln-WARN  { color: #d29922; }
     .ln-INFO  { color: #c9d1d9; }
+    .ln-DEBUG { color: #8b949e; }
   </style>
 </head>
 <body>
@@ -35,6 +36,7 @@
     <span id="status" class="badge off">connecting</span>
     <span id="count" class="count">0 lines</span>
     <label class="toggle"><input type="checkbox" id="autoscroll" checked /> auto-scroll</label>
+    <label class="toggle" title="Deep logging: show SMPP command_status codes and per-PDU detail. Auto-off after 30 min."><input type="checkbox" id="debug" /> deep logs</label>
     <button id="restart" type="button">Restart SMPP</button>
     <button id="pause" type="button">Pause</button>
     <button id="copy" type="button">Copy</button>
@@ -47,6 +49,7 @@
     (function () {
       var streamURL = {{ .StreamURL }};
       var restartURL = {{ .RestartURL }};
+      var debugURL = {{ .DebugURL }};
       var csrfToken = {{ .CSRFToken }};
       var logEl = document.getElementById('log');
       var scroller = document.getElementById('scroller');
@@ -67,7 +70,7 @@
         var stick = autoscroll.checked && atBottom();
         var div = document.createElement('div');
         var level = 'INFO';
-        var m = text.match(/^\S+\s+(ERROR|WARN|INFO)\b/);
+        var m = text.match(/^\S+\s+(ERROR|WARN|INFO|DEBUG)\b/);
         if (m) { level = m[1]; }
         div.className = 'ln-' + level;
         div.textContent = text;            // textContent only: no HTML is ever parsed
@@ -103,6 +106,23 @@
         }).catch(function () {
           window.alert('Restart request failed');
         }).finally(function () { restartBtn.disabled = false; });
+      });
+      var debugChk = document.getElementById('debug');
+      debugChk.addEventListener('change', function () {
+        var on = debugChk.checked;
+        fetch(debugURL, {                  // POST governed by CSP connect-src 'self'
+          method: 'POST',
+          headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+          credentials: 'same-origin',
+          body: 'on=' + (on ? '1' : '0')
+        }).then(function (r) {
+          if (!r.ok) { window.alert('Deep-logs toggle failed (HTTP ' + r.status + ')'); debugChk.checked = !on; return; }
+          debugChk.parentNode.title = on
+            ? 'Deep logging ON (auto-off after 30 min): command_status codes and per-PDU detail now stream.'
+            : 'Deep logging: show SMPP command_status codes and per-PDU detail.';
+        }).catch(function () {
+          window.alert('Deep-logs toggle failed'); debugChk.checked = !on;
+        });
       });
       document.getElementById('clear').addEventListener('click', function () {
         logEl.replaceChildren(); lines = 0; countEl.textContent = '0 lines';

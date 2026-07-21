@@ -32,6 +32,7 @@ type smppLogsPage struct {
 	Title      string
 	StreamURL  string
 	RestartURL string
+	DebugURL   string
 	CSRFToken  string
 	Nonce      string
 }
@@ -61,11 +62,34 @@ func (h *Handlers) GetCarrierSMPPLogsView() http.HandlerFunc {
 			Title:      c.Name,
 			StreamURL:  "/admin/carriers/" + c.CarrierID + "/smpp-logs/stream",
 			RestartURL: "/admin/carriers/" + c.CarrierID + "/smpp-restart",
+			DebugURL:   "/admin/carriers/" + c.CarrierID + "/smpp-logs/debug",
 			CSRFToken:  csrf.Token(r),
 			Nonce:      nonce,
 		}); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
+	}
+}
+
+// SetCarrierSMPPDebug turns verbose (deep) SMPP logging on or off for a carrier
+// so the live viewer surfaces command_status codes and per-PDU detail during
+// troubleshooting. Read-only permission (it only affects log verbosity, and
+// auto-expires); CSRF-protected POST. Responds with the effective state.
+func (h *Handlers) SetCarrierSMPPDebug() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cid := chi.URLParam(r, "id")
+		c, err := db.GetCarrier(r.Context(), h.Pool, cid)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if h.SMPPLogHub == nil {
+			http.Error(w, "log hub unavailable", http.StatusInternalServerError)
+			return
+		}
+		on := r.FormValue("on") == "1" || r.FormValue("on") == "true"
+		eff := h.SMPPLogHub.SetDebug(c.CarrierID, on)
+		writeDebugState(w, eff)
 	}
 }
 
@@ -133,6 +157,16 @@ func streamSMPPLogs(ctx context.Context, w io.Writer, flusher http.Flusher, hub 
 // frame. The hub guarantees no embedded CR/LF, so framing cannot be broken.
 func writeSSE(w io.Writer, line string) {
 	fmt.Fprintf(w, "data: %s\n\n", line)
+}
+
+// writeDebugState returns the effective deep-logging state to the viewer.
+func writeDebugState(w http.ResponseWriter, on bool) {
+	w.Header().Set("Content-Type", "application/json")
+	if on {
+		fmt.Fprint(w, `{"debug":true}`)
+	} else {
+		fmt.Fprint(w, `{"debug":false}`)
+	}
 }
 
 func randomNonce() string {

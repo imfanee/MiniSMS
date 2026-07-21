@@ -39,11 +39,33 @@ func (h *Handlers) GetClientSMPPLogsView() http.HandlerFunc {
 			Title:      c.Name + " (ingress)",
 			StreamURL:  "/admin/clients/" + c.ClientID + "/smpp-logs/stream",
 			RestartURL: "/admin/clients/" + c.ClientID + "/smpp-restart",
+			DebugURL:   "/admin/clients/" + c.ClientID + "/smpp-logs/debug",
 			CSRFToken:  csrf.Token(r),
 			Nonce:      nonce,
 		}); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
+	}
+}
+
+// SetClientSMPPDebug turns verbose (deep) SMPP ingress logging on or off for a
+// client. Read-only permission (affects log verbosity only, auto-expires);
+// CSRF-protected POST.
+func (h *Handlers) SetClientSMPPDebug() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		c, err := db.GetClient(r.Context(), h.Pool, id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if h.SMPPIngressLogHub == nil {
+			http.Error(w, "log hub unavailable", http.StatusInternalServerError)
+			return
+		}
+		on := r.FormValue("on") == "1" || r.FormValue("on") == "true"
+		eff := h.SMPPIngressLogHub.SetDebug(c.ClientID, on)
+		writeDebugState(w, eff)
 	}
 }
 

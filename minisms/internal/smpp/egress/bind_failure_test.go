@@ -31,12 +31,15 @@ func TestBind_FailureTearsDownNoOrphan(t *testing.T) {
 	before := runtime.NumGoroutine()
 
 	for i := 0; i < 8; i++ {
-		rejected, err := sess.bind(context.Background())
+		rejected, code, err := sess.bind(context.Background())
 		if err == nil {
 			t.Fatal("expected bind error against a dead address")
 		}
 		if rejected {
 			t.Fatal("a transport/connect failure must not be classified as an SMSC rejection")
+		}
+		if code != 0 {
+			t.Fatalf("transport failure should carry no SMPP command_status, got 0x%X", code)
 		}
 		if sess.isReady() {
 			t.Fatal("session must not be ready after a failed bind")

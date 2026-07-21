@@ -4,6 +4,7 @@ package egress
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"log/slog"
 	"math/rand"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/fiorix/go-smpp/v2/smpp/pdu/pdufield"
 	"github.com/minisms/minisms/internal/dlr"
 	"github.com/minisms/minisms/internal/smpp/egresslog"
+	"github.com/minisms/minisms/internal/smpp/smppstatus"
 	"golang.org/x/time/rate"
 )
 
@@ -67,6 +69,17 @@ func (s *liveSession) logEvent(level, msg string, kv ...string) {
 	s.hub.Event(s.cfg.CarrierID, level, msg, args...)
 }
 
+// logDebug emits a verbose (DEBUG-level) event only while an operator has turned
+// on deep logging for this carrier in the SMPP log viewer. Off by default so the
+// ring buffer keeps useful history and the hot path stays cheap.
+func (s *liveSession) logDebug(msg string, kv ...string) {
+	if s.hub == nil || !s.hub.Debug(s.cfg.CarrierID) {
+		return
+	}
+	args := append([]string{"bind", "#" + strconv.Itoa(s.idx)}, kv...)
+	s.hub.Event(s.cfg.CarrierID, "DEBUG", msg, args...)
+}
+
 func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
@@ -87,21 +100,31 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		}
 		onStatus("binding")
 		s.logEvent("INFO", "bind attempt", "addr", s.cfg.Addr, "mode", s.cfg.BindMode)
-		if rejected, err := s.bind(ctx); err != nil {
+		s.logDebug("bind attempt detail", "addr", s.cfg.Addr, "system_id", s.cfg.SystemID, "mode", s.cfg.BindMode,
+			"enquire_link_s", strconv.Itoa(int(s.cfg.EnquireLink/time.Second)), "window", strconv.Itoa(int(s.cfg.WindowSize)))
+		if rejected, code, err := s.bind(ctx); err != nil {
 			ceiling := maxReconnect
-			label := "bind failed"
 			if rejected {
 				// SMSC answered and refused the bind: it is at its concurrent-bind
 				// cap or still holding our stale sessions. Hold a long floor so it
-				// can reap them, and escalate toward a multi-minute ceiling.
+				// can reap them, and escalate toward a multi-minute ceiling. Surface
+				// the exact command_status so the reason is unambiguous (an SMPP
+				// rejection, not a network/firewall block) and shareable.
 				ceiling = maxCapBackoff
 				if backoff < capRejectBackoff {
 					backoff = capRejectBackoff
 				}
-				label = "bind rejected by SMSC (cap/session limit)"
+				name, desc := smppstatus.Describe(code)
+				slog.Warn("smpp egress bind rejected", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "command_status", fmt.Sprintf("0x%08X", uint32(code)), "code", name)
+				s.logEvent("ERROR", "bind rejected by SMSC",
+					"command_status", fmt.Sprintf("0x%08X", uint32(code)), "code", name, "detail", desc, "retry_in", backoff.String())
+			} else {
+				// No SMPP reply: TCP/transport failure (dial refused/timeout/reset).
+				// Call this out explicitly so it is not mistaken for a bind rejection.
+				slog.Warn("smpp egress bind failed", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "error", err)
+				s.logEvent("ERROR", "bind failed (network/transport, SMPP bind not reached)",
+					"error", err.Error(), "retry_in", backoff.String())
 			}
-			slog.Warn("smpp egress bind failed", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "rejected", rejected, "error", err)
-			s.logEvent("ERROR", label, "error", err.Error(), "retry_in", backoff.String())
 			onStatus("down")
 			if !sleepCtx(ctx, jitter(backoff)) {
 				return
@@ -207,7 +230,7 @@ func startupStagger(idx int) time.Duration {
 // cap-aware backoff. It ALWAYS tears down a failed client: the go-smpp Bind()
 // spawns a self-reconnecting goroutine, so returning without Close() would orphan
 // it and it would keep re-binding to the SMSC forever, piling up ghost sessions.
-func (s *liveSession) bind(ctx context.Context) (rejected bool, err error) {
+func (s *liveSession) bind(ctx context.Context) (rejected bool, code int, err error) {
 	s.closeClient()
 	respTimeout := 5 * time.Second
 	enquire := s.cfg.EnquireLink
@@ -243,17 +266,14 @@ func (s *liveSession) bind(ctx context.Context) (rejected bool, err error) {
 		if st.Status() != smpp.Connected {
 			rej := st.Status() == smpp.BindFailed
 			_ = trx.Close() // stop the library's self-reconnect goroutine + unbind
-			if e := st.Error(); e != nil {
-				return rej, e
-			}
-			return rej, smpp.ErrNotBound
+			return rej, bindStatusCode(st), bindErr(st)
 		}
 		s.mu.Lock()
 		s.trx = trx
 		s.tx = nil
 		s.status = status
 		s.mu.Unlock()
-		return false, nil
+		return false, 0, nil
 	default:
 		tx := &smpp.Transmitter{
 			Addr:        s.cfg.Addr,
@@ -271,18 +291,32 @@ func (s *liveSession) bind(ctx context.Context) (rejected bool, err error) {
 		if st.Status() != smpp.Connected {
 			rej := st.Status() == smpp.BindFailed
 			_ = tx.Close() // stop the library's self-reconnect goroutine + unbind
-			if e := st.Error(); e != nil {
-				return rej, e
-			}
-			return rej, smpp.ErrNotBound
+			return rej, bindStatusCode(st), bindErr(st)
 		}
 		s.mu.Lock()
 		s.tx = tx
 		s.trx = nil
 		s.status = status
 		s.mu.Unlock()
-		return false, nil
+		return false, 0, nil
 	}
+}
+
+// bindStatusCode extracts the SMPP command_status from a failed bind. The
+// go-smpp library returns the bind response status as a pdu.Status error, so a
+// rejection carries the real code (e.g. 0x0D ESME_RBINDFAIL); 0 otherwise.
+func bindStatusCode(st smpp.ConnStatus) int {
+	if ps, ok := st.Error().(pdu.Status); ok {
+		return int(ps)
+	}
+	return 0
+}
+
+func bindErr(st smpp.ConnStatus) error {
+	if e := st.Error(); e != nil {
+		return e
+	}
+	return smpp.ErrNotBound
 }
 
 func (s *liveSession) handleDeliverSM(ctx context.Context, p pdu.Body) {
@@ -298,6 +332,8 @@ func (s *liveSession) handleDeliverSM(ctx context.Context, p pdu.Body) {
 		return
 	}
 	s.logEvent("INFO", "deliver_sm receipt", "smsc_id", receipt.ID, "stat", receipt.State)
+	s.logDebug("deliver_sm detail", "smsc_id", receipt.ID, "stat", receipt.State, "err", receipt.Err,
+		"submitted", strconv.Itoa(receipt.Submitted), "delivered", strconv.Itoa(receipt.Delivered))
 	if s.dlr == nil {
 		return
 	}
@@ -352,7 +388,12 @@ func (s *liveSession) submit(ctx context.Context, req SubmitRequest) (*SubmitRes
 	if err != nil {
 		s.logEvent("ERROR", "submit_sm error", "dst", req.Dst, "error", err.Error())
 	} else if res != nil && res.CommandStatus != 0 {
-		s.logEvent("ERROR", "submit_sm rejected", "dst", req.Dst, "command_status", strconv.Itoa(res.CommandStatus))
+		name, desc := smppstatus.Describe(res.CommandStatus)
+		s.logEvent("ERROR", "submit_sm rejected", "dst", req.Dst,
+			"command_status", fmt.Sprintf("0x%08X", uint32(res.CommandStatus)), "code", name, "detail", desc)
+	} else if res != nil {
+		s.logDebug("submit_sm accepted", "dst", req.Dst, "segments", strconv.Itoa(req.Segments),
+			"smsc_id", res.CarrierMessageID, "command_status", "0x00000000 ESME_ROK")
 	}
 	return res, err
 }

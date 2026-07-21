@@ -22,21 +22,54 @@ const (
 	subscriberBuffer = 256
 )
 
+// debugWindow is how long a viewer-requested debug (verbose) level stays on
+// before auto-reverting, so leaving it on never floods the ring buffer forever.
+const debugWindow = 30 * time.Minute
+
 // Hub fans out per-carrier log lines to live subscribers and retains a bounded
 // history so a viewer launched after the fact still sees recent events.
 type Hub struct {
-	mu      sync.Mutex
-	history map[string][]string
-	subs    map[string]map[int]chan string
-	nextID  int
+	mu         sync.Mutex
+	history    map[string][]string
+	subs       map[string]map[int]chan string
+	debugUntil map[string]time.Time
+	nextID     int
 }
 
 // NewHub returns an empty hub ready for use.
 func NewHub() *Hub {
 	return &Hub{
-		history: make(map[string][]string),
-		subs:    make(map[string]map[int]chan string),
+		history:    make(map[string][]string),
+		subs:       make(map[string]map[int]chan string),
+		debugUntil: make(map[string]time.Time),
 	}
+}
+
+// SetDebug turns verbose (debug-level) logging on or off for one entity. When on
+// it auto-expires after debugWindow. Returns the effective on state.
+func (h *Hub) SetDebug(key string, on bool) bool {
+	if h == nil || key == "" {
+		return false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if on {
+		h.debugUntil[key] = time.Now().Add(debugWindow)
+		return true
+	}
+	delete(h.debugUntil, key)
+	return false
+}
+
+// Debug reports whether verbose logging is currently active for an entity.
+func (h *Hub) Debug(key string) bool {
+	if h == nil || key == "" {
+		return false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	until, ok := h.debugUntil[key]
+	return ok && time.Now().Before(until)
 }
 
 // Append records a preformatted line for a carrier and delivers it to every live

@@ -25,6 +25,7 @@ type App struct {
 	Send       *sending.Service
 	Routes     *routecache.Cache
 	SMPPServer *server.Server
+	Queue      *sending.QueueRunner
 }
 
 // Start initializes SMPP egress (always) and optional client SMSC listener.
@@ -61,6 +62,18 @@ func Start(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) (*App, e
 		slog.Info("smpp ingress disabled", "hint", "set SMPP_SERVER_ENABLED=true to listen for ESME binds")
 	}
 
+	if cfg.SendQueueEnabled {
+		q := sending.NewQueueRunner(sendSvc)
+		// On expiry/undelivered, notify the client (webhook + SMPP deliver_sm).
+		q.NotifyUndelivered = func(ctx context.Context, messageID string) {
+			_ = dlrProc.HandleInbound(ctx, messageID, map[string]string{"status": "undelivered"}, nil)
+		}
+		q.Start(ctx)
+		app.Queue = q
+	} else {
+		slog.Info("send queue disabled", "hint", "set SEND_QUEUE_ENABLED=true for async queued dispatch")
+	}
+
 	return app, nil
 }
 
@@ -68,6 +81,9 @@ func Start(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) (*App, e
 func (a *App) Stop() {
 	if a == nil {
 		return
+	}
+	if a.Queue != nil {
+		a.Queue.Stop()
 	}
 	if a.SMPPServer != nil {
 		a.SMPPServer.Stop()

@@ -13,7 +13,7 @@ func StandardStatus(raw string) string {
 		return "delivered"
 	case "failed", "undeliv", "expired", "deleted", "undeliverable":
 		return "undelivered"
-	case "reject":
+	case "reject", "rejectd":
 		return "rejected"
 	default:
 		return "unknown"

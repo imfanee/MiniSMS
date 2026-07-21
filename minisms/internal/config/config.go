@@ -41,6 +41,14 @@ type Config struct {
 	SMPPEnquireLinkSecs int
 	SMPPWindowSize      int
 	SMPPThroughputPerS  int
+	// Async send queue (reserve-on-accept, worker-pool dispatch). Off by default:
+	// when disabled, Submit dispatches synchronously exactly as before.
+	SendQueueEnabled     bool
+	SendQueueWorkers     int
+	SendQueueBatch       int
+	SendMessageTTLSecs   int // validity: drop to undelivered after this many seconds
+	SendRetryBackoffSecs int // base backoff between dispatch retries
+	SendStuckSecs        int // reclaim rows left 'sending' by a dead worker after this
 }
 
 // Load reads configuration from the environment, optionally from a .env file.
@@ -122,6 +130,28 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	c.SMPPThroughputPerS, err = parseIntDefault("SMPP_THROUGHPUT_PER_S", 50, 1, 10000)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SendQueueEnabled = parseBoolDefault("SEND_QUEUE_ENABLED", false)
+	c.SendQueueWorkers, err = parseIntDefault("SEND_QUEUE_WORKERS", 16, 1, 512)
+	if err != nil {
+		return nil, err
+	}
+	c.SendQueueBatch, err = parseIntDefault("SEND_QUEUE_BATCH", 100, 1, 5000)
+	if err != nil {
+		return nil, err
+	}
+	c.SendMessageTTLSecs, err = parseIntDefault("SEND_MESSAGE_TTL_S", 3600, 30, 604800)
+	if err != nil {
+		return nil, err
+	}
+	c.SendRetryBackoffSecs, err = parseIntDefault("SEND_RETRY_BACKOFF_S", 5, 1, 3600)
+	if err != nil {
+		return nil, err
+	}
+	c.SendStuckSecs, err = parseIntDefault("SEND_STUCK_S", 120, 30, 3600)
 	if err != nil {
 		return nil, err
 	}

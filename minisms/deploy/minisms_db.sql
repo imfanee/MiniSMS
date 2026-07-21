@@ -1485,3 +1485,26 @@ ALTER TABLE clients
 ALTER TABLE clients DROP CONSTRAINT IF EXISTS chk_clients_dlr_webhook_method;
 ALTER TABLE clients ADD CONSTRAINT chk_clients_dlr_webhook_method
     CHECK (dlr_webhook_method IN ('GET', 'POST'));
+
+-- >>> 015_send_queue.up.sql <<<
+-- Async send queue (reserve-on-accept, dispatch by a worker pool). Additive.
+ALTER TABLE sms_logs
+    ADD COLUMN IF NOT EXISTS attempts        INT         NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS expires_at      TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS claimed_at      TIMESTAMPTZ;
+
+-- Adds 'queued', 'sending', and 'undelivered' to the message lifecycle.
+ALTER TABLE sms_logs
+    DROP CONSTRAINT IF EXISTS chk_sms_logs_status,
+    ADD  CONSTRAINT chk_sms_logs_status
+        CHECK (status IN ('pending','queued','sending','accepted','sent','delivered','failed','rejected','undelivered'));
+
+-- Queue poll: only queued rows that are due, oldest first (claimed via SKIP LOCKED).
+CREATE INDEX IF NOT EXISTS idx_sms_logs_queue
+    ON sms_logs (next_attempt_at)
+    WHERE status = 'queued';
+-- Reaper: recover rows left 'sending' by a dead worker.
+CREATE INDEX IF NOT EXISTS idx_sms_logs_sending
+    ON sms_logs (claimed_at)
+    WHERE status = 'sending';

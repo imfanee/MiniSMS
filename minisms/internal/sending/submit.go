@@ -24,7 +24,13 @@ type SubmitParams struct {
 }
 
 // Submit runs the full prepaid send transaction (pending log → dispatch → debit → accept).
+// When the async send queue is enabled it instead reserves the charge and queues
+// the message for a worker to dispatch, so a transient egress rebind never rejects
+// the message (see enqueue / QueueRunner in queue.go).
 func (s *Service) Submit(ctx context.Context, p SubmitParams) SubmitOutcome {
+	if s.Config != nil && s.Config.SendQueueEnabled {
+		return s.enqueue(ctx, p)
+	}
 	client := p.Client
 	msg := p.Message
 	if msg.IngressTransport == "" {

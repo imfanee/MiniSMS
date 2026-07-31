@@ -329,15 +329,28 @@ func (s *liveSession) handleDeliverSM(ctx context.Context, p pdu.Body) {
 	receipt, err := pdufield.ParseDeliveryReceipt(body)
 	if err != nil {
 		s.logEvent("WARN", "deliver_sm parse failed", "error", err.Error())
+		slog.Warn("smpp egress deliver_sm parse failed", "carrier_id", s.cfg.CarrierID, "bind", s.idx, "error", err.Error())
 		return
 	}
+	// Ring buffer (live SMPP logs window) plus a durable journald line, so every carrier receipt
+	// survives a restart and can be reconciled against sms_logs later.
 	s.logEvent("INFO", "deliver_sm receipt", "smsc_id", receipt.ID, "stat", receipt.State)
+	slog.Info("smpp egress deliver_sm", "carrier_id", s.cfg.CarrierID, "bind", s.idx, "smsc_id", receipt.ID, "stat", receipt.State)
 	s.logDebug("deliver_sm detail", "smsc_id", receipt.ID, "stat", receipt.State, "err", receipt.Err,
 		"submitted", strconv.Itoa(receipt.Submitted), "delivered", strconv.Itoa(receipt.Delivered))
 	if s.dlr == nil {
 		return
 	}
-	s.dlr.HandleCarrierSMPP(ctx, s.cfg.CarrierID, receipt.ID, receipt.State)
+	switch s.dlr.HandleCarrierSMPP(ctx, s.cfg.CarrierID, receipt.ID, receipt.State) {
+	case dlr.CarrierDLRUnmatched:
+		// The carrier sent a receipt whose id maps to no message. Make it loud and countable instead
+		// of dropping it: this is the definitive signal for "did we miss a DLR update".
+		total := s.hub.IncUnmatched(s.cfg.CarrierID)
+		s.logEvent("WARN", "deliver_sm UNMATCHED (no message for id)", "smsc_id", receipt.ID, "stat", receipt.State, "unmatched_total", strconv.FormatInt(total, 10))
+		slog.Warn("smpp egress deliver_sm unmatched", "carrier_id", s.cfg.CarrierID, "bind", s.idx, "smsc_id", receipt.ID, "stat", receipt.State, "unmatched_total", total)
+	case dlr.CarrierDLRError:
+		s.logEvent("ERROR", "deliver_sm correlation lookup failed", "smsc_id", receipt.ID, "stat", receipt.State)
+	}
 }
 
 func (s *liveSession) closeClient() {

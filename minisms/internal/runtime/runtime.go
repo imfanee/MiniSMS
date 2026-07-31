@@ -26,6 +26,7 @@ type App struct {
 	Routes     *routecache.Cache
 	SMPPServer *server.Server
 	Queue      *sending.QueueRunner
+	Aging      *ageRunner
 }
 
 // Start initializes SMPP egress (always) and optional client SMSC listener.
@@ -74,6 +75,13 @@ func Start(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) (*App, e
 		slog.Info("send queue disabled", "hint", "set SEND_QUEUE_ENABLED=true for async queued dispatch")
 	}
 
+	if cfg.AcceptedDLRTTLSecs > 0 {
+		app.Aging = startAgeRunner(ctx, pool, dlrProc, cfg.AcceptedDLRTTLSecs)
+		slog.Info("accepted-no-dlr aging enabled", "ttl_seconds", cfg.AcceptedDLRTTLSecs)
+	} else {
+		slog.Info("accepted-no-dlr aging disabled", "hint", "set SEND_ACCEPTED_DLR_TTL_S>0 to close out messages with no final DLR")
+	}
+
 	return app, nil
 }
 
@@ -81,6 +89,9 @@ func Start(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) (*App, e
 func (a *App) Stop() {
 	if a == nil {
 		return
+	}
+	if a.Aging != nil {
+		a.Aging.stop()
 	}
 	if a.Queue != nil {
 		a.Queue.Stop()

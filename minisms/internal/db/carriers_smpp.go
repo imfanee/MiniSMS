@@ -3,7 +3,9 @@ package db
 
 import (
 	"context"
+	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -64,6 +66,9 @@ func UpdateCarrierSMPPStatus(ctx context.Context, pool *pgxpool.Pool, carrierID,
 	return err
 }
 
+// ResolveSMSLogMessageID maps a carrier receipt reference (carrier_message_id, or our own
+// message_id) back to the owning message. It returns ("", nil) when nothing correlates so the caller
+// can treat an unmatched receipt as a distinct, loggable outcome rather than a database error.
 func ResolveSMSLogMessageID(ctx context.Context, pool *pgxpool.Pool, carrierID, ref string) (string, error) {
 	var messageID string
 	err := pool.QueryRow(ctx, `
@@ -74,5 +79,8 @@ func ResolveSMSLogMessageID(ctx context.Context, pool *pgxpool.Pool, carrierID, 
 		ORDER BY received_at DESC
 		LIMIT 1`,
 		carrierID, ref).Scan(&messageID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
 	return messageID, err
 }

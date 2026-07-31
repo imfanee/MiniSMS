@@ -23,6 +23,7 @@ type carrierSMPPPanelData struct {
 	BindsKnown     bool
 	BindsReady     int
 	BindsTotal     int
+	UnmatchedDLRs  int64
 }
 
 func (h *Handlers) GetCarrierSMPPSettings() http.HandlerFunc {
@@ -178,6 +179,7 @@ func (h *Handlers) carrierSMPPPanelData(r *http.Request, c *db.CarrierFull, succ
 			data.BindsReady = ready
 			data.BindsTotal = total
 		}
+		data.UnmatchedDLRs = h.SMPPCtl.UnmatchedDLRs(cid)
 	}
 	return data
 }

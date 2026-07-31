@@ -7,7 +7,7 @@
     <div class="col-md-4">
       <label class="form-label">Session status</label>
       <input class="form-control font-monospace" readonly value="{{.Carrier.SMPPStatus}}{{if .BindsKnown}} ({{.BindsReady}}/{{.BindsTotal}} binds up){{end}}" />
-      <div class="form-text">Updated by the egress supervisor (read-only).</div>
+      <div class="form-text">Updated by the egress supervisor (read-only).{{if gt .UnmatchedDLRs 0}} <span class="text-danger">Unmatched DLRs since start: {{.UnmatchedDLRs}}</span> (receipts the carrier sent that matched no message; see SMPP logs).{{end}}</div>
     </div>
     <div class="col-md-4">
       <label class="form-label d-block">Connection logs</label>

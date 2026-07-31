@@ -96,6 +96,32 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 	if !shouldForwardDLR(hadPriorReceipt, dlrStatus) {
 		return nil
 	}
+	p.forwardToClient(ctx, row, messageID, dlrStatus)
+	return nil
+}
+
+// ResendToClient re-sends the stored delivery receipt to the client using the client's current DLR
+// delivery mode (http/smpp/both). It is a forward-only operator action: it does not re-apply the
+// received guard, re-rate, or touch any ledger; it only re-attempts client delivery and records the
+// forward outcome. Returns the resulting forward status (for example "smpp_ok", "success", "no_url").
+func (p *Processor) ResendToClient(ctx context.Context, messageID string) (string, error) {
+	messageID = strings.TrimSpace(messageID)
+	if _, err := uuid.Parse(messageID); err != nil {
+		return "", fmt.Errorf("invalid message id")
+	}
+	row, err := db.GetSMSLogForDLR(ctx, p.Pool, messageID)
+	if err != nil {
+		return "", err
+	}
+	if row.DLRStatus == nil || strings.TrimSpace(*row.DLRStatus) == "" {
+		return "", fmt.Errorf("no delivery receipt to resend")
+	}
+	return p.forwardToClient(ctx, row, messageID, StandardStatus(*row.DLRStatus)), nil
+}
+
+// forwardToClient delivers the receipt to the client over the client's configured DLR channel and
+// records the outcome. Shared by live DLR ingest (HandleInbound) and operator resend (ResendToClient).
+func (p *Processor) forwardToClient(ctx context.Context, row *db.DLRMessage, messageID, dlrStatus string) string {
 	mode := strings.ToLower(strings.TrimSpace(row.DLRDeliveryMode))
 	if mode == "" {
 		mode = "http"
@@ -106,14 +132,14 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 			p.recordDLRForward(ctx, messageID, "smpp_ok", "DLR delivered to client SMPP session", map[string]any{
 				"channel": "smpp", "dlr_status": dlrStatus,
 			})
-			return nil
+			return "smpp_ok"
 		}
 		if mode == "smpp" {
 			_ = db.UpdateDLRForwardStatus(ctx, p.Pool, messageID, "smpp_no_bind", false, false)
 			p.recordDLRForward(ctx, messageID, "smpp_no_bind", "No active client SMPP bind for DLR delivery", map[string]any{
 				"channel": "smpp", "dlr_status": dlrStatus,
 			})
-			return nil
+			return "smpp_no_bind"
 		}
 	}
 	if row.DLRWebhookURL == nil || strings.TrimSpace(*row.DLRWebhookURL) == "" {
@@ -121,7 +147,7 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 		p.recordDLRForward(ctx, messageID, "no_url", "Client has no DLR webhook URL configured", map[string]any{
 			"channel": "http", "dlr_status": dlrStatus,
 		})
-		return nil
+		return "no_url"
 	}
 	now := time.Now().UTC()
 	fwd, err := BuildClientForward(row, dlrStatus, now)
@@ -130,7 +156,7 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 		p.recordDLRForward(ctx, messageID, "failed", "Failed to build DLR webhook payload", map[string]any{
 			"channel": "http", "error": err.Error(),
 		})
-		return nil
+		return "failed"
 	}
 	if err := forwardEndpointValidator(fwd.URL); err != nil {
 		_ = db.UpdateDLRForwardStatus(ctx, p.Pool, messageID, "blocked", false, false)
@@ -138,7 +164,7 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 			"channel": "http", "webhook_url": fwd.URL, "error": err.Error(),
 		})
 		slog.Warn("dlr forward blocked by ssrf guard", "message_id", messageID, "webhook_url", fwd.URL, "error", err.Error())
-		return nil
+		return "blocked"
 	}
 	var bodyReader io.Reader
 	if len(fwd.Body) > 0 {
@@ -150,7 +176,7 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 		p.recordDLRForward(ctx, messageID, "failed", "Failed to create DLR webhook request", map[string]any{
 			"channel": "http", "webhook_url": fwd.URL, "error": err.Error(),
 		})
-		return nil
+		return "failed"
 	}
 	if fwd.ContentType != "" {
 		req.Header.Set("Content-Type", fwd.ContentType)
@@ -172,7 +198,7 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 			"channel": "http", "webhook_url": fwd.URL, "http_method": fwd.Method, "error": err.Error(),
 		})
 		slog.Warn("dlr forward failed", "message_id", messageID, "webhook_url", fwd.URL, "method", fwd.Method, "error", err.Error())
-		return nil
+		return "failed"
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
@@ -181,14 +207,14 @@ func (p *Processor) HandleInbound(ctx context.Context, messageID string, payload
 		p.recordDLRForward(ctx, messageID, "success", "DLR forwarded to client webhook", map[string]any{
 			"channel": "http", "webhook_url": fwd.URL, "http_method": fwd.Method, "http_status": resp.StatusCode,
 		})
-	} else {
-		_ = db.UpdateDLRForwardStatus(ctx, p.Pool, messageID, "failed", false, true)
-		p.recordDLRForward(ctx, messageID, "failed", fmt.Sprintf("Client webhook returned HTTP %d", resp.StatusCode), map[string]any{
-			"channel": "http", "webhook_url": fwd.URL, "http_method": fwd.Method, "http_status": resp.StatusCode,
-		})
-		slog.Warn("dlr forward failed", "message_id", messageID, "webhook_url", fwd.URL, "method", fwd.Method, "http_status", resp.StatusCode)
+		return "success"
 	}
-	return nil
+	_ = db.UpdateDLRForwardStatus(ctx, p.Pool, messageID, "failed", false, true)
+	p.recordDLRForward(ctx, messageID, "failed", fmt.Sprintf("Client webhook returned HTTP %d", resp.StatusCode), map[string]any{
+		"channel": "http", "webhook_url": fwd.URL, "http_method": fwd.Method, "http_status": resp.StatusCode,
+	})
+	slog.Warn("dlr forward failed", "message_id", messageID, "webhook_url", fwd.URL, "method", fwd.Method, "http_status", resp.StatusCode)
+	return "failed"
 }
 
 // shouldForwardDLR decides whether an applied receipt should be pushed to the client. The first
@@ -217,18 +243,36 @@ func (p *Processor) recordDLRForward(ctx context.Context, messageID, status, det
 	))
 }
 
-// HandleCarrierSMPP processes a delivery receipt received on a carrier TRX/RX session.
-func (p *Processor) HandleCarrierSMPP(ctx context.Context, carrierID, receiptRef, receiptStat string) {
+// CarrierDLRResult reports what happened to a delivery receipt received on a carrier SMPP session, so
+// the caller can log it durably and surface unmatched receipts (a receipt whose id maps to no message)
+// instead of dropping them silently.
+type CarrierDLRResult int
+
+const (
+	CarrierDLRMatched   CarrierDLRResult = iota // correlated to a message and applied
+	CarrierDLRUnmatched                         // no message has this carrier_message_id (dropped)
+	CarrierDLRError                             // lookup failed (transient); not applied
+)
+
+// HandleCarrierSMPP processes a delivery receipt received on a carrier TRX/RX session and reports
+// whether it correlated to a message. An unmatched receipt is returned (not swallowed) so the SMPP
+// layer can log and count it: that is the exact signal for "the carrier sent a DLR we could not match".
+func (p *Processor) HandleCarrierSMPP(ctx context.Context, carrierID, receiptRef, receiptStat string) CarrierDLRResult {
 	receiptRef = strings.TrimSpace(receiptRef)
 	if receiptRef == "" {
-		return
+		return CarrierDLRUnmatched
 	}
 	messageID, err := db.ResolveSMSLogMessageID(ctx, p.Pool, carrierID, receiptRef)
-	if err != nil || messageID == "" {
-		return
+	if err != nil {
+		slog.Warn("carrier dlr correlation lookup failed", "carrier_id", carrierID, "receipt_ref", receiptRef, "stat", receiptStat, "error", err.Error())
+		return CarrierDLRError
+	}
+	if messageID == "" {
+		return CarrierDLRUnmatched
 	}
 	fields := map[string]string{"status": StatusFromSMPPReceipt(receiptStat)}
 	_ = p.HandleInbound(ctx, messageID, fields, InboundFromSMPP(receiptRef, receiptStat))
+	return CarrierDLRMatched
 }
 
 func signForward(body []byte, secretKey []byte, secretEnc *string) string {

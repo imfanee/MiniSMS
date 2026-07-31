@@ -90,9 +90,11 @@ func UpdateDLRReceived(ctx context.Context, pool *pgxpool.Pool, messageID, dlrSt
 			status = CASE
 				WHEN $2 = 'delivered' THEN 'delivered'
 				WHEN $2 = 'undelivered' THEN 'failed'
+				WHEN $2 = 'rejected' THEN 'rejected'
 				ELSE status
 			END,
-			delivered_at = CASE WHEN $2 = 'delivered' THEN now() ELSE delivered_at END
+			delivered_at = CASE WHEN $2 = 'delivered' THEN now() ELSE delivered_at END,
+			failed_at = CASE WHEN $2 IN ('undelivered', 'rejected') THEN now() ELSE failed_at END
 		WHERE message_id = $1::uuid
 			AND (dlr_status IS NULL OR dlr_status NOT IN ('delivered', 'undelivered', 'rejected'))`,
 		messageID, dlrStatus,

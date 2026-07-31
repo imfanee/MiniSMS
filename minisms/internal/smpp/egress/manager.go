@@ -41,6 +41,10 @@ func NewManager(pool *pgxpool.Pool, cfg *config.Config, dlrProc *dlr.Processor) 
 // LogHub returns the per-carrier SMPP session log hub for live admin tailing.
 func (m *Manager) LogHub() *egresslog.Hub { return m.logHub }
 
+// UnmatchedDLRs reports how many delivery receipts from this carrier could not be correlated to a
+// message since process start (receipts the carrier sent that we could not match to a submit).
+func (m *Manager) UnmatchedDLRs(carrierID string) int64 { return m.logHub.Unmatched(carrierID) }
+
 // BindStatus reports how many of the carrier's parallel binds are currently up
 // and the configured total. present is false when no session group exists (the
 // carrier is not an active SMPP egress carrier).

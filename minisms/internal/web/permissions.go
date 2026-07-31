@@ -233,6 +233,8 @@ func RegisterProtectedAdminRoutes(r chi.Router, h *Handlers) {
 		r.Get("/sms-logs/export.csv", h.ExportSMSLogsCSV())
 		r.Get("/sms-logs/export.pdf", h.ExportSMSLogsPDF())
 		r.Get("/sms-logs/{id}", h.SMSLogDetailModal())
+		r.Get("/sms-logs/{id}/print", h.SMSLogPrintView())
+		r.Post("/sms-logs/{id}/resend-dlr", h.ResendDLR())
 	})
 
 	r.Group(func(r chi.Router) {

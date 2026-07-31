@@ -133,6 +133,7 @@ func min(a, b int) int {
 }
 
 type SMSLogDetailPage struct {
+	CSRFToken                                                                                           string
 	MessageID, ClientID, ToNumber, MessageBody, Encoding, RateApplied, TotalCharged, Currency, Status string
 	ClientRef, FromNumber, PrefixMatched, CarrierMessageID, CarrierResponseBody, IngressTransport       *string
 	RateGroupID, RoutingGroupID, RouteEntryID, CarrierID, DLRWebhookURL, DLRStatus, DLRForwardStatus    *string
@@ -147,12 +148,12 @@ type SMSLogDetailPage struct {
 	Timeline                                                                                              []smslog.TimelineEventView
 }
 
-func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
-		var d SMSLogDetailPage
-		var timelineRaw []byte
-		err := h.Pool.QueryRow(r.Context(), `
+// loadSMSLogDetail gathers one message's full detail (fields + timeline) for the detail modal and the
+// printable view. Returns pgx.ErrNoRows when the message does not exist.
+func (h *Handlers) loadSMSLogDetail(r *http.Request, id string) (*SMSLogDetailPage, error) {
+	var d SMSLogDetailPage
+	var timelineRaw []byte
+	err := h.Pool.QueryRow(r.Context(), `
 			SELECT sl.message_id::text, sl.client_id::text, sl.client_ref, sl.to_number, sl.from_number, sl.message_body,
 				sl.segments, sl.encoding, sl.rate_group_id::text, sl.prefix_matched, sl.rate_applied::text, sl.total_charged::text, sl.currency::text,
 				sl.routing_group_id::text, sl.route_entry_id::text, sl.failover_sequence, sl.carrier_id::text, sl.carrier_message_id,
@@ -176,6 +177,32 @@ func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
 				&d.IngressTransport, &timelineRaw,
 				&d.ClientName, &d.CarrierName, &d.RoutingGroupName,
 			)
+	if err != nil {
+		return nil, err
+	}
+	events := smslog.ParseTimeline(timelineRaw)
+	if len(events) == 0 {
+		ingress := "http"
+		if d.IngressTransport != nil {
+			ingress = *d.IngressTransport
+		}
+		events = smslog.SynthesizeTimeline(smslog.LegacyDetail{
+			ReceivedAt: d.ReceivedAt, DispatchedAt: d.DispatchedAt, DeliveredAt: d.DeliveredAt, FailedAt: d.FailedAt,
+			IngressTransport: ingress, CarrierName: d.CarrierName, FailoverSequence: d.FailoverSequence,
+			CarrierResponseCode: d.CarrierResponseCode, CarrierResponseBody: d.CarrierResponseBody,
+			CarrierMessageID: d.CarrierMessageID, CarrierSkipReason: d.CarrierSkipReason, Status: d.Status,
+			DLRRequested: d.DLRRequested, DLRWebhookURL: d.DLRWebhookURL, DLRStatus: d.DLRStatus,
+			DLRReceivedAt: d.DLRReceivedAt, DLRForwardedAt: d.DLRForwardedAt, DLRForwardStatus: d.DLRForwardStatus,
+			DLRForwardAttempts: d.DLRForwardAttempts,
+		})
+	}
+	d.Timeline = smslog.FormatViews(events)
+	return &d, nil
+}
+
+func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		d, err := h.loadSMSLogDetail(r, chi.URLParam(r, "id"))
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				http.NotFound(w, r)
@@ -184,24 +211,29 @@ func (h *Handlers) SMSLogDetailModal() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
-		events := smslog.ParseTimeline(timelineRaw)
-		if len(events) == 0 {
-			ingress := "http"
-			if d.IngressTransport != nil {
-				ingress = *d.IngressTransport
-			}
-			events = smslog.SynthesizeTimeline(smslog.LegacyDetail{
-				ReceivedAt: d.ReceivedAt, DispatchedAt: d.DispatchedAt, DeliveredAt: d.DeliveredAt, FailedAt: d.FailedAt,
-				IngressTransport: ingress, CarrierName: d.CarrierName, FailoverSequence: d.FailoverSequence,
-				CarrierResponseCode: d.CarrierResponseCode, CarrierResponseBody: d.CarrierResponseBody,
-				CarrierMessageID: d.CarrierMessageID, CarrierSkipReason: d.CarrierSkipReason, Status: d.Status,
-				DLRRequested: d.DLRRequested, DLRWebhookURL: d.DLRWebhookURL, DLRStatus: d.DLRStatus,
-				DLRReceivedAt: d.DLRReceivedAt, DLRForwardedAt: d.DLRForwardedAt, DLRForwardStatus: d.DLRForwardStatus,
-				DLRForwardAttempts: d.DLRForwardAttempts,
-			})
-		}
-		d.Timeline = smslog.FormatViews(events)
+		d.CSRFToken = csrf.Token(r)
 		if err := execT(w, h.SMSLogFragT, "sms_log_detail_modal", d); err != nil {
+			ServerError(w, r, err, h.Log, h.T500)
+		}
+	}
+}
+
+// SMSLogPrintView renders a standalone, print-friendly page for one message and auto-opens the
+// browser print dialog (which offers Save as PDF or the system default printer). Opened in a new
+// window by the "Print" button on the detail modal.
+func (h *Handlers) SMSLogPrintView() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		d, err := h.loadSMSLogDetail(r, chi.URLParam(r, "id"))
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				http.NotFound(w, r)
+				return
+			}
+			ServerError(w, r, err, h.Log, h.T500)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		if err := execT(w, h.SMSLogFragT, "sms_log_print", d); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 		}
 	}

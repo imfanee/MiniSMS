@@ -285,6 +285,7 @@ func main() {
 		tfs,
 		"templates/admin/sms_logs/table.html",
 		"templates/admin/sms_logs/detail_modal.html",
+		"templates/admin/sms_logs/print.html",
 	)
 	if err != nil {
 		log.Error("template sms logs fragments", "err", err)
@@ -411,6 +412,7 @@ func main() {
 	defer app.Stop()
 	h.RouteCache = app.Routes
 	h.Send = app.Send
+	h.DLRResend = app.DLR
 	if app.Egress != nil {
 		h.SMPPLogHub = app.Egress.LogHub()
 		h.SMPPCtl = app.Egress

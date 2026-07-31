@@ -5,7 +5,13 @@
 		<div class="modal-content border border-2 border-primary">
 			<div class="modal-header">
 				<h5 class="modal-title">SMS Log Detail</h5>
-				<button type="button" class="btn-close" onclick="document.getElementById('modal-container').innerHTML=''"></button>
+				<div class="d-flex align-items-center gap-2">
+					<button type="button" class="btn btn-sm btn-outline-secondary"
+						@click="window.open('/admin/sms-logs/{{.MessageID}}/print','smslogprint_{{.MessageID}}','width=800,height=900,resizable=yes,scrollbars=yes')">
+						Print / Save PDF
+					</button>
+					<button type="button" class="btn-close" onclick="document.getElementById('modal-container').innerHTML=''"></button>
+				</div>
 			</div>
 			<div class="modal-body">
 				<div class="row g-3 mb-4">
@@ -107,6 +113,18 @@
 					<dt class="col-sm-4">Message Body</dt><dd class="col-sm-8"><pre class="mb-0">{{.MessageBody}}</pre></dd>
 				</dl>
 			</div>
+			{{if .DLRStatus}}
+			<div class="modal-footer justify-content-between">
+				<span class="small text-secondary">Re-deliver the stored <strong>{{.DLRStatus}}</strong> receipt to the client over their current DLR channel.</span>
+				<div class="d-flex align-items-center gap-2">
+					<span id="resend-dlr-result"></span>
+					<form hx-post="/admin/sms-logs/{{.MessageID}}/resend-dlr" hx-target="#resend-dlr-result" hx-swap="innerHTML" class="d-inline">
+						<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}" />
+						<button class="btn btn-sm btn-outline-primary" type="submit">Resend DLR to client</button>
+					</form>
+				</div>
+			</div>
+			{{end}}
 		</div>
 	</div>
 </div>

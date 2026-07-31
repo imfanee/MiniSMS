@@ -50,6 +50,7 @@ type Handlers struct {
 	SMPPCtl       SMPPController
 	SMPPIngress       SMPPIngressController
 	SMPPIngressLogHub *egresslog.Hub
+	DLRResend         DLRResender
 	RGListT       *template.Template
 	RGDetT        *template.Template
 	RGFragT       *template.Template

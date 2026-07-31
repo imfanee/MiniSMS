@@ -49,6 +49,11 @@ type Config struct {
 	SendMessageTTLSecs   int // validity: drop to undelivered after this many seconds
 	SendRetryBackoffSecs int // base backoff between dispatch retries
 	SendStuckSecs        int // reclaim rows left 'sending' by a dead worker after this
+	// Age out messages the carrier accepted but never sent a final DLR for: after this many seconds
+	// a still-'accepted' + DLR-requested message becomes 'undelivered' and the client is notified.
+	// 0 disables the reaper. No refund: the carrier accepted and billed the message; a missing DLR is
+	// not proof of non-delivery.
+	AcceptedDLRTTLSecs int
 }
 
 // Load reads configuration from the environment, optionally from a .env file.
@@ -152,6 +157,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	c.SendStuckSecs, err = parseIntDefault("SEND_STUCK_S", 120, 30, 3600)
+	if err != nil {
+		return nil, err
+	}
+	c.AcceptedDLRTTLSecs, err = parseIntDefault("SEND_ACCEPTED_DLR_TTL_S", 0, 0, 2592000)
 	if err != nil {
 		return nil, err
 	}

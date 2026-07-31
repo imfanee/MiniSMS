@@ -23,6 +23,7 @@ import (
 type SMPPController interface {
 	BindStatus(carrierID string) (ready, total int, present bool)
 	Restart(carrierID string)
+	UnmatchedDLRs(carrierID string) int64
 }
 
 var errSMPPControllerUnavailable = errors.New("smpp controller unavailable")

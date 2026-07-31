@@ -1,0 +1,88 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "sms_log_print"}}<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>SMS {{.MessageID}}</title>
+	<style>
+		:root { color-scheme: light; }
+		* { box-sizing: border-box; }
+		body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #111; margin: 24px; font-size: 13px; }
+		h1 { font-size: 18px; margin: 0 0 2px; }
+		h2 { font-size: 14px; margin: 20px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+		.sub { color: #666; font-size: 12px; margin-bottom: 16px; }
+		.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+		table { width: 100%; border-collapse: collapse; }
+		th, td { text-align: left; vertical-align: top; padding: 4px 8px; border-bottom: 1px solid #eee; }
+		th { width: 34%; color: #444; font-weight: 600; }
+		.tl { margin: 0; padding: 0; list-style: none; }
+		.tl li { padding: 8px 0; border-bottom: 1px solid #eee; }
+		.tl .k { display: inline-block; font-size: 11px; text-transform: uppercase; color: #555; background: #f0f0f0; border-radius: 3px; padding: 1px 6px; margin-right: 6px; }
+		.tl .t { color: #666; font-size: 11px; }
+		pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; font-size: 12px; }
+		.toolbar { margin-bottom: 16px; }
+		.toolbar button { font-size: 13px; padding: 6px 14px; cursor: pointer; }
+		@media print { .toolbar { display: none; } body { margin: 0; } }
+	</style>
+</head>
+<body>
+	<div class="toolbar">
+		<button type="button" onclick="window.print()">Print / Save as PDF</button>
+		<button type="button" onclick="window.close()">Close</button>
+	</div>
+
+	<h1>SMS Message Detail</h1>
+	<div class="sub mono">{{.MessageID}}</div>
+
+	<h2>Summary</h2>
+	<table>
+		<tr><th>Status</th><td>{{.Status}}{{if .DLRStatus}} (DLR: {{.DLRStatus}}){{end}}</td></tr>
+		<tr><th>Client</th><td>{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</td></tr>
+		<tr><th>To</th><td>{{.ToNumber}}</td></tr>
+		<tr><th>From</th><td>{{if .FromNumber}}{{.FromNumber}}{{else}}-{{end}}</td></tr>
+		<tr><th>Carrier</th><td>{{if .CarrierName}}{{.CarrierName}}{{else}}-{{end}}{{if gt .FailoverSequence 0}} (Failover {{.FailoverSequence}}){{end}}</td></tr>
+		<tr><th>Segments / Encoding</th><td>{{.Segments}} / {{.Encoding}}</td></tr>
+		<tr><th>Charged</th><td>{{.TotalCharged}} {{.Currency}}</td></tr>
+		<tr><th>Received At</th><td>{{.ReceivedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}</td></tr>
+	</table>
+
+	<h2>Message timeline</h2>
+	{{if .Timeline}}
+	<ul class="tl">
+		{{range .Timeline}}
+		<li>
+			<span class="k">{{.Kind}}</span><strong>{{.Title}}</strong>
+			<span class="t">{{.AtDisplay}}</span>
+			{{if .Detail}}<pre>{{.Detail}}</pre>{{end}}
+		</li>
+		{{end}}
+	</ul>
+	{{else}}
+	<p>No timeline events recorded.</p>
+	{{end}}
+
+	<h2>Technical details</h2>
+	<table>
+		<tr><th>Client Ref</th><td>{{if .ClientRef}}{{.ClientRef}}{{else}}-{{end}}</td></tr>
+		<tr><th>Ingress</th><td>{{if .IngressTransport}}{{.IngressTransport}}{{else}}http{{end}}</td></tr>
+		<tr><th>Routing Group</th><td>{{if .RoutingGroupName}}{{.RoutingGroupName}}{{else}}-{{end}}</td></tr>
+		<tr><th>Prefix Matched</th><td>{{if .PrefixMatched}}{{.PrefixMatched}}{{else}}-{{end}}</td></tr>
+		<tr><th>Rate Applied</th><td>{{.RateApplied}}</td></tr>
+		<tr><th class="mono">Carrier Message ID</th><td class="mono">{{if .CarrierMessageID}}{{.CarrierMessageID}}{{else}}-{{end}}</td></tr>
+		<tr><th>Carrier Response Code</th><td>{{if .CarrierResponseCode}}{{.CarrierResponseCode}}{{else}}-{{end}}</td></tr>
+		<tr><th>Dispatched At</th><td>{{if .DispatchedAt}}{{.DispatchedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</td></tr>
+		<tr><th>Delivered At</th><td>{{if .DeliveredAt}}{{.DeliveredAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</td></tr>
+		<tr><th>Failed At</th><td>{{if .FailedAt}}{{.FailedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</td></tr>
+		<tr><th>DLR Requested</th><td>{{if .DLRRequested}}Yes{{else}}No{{end}}</td></tr>
+		<tr><th>DLR Status</th><td>{{if .DLRStatus}}{{.DLRStatus}}{{else}}-{{end}}</td></tr>
+		<tr><th>DLR Received At</th><td>{{if .DLRReceivedAt}}{{.DLRReceivedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</td></tr>
+		<tr><th>DLR Forward Status</th><td>{{if .DLRForwardStatus}}{{.DLRForwardStatus}}{{else}}-{{end}}</td></tr>
+		<tr><th>DLR Forwarded At</th><td>{{if .DLRForwardedAt}}{{.DLRForwardedAt.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}-{{end}}</td></tr>
+		<tr><th>Message Body</th><td><pre>{{.MessageBody}}</pre></td></tr>
+	</table>
+
+	<script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
+</body>
+</html>
+{{end}}

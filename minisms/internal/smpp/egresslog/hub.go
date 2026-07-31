@@ -33,6 +33,7 @@ type Hub struct {
 	history    map[string][]string
 	subs       map[string]map[int]chan string
 	debugUntil map[string]time.Time
+	unmatched  map[string]int64
 	nextID     int
 }
 
@@ -42,7 +43,30 @@ func NewHub() *Hub {
 		history:    make(map[string][]string),
 		subs:       make(map[string]map[int]chan string),
 		debugUntil: make(map[string]time.Time),
+		unmatched:  make(map[string]int64),
 	}
+}
+
+// IncUnmatched records one delivery receipt that could not be correlated to a message for this entity
+// (a DLR the upstream sent that we could not match), and returns the running total since start.
+func (h *Hub) IncUnmatched(key string) int64 {
+	if h == nil || key == "" {
+		return 0
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.unmatched[key]++
+	return h.unmatched[key]
+}
+
+// Unmatched returns the count of uncorrelated delivery receipts for an entity since process start.
+func (h *Hub) Unmatched(key string) int64 {
+	if h == nil || key == "" {
+		return 0
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.unmatched[key]
 }
 
 // SetDebug turns verbose (debug-level) logging on or off for one entity. When on

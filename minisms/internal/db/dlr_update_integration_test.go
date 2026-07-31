@@ -4,6 +4,7 @@ package db
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // TestUpdateDLRReceived_FinalNotOverwritten verifies the multi-bit dlr-mask guard: an intermediate
@@ -72,5 +73,65 @@ func TestUpdateDLRReceived_FinalNotOverwritten(t *testing.T) {
 	}
 	if dlrStatus != "delivered" || status != "delivered" {
 		t.Fatalf("final state not preserved: dlr_status=%q status=%q", dlrStatus, status)
+	}
+}
+
+// TestUpdateDLRReceived_RejectedFlipsStatus verifies a carrier REJECTD receipt propagates to the
+// top-level status column (shown on the SMS Logs screen), not only dlr_status, and stamps failed_at.
+// Regression: rejected receipts previously updated dlr_status but left status stuck at 'accepted'.
+func TestUpdateDLRReceived_RejectedFlipsStatus(t *testing.T) {
+	pool := testPoolOrSkip(t)
+	ctx := context.Background()
+
+	var clientID string
+	err := pool.QueryRow(ctx, `
+		INSERT INTO clients (name, email, status, currency)
+		VALUES ('dlr-reject-test', 'dlr-reject@test.example', 'active', 'GBP')
+		RETURNING client_id::text`).Scan(&clientID)
+	if err != nil {
+		t.Fatalf("insert client: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM clients WHERE client_id=$1::uuid`, clientID) })
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	msgID, err := CreateSMSLog(ctx, tx, SMSLog{
+		ClientID:       clientID,
+		ToNumber:       "+14155550103",
+		MessageBody:    "hi",
+		MessageLength:  2,
+		Segments:       1,
+		Encoding:       "GSM7",
+		RateApplied:    "0.010000",
+		TotalCharged:   "0.010000",
+		Currency:       "GBP",
+		Status:         "accepted",
+		SenderIDSource: "client_default",
+	})
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("create log: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM sms_logs WHERE message_id=$1::uuid`, msgID) })
+
+	if applied, err := UpdateDLRReceived(ctx, pool, msgID, "rejected"); err != nil || !applied {
+		t.Fatalf("rejected receipt: applied=%v err=%v, want applied=true", applied, err)
+	}
+
+	var dlrStatus, status string
+	var failedAt *time.Time
+	if err := pool.QueryRow(ctx, `SELECT dlr_status, status, failed_at FROM sms_logs WHERE message_id=$1::uuid`, msgID).Scan(&dlrStatus, &status, &failedAt); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if dlrStatus != "rejected" || status != "rejected" {
+		t.Fatalf("rejected not propagated: dlr_status=%q status=%q, want both 'rejected'", dlrStatus, status)
+	}
+	if failedAt == nil {
+		t.Fatalf("failed_at not stamped on rejected receipt")
 	}
 }

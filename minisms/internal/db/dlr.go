@@ -13,6 +13,7 @@ import (
 type DLRMessage struct {
 	MessageID                string
 	ClientID                 string
+	ClientName               string
 	ClientRef                *string
 	DLRDeliveryMode          string
 	ToNumber                 string
@@ -45,7 +46,7 @@ func GetSMSLogForDLR(ctx context.Context, pool *pgxpool.Pool, messageID string) 
 	var m DLRMessage
 	var statusMapRaw []byte
 	err := pool.QueryRow(ctx, `
-		SELECT sl.message_id::text, sl.client_id::text, sl.client_ref, sl.to_number, sl.from_number, sl.segments, sl.total_charged::text,
+		SELECT sl.message_id::text, sl.client_id::text, c.name, sl.client_ref, sl.to_number, sl.from_number, sl.segments, sl.total_charged::text,
 			ca.name, sl.failover_sequence, sl.received_at, sl.status, sl.dlr_status, sl.dlr_received_at,
 			sl.dlr_requested, sl.dlr_webhook_url,
 			sl.source_addr_ton, sl.source_addr_npi, sl.dest_addr_ton, sl.dest_addr_npi,
@@ -58,7 +59,7 @@ func GetSMSLogForDLR(ctx context.Context, pool *pgxpool.Pool, messageID string) 
 		WHERE sl.message_id = $1::uuid`,
 		messageID,
 	).Scan(
-		&m.MessageID, &m.ClientID, &m.ClientRef, &m.ToNumber, &m.FromNumber, &m.Segments, &m.TotalCharged,
+		&m.MessageID, &m.ClientID, &m.ClientName, &m.ClientRef, &m.ToNumber, &m.FromNumber, &m.Segments, &m.TotalCharged,
 			&m.CarrierName, &m.FailoverSequence, &m.ReceivedAt, &m.Status, &m.DLRStatus, &m.DLRReceivedAt,
 			&m.DLRRequested, &m.DLRWebhookURL,
 			&m.SourceAddrTON, &m.SourceAddrNPI, &m.DestAddrTON, &m.DestAddrNPI,

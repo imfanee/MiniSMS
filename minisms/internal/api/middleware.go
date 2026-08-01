@@ -2,7 +2,9 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minisms/minisms/internal/db"
+	"github.com/minisms/minisms/internal/wirelog"
 	"golang.org/x/time/rate"
 )
 
@@ -57,9 +60,51 @@ func APIKeyAuth(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				return
 			}
 			ctx := context.WithValue(r.Context(), authedClientKey, client)
+			if wirelog.Enabled() {
+				logClientHTTP(w, r.WithContext(ctx), client.Name, next)
+				return
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// logClientHTTP records one inbound client REST call (request + response) to the client's http wire
+// log, then serves it. The request body is captured (capped) and restored; the API key never appears
+// because it rides in a header, and RedactBody masks any credential-shaped body params.
+func logClientHTTP(w http.ResponseWriter, r *http.Request, clientName string, next http.Handler) {
+	var body string
+	if r.Body != nil {
+		b, _ := io.ReadAll(io.LimitReader(r.Body, 16*1024))
+		_ = r.Body.Close()
+		body = string(b)
+		r.Body = io.NopCloser(bytes.NewReader(b))
+	}
+	wirelog.Emit(clientName, "http", "<<", "request",
+		"method", r.Method, "path", r.URL.Path, "query", wirelog.RedactURL(r.URL.RequestURI()), "body", wirelog.RedactBody(body))
+	rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+	next.ServeHTTP(rec, r)
+	wirelog.Emit(clientName, "http", ">>", "response", "method", r.Method, "path", r.URL.Path, "status", strconv.Itoa(rec.status))
+}
+
+// statusRecorder captures the response status code for wire logging.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+	wrote  bool
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	if !r.wrote {
+		r.status = code
+		r.wrote = true
+	}
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	r.wrote = true
+	return r.ResponseWriter.Write(b)
 }
 
 func apiKeyFromRequest(r *http.Request) string {

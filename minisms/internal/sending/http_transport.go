@@ -19,6 +19,7 @@ func (HTTPTransport) Dispatch(ctx context.Context, in CarrierDispatchInput) (*Ca
 		Query:       in.Query,
 		Headers:     in.Headers,
 		Timeout:     in.Timeout,
+		CarrierName: in.CarrierName,
 	})
 	if err != nil {
 		return nil, err

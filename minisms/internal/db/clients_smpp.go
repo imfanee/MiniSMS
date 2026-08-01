@@ -14,6 +14,7 @@ import (
 // ClientSMPPIngress is the SMPP SMSC bind profile for a client.
 type ClientSMPPIngress struct {
 	ClientID            string
+	Name                string
 	Status              string
 	SMPPSystemID        string
 	SMPPPasswordEnc     string
@@ -31,7 +32,7 @@ var ErrSMPPAuthFailed = errors.New("smpp auth failed")
 func LookupClientSMPPIngress(ctx context.Context, pool *pgxpool.Pool, systemID string) (*ClientSMPPIngress, error) {
 	var c ClientSMPPIngress
 	err := pool.QueryRow(ctx, `
-		SELECT client_id::text, status, smpp_system_id, smpp_password_enc, smpp_allowed_cidrs,
+		SELECT client_id::text, name, status, smpp_system_id, smpp_password_enc, smpp_allowed_cidrs,
 			smpp_max_binds, smpp_default_src_ton, smpp_default_src_npi, smpp_throughput_per_s,
 			dlr_delivery_mode, dlr_webhook_url
 		FROM clients
@@ -39,7 +40,7 @@ func LookupClientSMPPIngress(ctx context.Context, pool *pgxpool.Pool, systemID s
 		  AND smpp_system_id IS NOT NULL
 		  AND trim(smpp_system_id) = trim($1)
 		LIMIT 1`, systemID).Scan(
-		&c.ClientID, &c.Status, &c.SMPPSystemID, &c.SMPPPasswordEnc, &c.SMPPAllowedCIDRs,
+		&c.ClientID, &c.Name, &c.Status, &c.SMPPSystemID, &c.SMPPPasswordEnc, &c.SMPPAllowedCIDRs,
 		&c.SMPPMaxBinds, &c.SMPPDefaultSrcTON, &c.SMPPDefaultSrcNPI, &c.SMPPThroughputPerS,
 		&c.DLRDeliveryMode, &c.DLRWebhookURL,
 	)

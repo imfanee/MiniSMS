@@ -20,6 +20,7 @@ type CarrierDispatchInput struct {
 	Query       string
 	Headers     map[string]string
 	Timeout     time.Duration
+	CarrierName string
 }
 
 // CarrierDispatchResult is the normalized carrier response.

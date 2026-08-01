@@ -6,9 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/minisms/minisms/internal/wirelog"
 )
 
 var (
@@ -43,6 +46,7 @@ type DispatchRequest struct {
 	Query       string
 	Headers     map[string]string
 	Timeout     time.Duration
+	CarrierName string // for per-carrier wire logging (optional)
 }
 
 type DispatchResult struct {
@@ -89,12 +93,29 @@ func DispatchToCarrier(req DispatchRequest) (*DispatchResult, error) {
 		httpReq.Header.Set(k, v)
 	}
 
+	if wirelog.Enabled() {
+		wirelog.Emit(req.CarrierName, "http", ">>", "request",
+			"method", req.Method,
+			"url", wirelog.RedactURL(u.String()),
+			"content_type", req.ContentType,
+			"headers", wirelog.RedactHeaders(req.Headers),
+			"body", wirelog.RedactBody(req.Body))
+	}
+
 	resp, err := dispatchHTTPClient(req.Timeout).Do(httpReq)
 	if err != nil {
+		if wirelog.Enabled() {
+			wirelog.Emit(req.CarrierName, "http", "<<", "error", "url", wirelog.RedactURL(u.String()), "error", err.Error())
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if wirelog.Enabled() {
+		wirelog.Emit(req.CarrierName, "http", "<<", "response",
+			"status", strconv.Itoa(resp.StatusCode),
+			"body", string(b))
+	}
 	return &DispatchResult{
 		StatusCode: resp.StatusCode,
 		Body:       string(b),

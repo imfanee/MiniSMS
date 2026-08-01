@@ -54,6 +54,12 @@ type Config struct {
 	// 0 disables the reaper. No refund: the carrier accepted and billed the message; a missing DLR is
 	// not proof of non-delivery.
 	AcceptedDLRTTLSecs int
+	// Per-entity wire logging: every SMPP PDU and HTTP request/response to/from each carrier and client
+	// to dedicated, size-rotated files under WireLogDir (secrets always masked).
+	WireLogEnabled  bool
+	WireLogDir      string
+	WireLogMaxMB    int
+	WireLogMaxFiles int
 }
 
 // Load reads configuration from the environment, optionally from a .env file.
@@ -161,6 +167,19 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	c.AcceptedDLRTTLSecs, err = parseIntDefault("SEND_ACCEPTED_DLR_TTL_S", 0, 0, 2592000)
+	if err != nil {
+		return nil, err
+	}
+	c.WireLogEnabled = parseBoolDefault("WIRE_LOG_ENABLED", false)
+	c.WireLogDir = strings.TrimSpace(os.Getenv("WIRE_LOG_DIR"))
+	if c.WireLogDir == "" {
+		c.WireLogDir = "/var/log/minisms"
+	}
+	c.WireLogMaxMB, err = parseIntDefault("WIRE_LOG_MAX_MB", 100, 1, 10240)
+	if err != nil {
+		return nil, err
+	}
+	c.WireLogMaxFiles, err = parseIntDefault("WIRE_LOG_MAX_FILES", 5, 1, 100)
 	if err != nil {
 		return nil, err
 	}

@@ -32,11 +32,12 @@ func (m bindMode) canSubmit() bool  { return m == bindTX || m == bindTRX }
 func (m bindMode) canDeliver() bool { return m == bindRX || m == bindTRX }
 
 type session struct {
-	clientID string
-	mode     bindMode
-	remote   net.Addr
-	conn     *conn
-	limiter  *rate.Limiter
+	clientID   string
+	clientName string
+	mode       bindMode
+	remote     net.Addr
+	conn       *conn
+	limiter    *rate.Limiter
 }
 
 type sessionRegistry struct {

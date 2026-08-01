@@ -48,8 +48,10 @@ func (s *Server) DeliverDLR(clientID, messageID, dlrStatus string) bool {
 	_ = f.Set(pdufield.DataCoding, uint8(pdutext.DefaultType))
 	if err := sess.conn.Write(p); err != nil {
 		s.logEvent(clientID, "ERROR", "deliver_sm write failed", "message_id", messageID, "error", err.Error())
+		s.wireClient(sess, ">>", "deliver_sm", "message_id", messageID, "stat", stat, "error", err.Error())
 		return false
 	}
 	s.logEvent(clientID, "INFO", "deliver_sm DLR sent", "message_id", messageID, "stat", stat)
+	s.wireClient(sess, ">>", "deliver_sm", "message_id", messageID, "stat", stat)
 	return true
 }

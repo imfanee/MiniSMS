@@ -12,6 +12,7 @@ import (
 // CarrierConfig is the runtime view of a carrier SMPP egress row.
 type CarrierConfig struct {
 	CarrierID           string
+	Name                string
 	EgressTransport     string
 	Addr                string
 	SystemID            string
@@ -50,6 +51,7 @@ func carrierConfigFromRow(row db.CarrierSMPPEgress, password string, cfg *config
 	}
 	return CarrierConfig{
 		CarrierID:           row.CarrierID,
+		Name:                row.Name,
 		EgressTransport:     row.EgressTransport,
 		Addr:                fmt.Sprintf("%s:%d", row.SMPPHost, row.SMPPPort),
 		SystemID:            row.SMPPSystemID,

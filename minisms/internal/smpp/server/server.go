@@ -22,6 +22,7 @@ import (
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/sending"
 	"github.com/minisms/minisms/internal/smpp/egresslog"
+	"github.com/minisms/minisms/internal/wirelog"
 	"github.com/minisms/minisms/internal/smpp/smppstatus"
 	"golang.org/x/time/rate"
 )
@@ -84,6 +85,15 @@ func (s *Server) logEvent(clientID, level, msg string, kv ...string) {
 		return
 	}
 	s.logHub.Event(clientID, level, msg, kv...)
+}
+
+// wireClient appends a directional PDU/lifecycle entry to the per-client SMPP wire log file (no-op
+// unless wire logging is enabled and the session's client name is known). Never carries the password.
+func (s *Server) wireClient(sess *session, dir, event string, kv ...string) {
+	if sess == nil || !wirelog.Enabled() {
+		return
+	}
+	wirelog.Emit(sess.clientName, "smpp", dir, event, kv...)
 }
 
 // logDebug emits a verbose event only while an operator has turned on deep
@@ -210,13 +220,17 @@ func (s *Server) handleConn(ctx context.Context, c *conn) {
 			}
 			s.handleSubmit(ctx, c, sess, p)
 		case pdu.EnquireLinkID:
+			s.wireClient(sess, "<<", "enquire_link", "seq", strconv.FormatUint(uint64(p.Header().Seq), 10))
 			resp := pdu.NewEnquireLinkResp()
 			resp.Header().Seq = p.Header().Seq
 			_ = c.Write(resp)
+			s.wireClient(sess, ">>", "enquire_link_resp", "seq", strconv.FormatUint(uint64(p.Header().Seq), 10))
 		case pdu.UnbindID:
+			s.wireClient(sess, "<<", "unbind", "seq", strconv.FormatUint(uint64(p.Header().Seq), 10))
 			resp := pdu.NewUnbindResp()
 			resp.Header().Seq = p.Header().Seq
 			_ = c.Write(resp)
+			s.wireClient(sess, ">>", "unbind_resp")
 			if sess != nil {
 				s.endSession(sess, "unbind")
 				sess = nil
@@ -226,9 +240,11 @@ func (s *Server) handleConn(ctx context.Context, c *conn) {
 			if sess == nil {
 				return
 			}
+			s.wireClient(sess, "<<", "unsupported_pdu", "id", fmt.Sprintf("0x%08X", uint32(p.Header().ID)))
 			nack := pdu.NewGenericNACK()
 			nack.Header().Seq = p.Header().Seq
 			_ = c.Write(nack)
+			s.wireClient(sess, ">>", "generic_nack")
 		}
 	}
 }
@@ -308,10 +324,12 @@ func (s *Server) handleBind(ctx context.Context, c *conn, p pdu.Body) *session {
 		perS = 50
 	}
 	lim := rate.NewLimiter(rate.Limit(perS), perS)
-	sess := &session{clientID: profile.ClientID, mode: mode, remote: c.remote, conn: c, limiter: lim}
+	sess := &session{clientID: profile.ClientID, clientName: profile.Name, mode: mode, remote: c.remote, conn: c, limiter: lim}
 	s.sessions.add(sess)
 	s.logEvent(profile.ClientID, "INFO", "bind accepted", "mode", mode.String(), "remote", hostStr(c.remote), "binds", strconv.Itoa(s.sessions.bindCount(profile.ClientID)))
 	_ = db.InsertSMPPBindEvent(ctx, s.Pool, profile.ClientID, "bind_ok", mode.String(), remoteHost(c.remote), intPtr(0), "")
+	wirelog.Emit(profile.Name, "smpp", "<<", "bind_"+mode.String(), "system_id", profile.SMPPSystemID, "remote", hostStr(c.remote), "password", wirelog.Mask(password))
+	wirelog.Emit(profile.Name, "smpp", ">>", "bind_resp_ok", "remote", hostStr(c.remote))
 	s.writeBindResp(c, p, StatusROK)
 	return sess
 }
@@ -336,9 +354,11 @@ func (s *Server) handleSubmit(ctx context.Context, c *conn, sess *session, p pdu
 	}
 	dec, err := decodeSubmitSM(p.Fields())
 	if err != nil {
+		s.wireClient(sess, "<<", "submit_sm", "error", "decode failed")
 		s.writeResp(c, pdu.NewSubmitSMResp(), p.Header().Seq, StatusRInvMsgLen)
 		return
 	}
+	s.wireClient(sess, "<<", "submit_sm", "src", dec.From, "dst", dec.To, "len", strconv.Itoa(len(dec.Body)))
 	if err := validateMessageBody(dec.Body); err != nil {
 		s.writeResp(c, pdu.NewSubmitSMResp(), p.Header().Seq, StatusRInvMsgLen)
 		return
@@ -381,10 +401,12 @@ func (s *Server) handleSubmit(ctx context.Context, c *conn, sess *session, p pdu
 		s.logEvent(sess.clientID, "INFO", "submit_sm accepted", "to", dec.To, "from", from, "message_id", out.Accepted.MessageID)
 		s.logDebug(sess.clientID, "submit_sm detail", "to", dec.To, "from", from, "segments", strconv.Itoa(out.Accepted.Segments),
 			"command_status", "0x00000000 ESME_ROK", "message_id", out.Accepted.MessageID)
+		s.wireClient(sess, ">>", "submit_sm_resp", "message_id", out.Accepted.MessageID, "command_status", "0x00000000 ESME_ROK")
 	} else {
 		name, desc := smppstatus.Describe(int(st))
 		s.logEvent(sess.clientID, "ERROR", "submit_sm rejected", "to", dec.To, "from", from,
 			"command_status", fmt.Sprintf("0x%08X", uint32(st)), "code", name, "detail", desc)
+		s.wireClient(sess, ">>", "submit_sm_resp", "command_status", fmt.Sprintf("0x%08X", uint32(st)), "code", name)
 	}
 	_ = c.Write(resp)
 }

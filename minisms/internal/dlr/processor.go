@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/minisms/minisms/internal/carrier"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/smslog"
+	"github.com/minisms/minisms/internal/wirelog"
 )
 
 // forwardEndpointValidator guards client DLR webhook URLs against SSRF (loopback, RFC1918,
@@ -191,6 +193,10 @@ func (p *Processor) forwardToClient(ctx context.Context, row *db.DLRMessage, mes
 			return http.ErrUseLastResponse
 		},
 	}
+	if wirelog.Enabled() {
+		wirelog.Emit(row.ClientName, "http", ">>", "dlr_forward",
+			"message_id", messageID, "method", fwd.Method, "url", wirelog.RedactURL(fwd.URL), "body", wirelog.RedactBody(string(fwd.Body)))
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		_ = db.UpdateDLRForwardStatus(ctx, p.Pool, messageID, "failed", false, true)
@@ -198,10 +204,16 @@ func (p *Processor) forwardToClient(ctx context.Context, row *db.DLRMessage, mes
 			"channel": "http", "webhook_url": fwd.URL, "http_method": fwd.Method, "error": err.Error(),
 		})
 		slog.Warn("dlr forward failed", "message_id", messageID, "webhook_url", fwd.URL, "method", fwd.Method, "error", err.Error())
+		if wirelog.Enabled() {
+			wirelog.Emit(row.ClientName, "http", "<<", "dlr_forward_error", "message_id", messageID, "error", err.Error())
+		}
 		return "failed"
 	}
-	_, _ = io.Copy(io.Discard, resp.Body)
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8*1024))
 	_ = resp.Body.Close()
+	if wirelog.Enabled() {
+		wirelog.Emit(row.ClientName, "http", "<<", "dlr_forward_resp", "message_id", messageID, "status", strconv.Itoa(resp.StatusCode), "body", string(respBody))
+	}
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 		_ = db.UpdateDLRForwardStatus(ctx, p.Pool, messageID, "success", true, true)
 		p.recordDLRForward(ctx, messageID, "success", "DLR forwarded to client webhook", map[string]any{

@@ -293,6 +293,7 @@ func (s *Service) tryHTTPDispatch(
 		Query:       carrier.InjectQueryVariables(tpl.QueryTemplate, vars),
 		Headers:     hdrs,
 		Timeout:     timeout,
+		CarrierName: carrierName,
 	})
 	if err != nil {
 		return false, err

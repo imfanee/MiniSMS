@@ -18,6 +18,7 @@ import (
 	"github.com/minisms/minisms"
 	"github.com/minisms/minisms/internal/api"
 	"github.com/minisms/minisms/internal/carrier"
+	"github.com/minisms/minisms/internal/wirelog"
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/runtime"
@@ -38,7 +39,14 @@ func main() {
 		os.Exit(1)
 	}
 	carrier.SetDispatchInsecureTLS(cfg.HTTPCarrierInsecureTLS)
+	if err := wirelog.Init(cfg.WireLogDir, cfg.WireLogEnabled, cfg.WireLogMaxMB, cfg.WireLogMaxFiles); err != nil {
+		slog.Error("wirelog init", "err", err)
+		os.Exit(1)
+	}
 	log := newLogger(cfg.LogLevel)
+	if cfg.WireLogEnabled {
+		log.Info("wire logging enabled", "dir", cfg.WireLogDir, "max_mb", cfg.WireLogMaxMB, "max_files", cfg.WireLogMaxFiles)
+	}
 
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {

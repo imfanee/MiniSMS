@@ -15,6 +15,7 @@ import (
 	"github.com/fiorix/go-smpp/v2/smpp/pdu"
 	"github.com/fiorix/go-smpp/v2/smpp/pdu/pdufield"
 	"github.com/minisms/minisms/internal/dlr"
+	"github.com/minisms/minisms/internal/wirelog"
 	"github.com/minisms/minisms/internal/smpp/egresslog"
 	"github.com/minisms/minisms/internal/smpp/smppstatus"
 	"golang.org/x/time/rate"
@@ -69,6 +70,16 @@ func (s *liveSession) logEvent(level, msg string, kv ...string) {
 	s.hub.Event(s.cfg.CarrierID, level, msg, args...)
 }
 
+// wire appends a directional PDU/lifecycle entry to the per-carrier SMPP wire log file (no-op unless
+// wire logging is enabled). dir is ">>" sent, "<<" received, "--" lifecycle. Never carries the password.
+func (s *liveSession) wire(dir, event string, kv ...string) {
+	if !wirelog.Enabled() {
+		return
+	}
+	args := append([]string{"bind", "#" + strconv.Itoa(s.idx)}, kv...)
+	wirelog.Emit(s.cfg.Name, "smpp", dir, event, args...)
+}
+
 // logDebug emits a verbose (DEBUG-level) event only while an operator has turned
 // on deep logging for this carrier in the SMPP log viewer. Off by default so the
 // ring buffer keeps useful history and the hot path stays cheap.
@@ -102,6 +113,8 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 		s.logEvent("INFO", "bind attempt", "addr", s.cfg.Addr, "mode", s.cfg.BindMode)
 		s.logDebug("bind attempt detail", "addr", s.cfg.Addr, "system_id", s.cfg.SystemID, "mode", s.cfg.BindMode,
 			"enquire_link_s", strconv.Itoa(int(s.cfg.EnquireLink/time.Second)), "window", strconv.Itoa(int(s.cfg.WindowSize)))
+		s.wire(">>", "bind_"+s.cfg.BindMode, "addr", s.cfg.Addr, "system_id", s.cfg.SystemID,
+			"password", wirelog.Mask(s.cfg.Password), "system_type", s.cfg.SystemType)
 		if rejected, code, err := s.bind(ctx); err != nil {
 			ceiling := maxReconnect
 			if rejected {
@@ -118,12 +131,15 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 				slog.Warn("smpp egress bind rejected", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "command_status", fmt.Sprintf("0x%08X", uint32(code)), "code", name)
 				s.logEvent("ERROR", "bind rejected by SMSC",
 					"command_status", fmt.Sprintf("0x%08X", uint32(code)), "code", name, "detail", desc, "retry_in", backoff.String())
+				s.wire("<<", "bind_resp_rejected",
+					"command_status", fmt.Sprintf("0x%08X", uint32(code)), "code", name, "retry_in", backoff.String())
 			} else {
 				// No SMPP reply: TCP/transport failure (dial refused/timeout/reset).
 				// Call this out explicitly so it is not mistaken for a bind rejection.
 				slog.Warn("smpp egress bind failed", "carrier_id", s.cfg.CarrierID, "addr", s.cfg.Addr, "error", err)
 				s.logEvent("ERROR", "bind failed (network/transport, SMPP bind not reached)",
 					"error", err.Error(), "retry_in", backoff.String())
+				s.wire("--", "bind_failed_transport", "addr", s.cfg.Addr, "error", err.Error(), "retry_in", backoff.String())
 			}
 			onStatus("down")
 			if !sleepCtx(ctx, jitter(backoff)) {
@@ -133,6 +149,7 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 			continue
 		}
 		s.logEvent("INFO", "bind established", "addr", s.cfg.Addr)
+		s.wire("<<", "bind_resp_ok", "addr", s.cfg.Addr)
 		onStatus("up")
 		upSince := time.Now()
 		s.mu.Lock()
@@ -171,6 +188,7 @@ func (s *liveSession) run(ctx context.Context, onStatus func(string)) {
 			backoff = nextBackoff(backoff, maxReconnect)
 		}
 		s.logEvent("WARN", "session disconnected", "uptime", uptime.Truncate(time.Second).String(), "reconnect_in", backoff.String())
+		s.wire("--", "disconnected", "uptime", uptime.Truncate(time.Second).String(), "reconnect_in", backoff.String())
 		onStatus("down")
 		if !sleepCtx(ctx, jitter(backoff)) {
 			return
@@ -336,6 +354,8 @@ func (s *liveSession) handleDeliverSM(ctx context.Context, p pdu.Body) {
 	// survives a restart and can be reconciled against sms_logs later.
 	s.logEvent("INFO", "deliver_sm receipt", "smsc_id", receipt.ID, "stat", receipt.State)
 	slog.Info("smpp egress deliver_sm", "carrier_id", s.cfg.CarrierID, "bind", s.idx, "smsc_id", receipt.ID, "stat", receipt.State)
+	s.wire("<<", "deliver_sm", "smsc_id", receipt.ID, "stat", receipt.State, "err", receipt.Err,
+		"submitted", strconv.Itoa(receipt.Submitted), "delivered", strconv.Itoa(receipt.Delivered))
 	s.logDebug("deliver_sm detail", "smsc_id", receipt.ID, "stat", receipt.State, "err", receipt.Err,
 		"submitted", strconv.Itoa(receipt.Submitted), "delivered", strconv.Itoa(receipt.Delivered))
 	if s.dlr == nil {
@@ -397,16 +417,21 @@ func (s *liveSession) submit(ctx context.Context, req SubmitRequest) (*SubmitRes
 	default:
 		return nil, smpp.ErrNotBound
 	}
+	s.wire(">>", "submit_sm", "src", req.Src, "dst", req.Dst, "segments", strconv.Itoa(req.Segments), "encoding", req.Encoding)
 	// Surface submit problems for debugging without logging message content.
 	if err != nil {
 		s.logEvent("ERROR", "submit_sm error", "dst", req.Dst, "error", err.Error())
+		s.wire("<<", "submit_sm_resp", "dst", req.Dst, "error", err.Error())
 	} else if res != nil && res.CommandStatus != 0 {
 		name, desc := smppstatus.Describe(res.CommandStatus)
 		s.logEvent("ERROR", "submit_sm rejected", "dst", req.Dst,
 			"command_status", fmt.Sprintf("0x%08X", uint32(res.CommandStatus)), "code", name, "detail", desc)
+		s.wire("<<", "submit_sm_resp", "dst", req.Dst,
+			"command_status", fmt.Sprintf("0x%08X", uint32(res.CommandStatus)), "code", name)
 	} else if res != nil {
 		s.logDebug("submit_sm accepted", "dst", req.Dst, "segments", strconv.Itoa(req.Segments),
 			"smsc_id", res.CarrierMessageID, "command_status", "0x00000000 ESME_ROK")
+		s.wire("<<", "submit_sm_resp", "dst", req.Dst, "smsc_id", res.CarrierMessageID, "command_status", "0x00000000 ESME_ROK")
 	}
 	return res, err
 }

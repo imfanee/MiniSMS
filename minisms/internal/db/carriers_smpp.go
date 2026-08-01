@@ -12,6 +12,7 @@ import (
 // CarrierSMPPEgress is the configuration for an outbound SMPP ESME session.
 type CarrierSMPPEgress struct {
 	CarrierID           string
+	Name                string
 	EgressTransport     string
 	SMPPHost            string
 	SMPPPort            int
@@ -28,7 +29,7 @@ type CarrierSMPPEgress struct {
 
 func ListCarriersSMPPEgress(ctx context.Context, pool *pgxpool.Pool) ([]CarrierSMPPEgress, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT carrier_id::text, egress_transport, smpp_host, smpp_port, smpp_system_id, smpp_password_enc,
+		SELECT carrier_id::text, name, egress_transport, smpp_host, smpp_port, smpp_system_id, smpp_password_enc,
 			smpp_system_type, smpp_bind_mode, smpp_tls, smpp_enquire_link_s, smpp_window_size, smpp_throughput_per_s,
 			COALESCE(smpp_bind_count, 1)
 		FROM carriers
@@ -47,7 +48,7 @@ func ListCarriersSMPPEgress(ctx context.Context, pool *pgxpool.Pool) ([]CarrierS
 	for rows.Next() {
 		var c CarrierSMPPEgress
 		if err := rows.Scan(
-			&c.CarrierID, &c.EgressTransport, &c.SMPPHost, &c.SMPPPort, &c.SMPPSystemID, &c.SMPPPasswordEnc,
+			&c.CarrierID, &c.Name, &c.EgressTransport, &c.SMPPHost, &c.SMPPPort, &c.SMPPSystemID, &c.SMPPPasswordEnc,
 			&c.SMPPSystemType, &c.SMPPBindMode, &c.SMPPTLS, &c.SMPPEnquireLinkS, &c.SMPPWindowSize, &c.SMPPThroughputPerS,
 			&c.SMPPBindCount,
 		); err != nil {

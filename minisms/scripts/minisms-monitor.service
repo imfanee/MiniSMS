@@ -1,0 +1,21 @@
+# Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
+# MiniSMS health monitor daemon. Install the script to /usr/local/bin, then:
+#   sudo cp scripts/minisms-monitor.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now minisms-monitor
+# View findings any time: tail -f /var/log/minisms/monitor.log
+[Unit]
+Description=MiniSMS health monitor
+After=minisms.service network-online.target
+Wants=minisms.service
+
+[Service]
+Type=simple
+# Root so the monitor can read the service journal, per-process sockets (ss -p) and the env file.
+ExecStart=/usr/local/bin/minisms-monitor.sh
+Restart=always
+RestartSec=10
+Environment=MONITOR_INTERVAL=300
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

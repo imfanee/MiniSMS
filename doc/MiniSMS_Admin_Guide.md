@@ -263,11 +263,12 @@ Primary navigation on the carrier detail page:
 - Outbound dispatch uses SMPP `submit_sm` instead of HTTP.
 - TON/NPI fields may be static or `dynamic` per carrier.
 - **Session status** shows the live state plus how many parallel binds are currently up, for example `up (6/8 binds up)`. The count comes from the running egress supervisor (not the database), so it reflects binds in real time, including while a restart is rebinding.
-- **Open SMPP logs** (button on the SMPP tab) launches a resizable popup window that live-tails this carrier's SMPP session events (bind attempts, bind established or failed, disconnects/reconnects, `deliver_sm` receipts, and `submit_sm` errors). It connects only while the window is open, shows recent history first then streams new lines, auto-scrolls (toggleable), and offers Pause, Copy, and Clear. Lines never contain credentials. The viewer is read-only and requires the same admin permission and session as the rest of the carrier screens, so it adds no new exposure.
+- **Open SMPP logs** (button on the SMPP tab) launches a resizable popup window that live-tails this carrier's SMPP session events (bind attempts, bind established or failed, disconnects/reconnects, `deliver_sm` receipts, and `submit_sm` errors). It connects only while the window is open, shows recent history first then streams new lines, auto-scrolls (toggleable), and offers Pause, Copy, and Clear. Lines never contain credentials. The viewer is read-only and requires the same admin permission and session as the rest of the carrier screens, so it adds no new exposure. This live viewer is an in-memory ring buffer (recent history only). For a durable, full record on disk, enable per-entity wire logging (DevOps Guide 5.4), which writes every PDU and HTTP exchange per carrier and per client to rotated files under `/var/log/minisms`, with credentials masked.
 - **Bind and submit failures show the SMPP `command_status`** with the ESME mnemonic and a plain-English description, so you can tell an SMSC rejection from a network problem and share an exact reason with the carrier. For example a rejected bind logs `bind rejected by SMSC command_status=0x0000000D code=ESME_RBINDFAIL detail="...an SMPP-level rejection, NOT a network/firewall block..."`, while a connectivity failure logs `bind failed (network/transport, SMPP bind not reached)`.
 - **deep logs** (checkbox in the log popup) turns on verbose per-PDU logging for that carrier or client (bind parameters, every `submit_sm` and `deliver_sm` with its `command_status` and decode). Use it during a troubleshooting session; it streams extra `DEBUG` lines and auto-reverts after 30 minutes so it never floods the log. It changes log verbosity only (no effect on traffic) and is permission-gated and CSRF-protected.
 - **Restart SMPP** (button on both the SMPP tab and inside the log popup) tears down and immediately rebinds all of this carrier's SMPP sessions. Use it when a carrier asks for a bind restart during troubleshooting. The action requires the carrier-edit permission and is CSRF-protected. If the log popup is open, the restart request and the fresh bind attempts appear in it in real time (the log stream is independent of the SMPP sessions, so it keeps updating across the restart).
 - **Parallel binds** (1..16): the number of concurrent ESME sessions MiniSMS opens to the SMSC. Many operators advise several parallel transceiver binds for throughput and so the SMSC can spread delivery receipts across sessions. **Throughput (/s)** is applied per bind, so aggregate throughput is binds times that value. A `deliver_sm` receipt can arrive on any bind; MiniSMS correlates it to the original message regardless. Changing the bind count rebinds within about 60 seconds; the **Session status** field reads `up` once at least one bind is established.
+- **Unmatched DLRs** counter (shown on the panel when non-zero): how many delivery receipts the carrier sent that MiniSMS could not correlate to any message since the process started. A non-zero value means the carrier is returning receipts whose id does not match a submitted message (for example a wrong id format), and each such receipt is also written to the SMPP log popup as a `deliver_sm UNMATCHED` line and to journald. A message the carrier accepted but never sent a receipt for is a different case (it stays `accepted` until a DLR arrives or the accepted-no-DLR aging TTL closes it).
 
 Switching interconnect type changes which downstream path MiniSMS uses; retest with a single message after any change.
 
@@ -836,8 +837,8 @@ Message lifecycle status values:
 - **queued** - accepted and charge reserved; waiting for an async-queue worker to dispatch (only when the send queue is enabled; see 9.7).
 - **sending** - claimed by a worker and being dispatched right now.
 - **delivered** - carrier confirmed delivery (final DLR).
-- **failed** / **rejected** - the carrier attempt failed or was rejected.
-- **undelivered** - could not be delivered within its validity window; the client charge is refunded and a failure DLR is sent (async queue).
+- **failed** / **rejected** - the carrier attempt failed, or a carrier receipt reported the message rejected. A carrier `REJECTD` receipt sets the top-level status to `rejected` (not only `dlr_status`), so a rejected message is visible in the list and filters, not left showing `accepted`.
+- **undelivered** - could not be delivered within its validity window. For the async queue this refunds the client charge and sends a failure DLR. Separately, if `SEND_ACCEPTED_DLR_TTL_S` is set, a message the carrier accepted but never sent a final DLR for is aged out after the TTL to `failed` (dlr_status `undelivered`), with a "no final DLR" timeline note and a client notification, but no refund (the carrier accepted and billed it).
 
 DLR status values:
 
@@ -873,6 +874,11 @@ You can inspect:
 - DLR Forwarded At
 - DLR Forward Status
 - DLR Forward Attempts
+
+The modal also has two actions:
+
+- **Print / Save PDF** opens a clean, print-friendly version of the message detail in a new window and triggers the browser print dialog, from which you can print to a physical printer or save as PDF.
+- **Resend DLR to client** (shown once a DLR status is stored) re-delivers the stored receipt to the client over its current DLR channel (HTTP webhook or SMPP `deliver_sm`). It is forward-only: it does not re-rate the message or touch any ledger, only re-attempts client delivery. The action is permission-gated and audited (`dlr.resend`). Use it after a client webhook outage, or after switching a client's DLR delivery mode.
 
 ### 9.6 Diagnosing failures quickly
 

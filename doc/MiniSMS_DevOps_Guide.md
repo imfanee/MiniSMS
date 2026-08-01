@@ -214,8 +214,17 @@ MiniSMS reads environment using `godotenv` (`.env` for local/dev).
 | `SEND_MESSAGE_TTL_S` | No | int (30..604800) | `3600` |
 | `SEND_RETRY_BACKOFF_S` | No | int (1..3600) | `5` |
 | `SEND_STUCK_S` | No | int (30..3600) | `120` |
+| `SEND_ACCEPTED_DLR_TTL_S` | No | int (0..2592000) | `0` (disabled); `172800` = 48h |
+| `WIRE_LOG_ENABLED` | No | bool | `false` |
+| `WIRE_LOG_DIR` | No | path | `/var/log/minisms` |
+| `WIRE_LOG_MAX_MB` | No | int (1..10240) | `100` |
+| `WIRE_LOG_MAX_FILES` | No | int (1..100) | `5` |
 
 **Async send queue (`SEND_QUEUE_*`):** when `SEND_QUEUE_ENABLED=true`, sends are accepted, the client charge is reserved, and delivery is handled by a background worker pool (retry until `SEND_MESSAGE_TTL_S`, then refund + failure DLR) rather than dispatched synchronously. See Admin Guide 9.7. Size the worker pool and the pgx pool together when scaling: keep DB pool connections >= workers + margin. `SEND_STUCK_S` is how long a row may sit `sending` (dead worker) before a reaper reclaims it.
+
+**Accepted-no-DLR aging (`SEND_ACCEPTED_DLR_TTL_S`):** `0` disables it. When greater than zero, a background reaper closes out any message the carrier accepted but never sent a final DLR for: after the TTL a still-`accepted` message that requested a DLR becomes `failed` (dlr_status `undelivered`), a timeline note is added, and the client is notified over its DLR channel. No refund is issued (the carrier accepted and billed the message; a missing DLR is not proof of non-delivery). Set the TTL longer than the carrier's realistic worst-case DLR latency (for example 48h) so a late-but-real receipt is not pre-empted.
+
+**Per-entity wire logging (`WIRE_LOG_*`):** off by default. When `WIRE_LOG_ENABLED=true`, every SMPP PDU and HTTP request/response exchanged with each carrier and client is appended to a dedicated file under `WIRE_LOG_DIR`, one file per entity per channel: `<name>_smpp.log` and `<name>_http.log`. Each file rotates at `WIRE_LOG_MAX_MB` and keeps `WIRE_LOG_MAX_FILES` generations. Credentials (SMPP passwords, HTTP auth and secret headers, credential query/form parameters) are always masked. See section 5.4.
 
 ### 4.2 Generate required secrets
 
@@ -337,6 +346,26 @@ Logs:
 ```bash
 journalctl -u minisms -f
 ```
+
+### 5.4 Per-entity wire logs (optional)
+
+When `WIRE_LOG_ENABLED=true`, MiniSMS writes a dedicated, size-rotated file per carrier and per client under `WIRE_LOG_DIR` (default `/var/log/minisms`):
+
+- `<name>_smpp.log` records every SMPP PDU exchanged with that entity (bind, submit_sm and its response, deliver_sm, enquire_link, unbind) plus connection lifecycle, with `>>` for bytes sent to the entity and `<<` for bytes received from it.
+- `<name>_http.log` records every HTTP request and response (carrier dispatch, client REST API calls, DLR webhook forwards).
+
+Credentials are always masked (SMPP passwords render as `***`, and auth or secret headers and credential query/form parameters are redacted), so these files never contain a usable secret. Raw TCP bytes are not captured on the carrier SMPP egress path because the SMPP client library owns that socket; that channel is logged at full PDU level.
+
+Because the hardened unit uses `ProtectSystem=strict`, the service cannot write outside its `ReadWritePaths`. Pre-create the directory and grant the path, otherwise entries are dropped (a one-time warning is logged to journald):
+
+```bash
+sudo install -d -o minisms -g minisms -m 0750 /var/log/minisms
+sudo mkdir -p /etc/systemd/system/minisms.service.d
+printf '[Service]\nReadWritePaths=/var/log/minisms\n' | sudo tee /etc/systemd/system/minisms.service.d/wirelog.conf
+sudo systemctl daemon-reload && sudo systemctl restart minisms
+```
+
+Sizing: each file is capped at `WIRE_LOG_MAX_MB` (default 100) with `WIRE_LOG_MAX_FILES` generations (default 5), so worst-case disk use is roughly `(carriers + clients) x 2 channels x MAX_MB x (MAX_FILES + 1)`. Rotate more aggressively or point `WIRE_LOG_DIR` at a dedicated volume for high-throughput deployments. Names are sanitized to a safe filename stem; keep carrier and client names distinct so their files do not collide.
 
 ### 5.3 Docker (single host)
 

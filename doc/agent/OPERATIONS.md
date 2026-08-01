@@ -276,6 +276,16 @@ curl -skS https://127.0.0.1:18080/healthz
 
 See [MiniSMS_SMPP_Guide.md](../MiniSMS_SMPP_Guide.md) for operator UI steps.
 
+### DLR observability and diagnostics
+
+- **Unmatched DLR logging:** a carrier `deliver_sm` whose id matches no message is no longer dropped silently. It is logged to journald (`smpp egress deliver_sm unmatched`), to the SMPP log popup (`deliver_sm UNMATCHED`), and counted on the carrier SMPP panel. Every received `deliver_sm` also logs a durable journald line (`smpp egress deliver_sm`). Use these to answer "did the carrier send a DLR we dropped" versus "the carrier never sent one".
+- **Accepted-no-DLR aging (`SEND_ACCEPTED_DLR_TTL_S`, seconds, 0=off):** background reaper closes messages the carrier accepted but never sent a final DLR for. After the TTL a still-`accepted` + DLR-requested message becomes `failed` / dlr_status `undelivered`, gets a timeline note, and the client is notified. No refund (carrier-accepted and billed). Prod runs 48h. Pick a TTL longer than the carrier's worst-case DLR latency so a late real receipt is not pre-empted.
+- **Resend DLR:** SMS Log detail has a permission-gated, audited **Resend DLR to client** action (forward-only, no re-rating or ledger change) for replaying a stored receipt after a client outage or a DLR-channel change.
+
+### Per-entity wire logs (`WIRE_LOG_ENABLED`)
+
+When enabled, every SMPP PDU and HTTP request/response per carrier and per client is appended to `/var/log/minisms/<name>_{smpp,http}.log` (rotated `WIRE_LOG_MAX_MB` x `WIRE_LOG_MAX_FILES`, default 100MB x5), credentials masked. This is the durable, full record behind the live in-UI popup (which is only an in-memory ring buffer). Setup detail (directory ownership and the `ReadWritePaths` systemd drop-in required under `ProtectSystem=strict`) is in DevOps Guide 5.4. If entries are missing, check journald for `wirelog: cannot open log file` (a blocked or full path). Carrier SMPP egress is full PDU-level; raw TCP bytes are not captured there because the SMPP client library owns the socket.
+
 ---
 
 ## 9. Known doc/code gaps

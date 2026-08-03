@@ -3,25 +3,26 @@
 <div class="table-responsive">
 	<table class="table table-sm align-middle">
 		<thead>
-			<tr><th>Received</th><th>Message ID</th><th>Client</th><th>To</th><th>From</th><th>Segments</th><th>Charged</th><th>Carrier</th><th>Failover</th><th>Status</th><th>Actions</th></tr>
+			<tr><th data-col="received">Received</th><th data-col="message_id">Message ID</th><th data-col="client">Client</th><th data-col="to">To</th><th data-col="from">From</th><th data-col="segments">Segments</th><th data-col="charged">Charged</th><th data-col="currency">Currency</th><th data-col="carrier">Carrier</th><th data-col="failover">Failover</th><th data-col="status">Status</th><th data-col="actions">Actions</th></tr>
 		</thead>
 		<tbody>
 			{{range .Rows}}
 			<tr>
-				<td>{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td>
-				<td><span data-bs-toggle="tooltip" title="{{.MessageID}}">{{slice .MessageID 0 8}}...</span></td>
-				<td>{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</td>
-				<td>{{.ToNumber}}</td>
-				<td>{{if .FromNumber}}{{.FromNumber}}{{else}}-{{end}}</td>
-				<td>{{.Segments}}</td>
-				<td>{{.TotalCharged}}</td>
-				<td>{{if .CarrierName}}{{.CarrierName}}{{else}}-{{end}}</td>
-				<td>{{if eq .FailoverSequence 0}}<span class="badge bg-light text-dark">Primary</span>{{else if eq .FailoverSequence 1}}<span class="badge bg-warning text-dark">F1</span>{{else}}<span class="badge bg-danger">F2</span>{{end}}</td>
-				<td>{{if or (eq .Status "accepted") (eq .Status "sent")}}<span class="badge bg-success">{{.Status}}</span>{{else if eq .Status "delivered"}}<span class="badge bg-primary">{{.Status}}</span>{{else if eq .Status "failed"}}<span class="badge bg-danger">{{.Status}}</span>{{else if eq .Status "rejected"}}<span class="badge bg-secondary">{{.Status}}</span>{{else}}<span class="badge bg-info text-dark">{{.Status}}</span>{{end}}</td>
-				<td><a href="/admin/sms-logs/{{.MessageID}}" hx-get="/admin/sms-logs/{{.MessageID}}" hx-target="#modal-container">Detail</a></td>
+				<td data-col="received">{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td>
+				<td data-col="message_id"><span data-bs-toggle="tooltip" title="{{.MessageID}}">{{slice .MessageID 0 8}}...</span></td>
+				<td data-col="client">{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</td>
+				<td data-col="to">{{.ToNumber}}</td>
+				<td data-col="from">{{if .FromNumber}}{{.FromNumber}}{{else}}-{{end}}</td>
+				<td data-col="segments">{{.Segments}}</td>
+				<td data-col="charged">{{.TotalCharged}}</td>
+				<td data-col="currency">{{.Currency}}</td>
+				<td data-col="carrier">{{if .CarrierName}}{{.CarrierName}}{{else}}-{{end}}</td>
+				<td data-col="failover">{{if eq .FailoverSequence 0}}<span class="badge bg-light text-dark">Primary</span>{{else if eq .FailoverSequence 1}}<span class="badge bg-warning text-dark">F1</span>{{else}}<span class="badge bg-danger">F2</span>{{end}}</td>
+				<td data-col="status">{{if or (eq .Status "accepted") (eq .Status "sent")}}<span class="badge bg-success">{{.Status}}</span>{{else if eq .Status "delivered"}}<span class="badge bg-primary">{{.Status}}</span>{{else if eq .Status "failed"}}<span class="badge bg-danger">{{.Status}}</span>{{else if eq .Status "rejected"}}<span class="badge bg-secondary">{{.Status}}</span>{{else}}<span class="badge bg-info text-dark">{{.Status}}</span>{{end}}</td>
+				<td data-col="actions"><a href="/admin/sms-logs/{{.MessageID}}" hx-get="/admin/sms-logs/{{.MessageID}}" hx-target="#modal-container">Detail</a></td>
 			</tr>
 			{{else}}
-			<tr><td colspan="11" class="text-secondary">No SMS logs found.</td></tr>
+			<tr><td colspan="12" class="text-secondary">No SMS logs found.</td></tr>
 			{{end}}
 		</tbody>
 	</table>

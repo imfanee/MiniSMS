@@ -834,7 +834,7 @@ Message lifecycle status (send pipeline) is separate from DLR status.
 Message lifecycle status values:
 
 - **pending** / **accepted** / **sent** - progressing through / delivered to the carrier.
-- **queued** - accepted and charge reserved; waiting for an async-queue worker to dispatch (only when the send queue is enabled; see 9.8).
+- **queued** - accepted and charge reserved; waiting for an async-queue worker to dispatch (only when the send queue is enabled; see 9.9).
 - **sending** - claimed by a worker and being dispatched right now.
 - **delivered** - carrier confirmed delivery (final DLR).
 - **failed** / **rejected** - the carrier attempt failed, or a carrier receipt reported the message rejected. A carrier `REJECTD` receipt sets the top-level status to `rejected` (not only `dlr_status`), so a rejected message is visible in the list and filters, not left showing `accepted`.
@@ -875,7 +875,21 @@ Message status changes (for example `accepted` becoming `delivered` or `rejected
 
 This is a display convenience only: it changes nothing server-side and issues the same read the page already performs.
 
-### 9.6 Message detail modal (DLR section)
+### 9.6 Choosing columns (view and export)
+
+The **Columns** button at the top of the SMS Logs screen opens a checklist of every table column (Received, Message ID, Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Actions). Unticking a column does two things at once, so what you see is what you share:
+
+- It hides that column in the on-screen table, which is handy for a clean screenshot with only the fields you want visible (for example, hide Client and Charged before sharing a screenshot externally).
+- It removes that column from the **Export CSV** and **Export PDF** downloads, so a shared report contains only the selected fields. The `Actions` column is view-only and never appears in an export.
+
+Notes:
+
+- Hiding is purely local to your browser; it never changes the stored data, and it is remembered for next time (the choice is kept in the browser).
+- Column visibility survives auto-refresh, paging, and filtering: the hidden columns stay hidden as the table updates.
+- Exports still respect all active filters (client, carrier, status, date range, and so on); the column choice only narrows which fields each row includes.
+- Use **Show all** in the dropdown to restore every column at once.
+
+### 9.7 Message detail modal (DLR section)
 
 You can inspect:
 
@@ -892,13 +906,13 @@ The modal also has two actions:
 - **Print / Save PDF** opens a clean, print-friendly version of the message detail in a new window and triggers the browser print dialog, from which you can print to a physical printer or save as PDF.
 - **Resend DLR to client** (shown once a DLR status is stored) re-delivers the stored receipt to the client over its current DLR channel (HTTP webhook or SMPP `deliver_sm`). It is forward-only: it does not re-rate the message or touch any ledger, only re-attempts client delivery. The action is permission-gated and audited (`dlr.resend`). Use it after a client webhook outage, or after switching a client's DLR delivery mode.
 
-### 9.7 Diagnosing failures quickly
+### 9.8 Diagnosing failures quickly
 
 - `dlr_forward_status=failed` -> client webhook endpoint issue
 - `dlr_forward_status=no_url` -> DLR requested but no webhook URL resolved
 - `dlr_status` empty/null -> carrier callback has not arrived yet
 
-### 9.8 Async send queue
+### 9.9 Async send queue
 
 When the async send queue is enabled (`SEND_QUEUE_ENABLED=true`), a message is not dispatched to the carrier inside the request/bind thread. Instead MiniSMS:
 

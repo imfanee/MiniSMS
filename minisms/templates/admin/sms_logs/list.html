@@ -38,6 +38,63 @@ window.smsLogAutoRefresh = window.smsLogAutoRefresh || function () {
 		stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }
 	};
 };
+// Column picker for the SMS Logs table. One control drives BOTH the on-screen view and the CSV/PDF
+// exports: hidden columns are removed from the table (for a clean screenshot) and excluded from the
+// export "cols" parameter (to share only the selected fields). Visibility is applied via a single
+// <style id="sms-col-style"> block that lives OUTSIDE #log-table-container, so it keeps applying across
+// every HTMX table swap (auto-refresh, paginate, filter) with no re-binding. Choice persists in
+// localStorage. Keys mirror the Go column registry (sms_logs.go); "actions" is view-only, never exported.
+window.smsLogColumns = window.smsLogColumns || function () {
+	var ALL = [
+		{ key: "received", label: "Received" },
+		{ key: "message_id", label: "Message ID" },
+		{ key: "client", label: "Client" },
+		{ key: "to", label: "To" },
+		{ key: "from", label: "From" },
+		{ key: "segments", label: "Segments" },
+		{ key: "charged", label: "Charged" },
+		{ key: "currency", label: "Currency" },
+		{ key: "carrier", label: "Carrier" },
+		{ key: "failover", label: "Failover" },
+		{ key: "status", label: "Status" },
+		{ key: "actions", label: "Actions" }
+	];
+	var EXPORTABLE = ALL.filter(function (c) { return c.key !== "actions"; }).map(function (c) { return c.key; });
+	return {
+		all: ALL,
+		hidden: {},
+		init() {
+			try {
+				var saved = JSON.parse(localStorage.getItem("smsLogHiddenCols") || "{}");
+				if (saved && typeof saved === "object") this.hidden = saved;
+			} catch (e) { this.hidden = {}; }
+			this.apply();
+		},
+		visible(key) { return !this.hidden[key]; },
+		toggle(key) {
+			this.hidden = Object.assign({}, this.hidden, { [key]: !this.hidden[key] });
+			localStorage.setItem("smsLogHiddenCols", JSON.stringify(this.hidden));
+			this.apply();
+		},
+		showAll() {
+			this.hidden = {};
+			localStorage.setItem("smsLogHiddenCols", "{}");
+			this.apply();
+		},
+		apply() {
+			var css = "", self = this;
+			this.all.forEach(function (c) {
+				if (self.hidden[c.key]) css += '#log-table-container [data-col="' + c.key + '"]{display:none}';
+			});
+			var el = document.getElementById("sms-col-style");
+			if (el) el.textContent = css;
+		},
+		exportCols() {
+			var self = this;
+			return EXPORTABLE.filter(function (k) { return !self.hidden[k]; }).join(",");
+		}
+	};
+};
 </script>
 <div class="card bg-body-tertiary border mb-3">
 	<div class="card-body">
@@ -87,15 +144,26 @@ window.smsLogAutoRefresh = window.smsLogAutoRefresh || function () {
 				<button class="btn btn-primary btn-sm" hx-get="/admin/sms-logs" hx-include=".filter-input" hx-target="#log-table-container" hx-push-url="true">Apply Filters</button>
 				<a class="btn btn-outline-secondary btn-sm" href="/admin/sms-logs">Reset</a>
 			</div>
-			<div class="col-md-4 d-flex gap-2">
-				<a class="btn btn-outline-success btn-sm"
-					hx-boost="false"
-					download
-					href="/admin/sms-logs/export.csv?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}">Export CSV</a>
-				<a class="btn btn-outline-danger btn-sm"
-					hx-boost="false"
-					download
-					href="/admin/sms-logs/export.pdf?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}">Export PDF</a>
+			<div class="col-md-6 d-flex gap-2 align-items-center" x-data="smsLogColumns()" x-init="init()"
+				data-csv="/admin/sms-logs/export.csv?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}"
+				data-pdf="/admin/sms-logs/export.pdf?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}">
+				<div class="dropdown">
+					<button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">Columns</button>
+					<div class="dropdown-menu p-2" style="min-width:220px">
+						<div class="d-flex justify-content-between align-items-center mb-2 px-1">
+							<span class="small text-secondary">Show columns</span>
+							<button type="button" class="btn btn-link btn-sm p-0" @click="showAll()">Show all</button>
+						</div>
+						<template x-for="c in all" :key="c.key">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" :id="'col-' + c.key" :checked="visible(c.key)" @change="toggle(c.key)">
+								<label class="form-check-label small" :for="'col-' + c.key" x-text="c.label"></label>
+							</div>
+						</template>
+					</div>
+				</div>
+				<a class="btn btn-outline-success btn-sm" hx-boost="false" download :href="$root.dataset.csv + '&cols=' + exportCols()">Export CSV</a>
+				<a class="btn btn-outline-danger btn-sm" hx-boost="false" download :href="$root.dataset.pdf + '&cols=' + exportCols()">Export PDF</a>
 			</div>
 			<div class="col-md-4 d-flex align-items-center gap-2 ms-auto justify-content-end"
 				x-data="smsLogAutoRefresh()"
@@ -115,5 +183,6 @@ window.smsLogAutoRefresh = window.smsLogAutoRefresh || function () {
 		</div>
 	</div>
 </div>
+<style id="sms-col-style"></style>
 <div id="log-table-container">{{template "sms_logs_table" .}}</div>
 {{end}}

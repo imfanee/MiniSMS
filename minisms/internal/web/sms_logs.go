@@ -242,6 +242,7 @@ func (h *Handlers) SMSLogPrintView() http.HandlerFunc {
 func (h *Handlers) ExportSMSLogsCSV() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		f := parseSMSLogFilter(r)
+		cols := selectedSMSLogColumns(r)
 		rows, err := h.querySMSLogsForExport(r, f)
 		if err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
@@ -251,36 +252,20 @@ func (h *Handlers) ExportSMSLogsCSV() http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 		cw := csv.NewWriter(w)
-		if err := cw.Write([]string{"received_at", "message_id", "client", "to", "from", "segments", "total_charged", "currency", "carrier", "failover_sequence", "status"}); err != nil {
+		head := make([]string, len(cols))
+		for i, c := range cols {
+			head[i] = c.CSVHead
+		}
+		if err := cw.Write(head); err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
+		rec := make([]string, len(cols))
 		for _, row := range rows {
-			client := "-"
-			if row.ClientName != nil {
-				client = *row.ClientName
+			for i, c := range cols {
+				rec[i] = c.Value(row)
 			}
-			from := "-"
-			if row.FromNumber != nil {
-				from = *row.FromNumber
-			}
-			carrierName := "-"
-			if row.CarrierName != nil {
-				carrierName = *row.CarrierName
-			}
-			if err := cw.Write([]string{
-				row.ReceivedAt.UTC().Format("2006-01-02 15:04:05"),
-				row.MessageID,
-				client,
-				row.ToNumber,
-				from,
-				strconv.Itoa(row.Segments),
-				row.TotalCharged,
-				row.Currency,
-				carrierName,
-				strconv.Itoa(row.FailoverSequence),
-				row.Status,
-			}); err != nil {
+			if err := cw.Write(rec); err != nil {
 				ServerError(w, r, err, h.Log, h.T500)
 				return
 			}
@@ -296,6 +281,7 @@ func (h *Handlers) ExportSMSLogsCSV() http.HandlerFunc {
 func (h *Handlers) ExportSMSLogsPDF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		f := parseSMSLogFilter(r)
+		cols := selectedSMSLogColumns(r)
 		rows, err := h.querySMSLogsForExport(r, f)
 		if err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
@@ -331,42 +317,19 @@ func (h *Handlers) ExportSMSLogsPDF() http.HandlerFunc {
 			pdf.CellFormat(0, 5.5, c[1], "0", 1, "L", false, 0, "")
 		}
 		pdf.Ln(1)
-		headers := []string{"Received", "Message ID", "Client", "To", "From", "Seg", "Charged", "Currency", "Carrier", "Fail", "Status"}
-		widths := []float64{28, 28, 30, 28, 24, 10, 18, 14, 28, 10, 16}
 		pdf.SetFont("Arial", "B", 8)
-		for i := range headers {
-			pdf.CellFormat(widths[i], 6, headers[i], "1", 0, "L", false, 0, "")
+		for _, c := range cols {
+			pdf.CellFormat(c.PDFWidth, 6, c.PDFHead, "1", 0, "L", false, 0, "")
 		}
 		pdf.Ln(-1)
 		pdf.SetFont("Arial", "", 8)
 		for _, row := range rows {
-			client := "-"
-			if row.ClientName != nil {
-				client = *row.ClientName
-			}
-			from := "-"
-			if row.FromNumber != nil {
-				from = *row.FromNumber
-			}
-			carrierName := "-"
-			if row.CarrierName != nil {
-				carrierName = *row.CarrierName
-			}
-			values := []string{
-				row.ReceivedAt.UTC().Format("2006-01-02 15:04:05"),
-				truncateText(row.MessageID, 18),
-				truncateText(client, 20),
-				row.ToNumber,
-				truncateText(from, 16),
-				strconv.Itoa(row.Segments),
-				row.TotalCharged,
-				row.Currency,
-				truncateText(carrierName, 20),
-				strconv.Itoa(row.FailoverSequence),
-				row.Status,
-			}
-			for i := range values {
-				pdf.CellFormat(widths[i], 5.5, values[i], "1", 0, "L", false, 0, "")
+			for _, c := range cols {
+				v := c.Value(row)
+				if c.PDFTrunc > 0 {
+					v = truncateText(v, c.PDFTrunc)
+				}
+				pdf.CellFormat(c.PDFWidth, 5.5, v, "1", 0, "L", false, 0, "")
 			}
 			pdf.Ln(-1)
 		}
@@ -434,6 +397,69 @@ func exportValueOrAll(v string) string {
 		return "All"
 	}
 	return x
+}
+
+// smsLogColumn defines one SMS-log column. This single registry is the source of truth for both the
+// CSV and PDF exports; the on-screen table references the same keys (data-col) so the view, CSV and PDF
+// stay in lockstep and the column picker can drive all three. Value returns the full cell string (used
+// verbatim by CSV); the PDF additionally truncates it to PDFTrunc runes when PDFTrunc > 0. PDFWidth is
+// the fixed PDF column width in mm.
+type smsLogColumn struct {
+	Key      string
+	CSVHead  string
+	PDFHead  string
+	PDFWidth float64
+	PDFTrunc int
+	Value    func(SMSLogRow) string
+}
+
+func derefOrDash(p *string) string {
+	if p != nil {
+		return *p
+	}
+	return "-"
+}
+
+// smsLogColumns is the canonical, ordered column set. The default (no `cols` param) export reproduces
+// the historical CSV/PDF output byte-for-byte, so pre-existing export URLs keep working unchanged.
+var smsLogColumns = []smsLogColumn{
+	{"received", "received_at", "Received", 28, 0, func(x SMSLogRow) string { return x.ReceivedAt.UTC().Format("2006-01-02 15:04:05") }},
+	{"message_id", "message_id", "Message ID", 28, 18, func(x SMSLogRow) string { return x.MessageID }},
+	{"client", "client", "Client", 30, 20, func(x SMSLogRow) string { return derefOrDash(x.ClientName) }},
+	{"to", "to", "To", 28, 0, func(x SMSLogRow) string { return x.ToNumber }},
+	{"from", "from", "From", 24, 16, func(x SMSLogRow) string { return derefOrDash(x.FromNumber) }},
+	{"segments", "segments", "Seg", 10, 0, func(x SMSLogRow) string { return strconv.Itoa(x.Segments) }},
+	{"charged", "total_charged", "Charged", 18, 0, func(x SMSLogRow) string { return x.TotalCharged }},
+	{"currency", "currency", "Currency", 14, 0, func(x SMSLogRow) string { return x.Currency }},
+	{"carrier", "carrier", "Carrier", 28, 20, func(x SMSLogRow) string { return derefOrDash(x.CarrierName) }},
+	{"failover", "failover_sequence", "Fail", 10, 0, func(x SMSLogRow) string { return strconv.Itoa(x.FailoverSequence) }},
+	{"status", "status", "Status", 16, 0, func(x SMSLogRow) string { return x.Status }},
+}
+
+// selectedSMSLogColumns returns the export columns named by the `cols` query parameter (comma-separated
+// keys) in canonical registry order. Unknown keys are ignored; when `cols` is absent or names nothing
+// recognised, all columns are returned so a bare export URL still yields the full report.
+func selectedSMSLogColumns(r *http.Request) []smsLogColumn {
+	raw := strings.TrimSpace(r.URL.Query().Get("cols"))
+	if raw == "" {
+		return smsLogColumns
+	}
+	want := make(map[string]bool)
+	for _, k := range strings.Split(raw, ",") {
+		if k = strings.TrimSpace(k); k != "" {
+			want[k] = true
+		}
+	}
+	var out []smsLogColumn
+	for _, c := range smsLogColumns {
+		if want[c.Key] {
+			out = append(out, c)
+		}
+	}
+	if len(out) == 0 {
+		return smsLogColumns
+	}
+	return out
 }
 
 func (h *Handlers) querySMSLogs(r *http.Request, f SMSLogFilter) ([]SMSLogRow, int, error) {

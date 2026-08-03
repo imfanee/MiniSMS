@@ -66,6 +66,7 @@ make run
 - **Multi-admin RBAC** with permission keys and super-admin-only settings/audit/users
 - **Audit log** (append-only) with admin user attribution
 - Dashboard reports and HTMX-driven Admin UI
+- **SMS Logs** with per-message timeline, opt-in live auto-refresh, show/hide and reorderable columns, and CSV/PDF export (selectable columns and order, choice of PDF page orientation)
 - Client/carrier **invoices** (PDF generation, payment allocation, summary stats)
 
 ## API Overview

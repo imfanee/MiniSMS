@@ -815,17 +815,9 @@ SMS Logs are your primary operational truth source.
 
 ### 9.1 Table columns (including DLR)
 
-Common columns include:
+The results table shows these columns: Received, Message ID, Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, and Actions (the per-row Detail link). Which columns are shown, and in what order, is up to you (see 9.6); the choice also controls what the CSV/PDF exports contain.
 
-- message ID
-- client/carrier
-- destination/sender
-- status
-- segments/charged
-- failover sequence
-- `dlr_requested`
-- `dlr_status`
-- `dlr_forward_status`
+Fuller DLR fields (`dlr_requested`, `dlr_status`, `dlr_received_at`, `dlr_forward_status`, `dlr_forwarded_at`, and the delivery-receipt details) are shown per message in the detail modal (see 9.7), not as list columns.
 
 ### 9.2 Status values
 

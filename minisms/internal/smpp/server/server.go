@@ -236,6 +236,13 @@ func (s *Server) handleConn(ctx context.Context, c *conn) {
 				sess = nil
 			}
 			return
+		case pdu.DeliverSMRespID:
+			// The client is acknowledging a DLR (deliver_sm) we pushed to it. This is the normal,
+			// correct response to our receipt and needs no reply: consume it. Do not fall through to
+			// the default arm, which would wrongly generic_nack a perfectly valid ack.
+			s.wireClient(sess, "<<", "deliver_sm_resp",
+				"seq", strconv.FormatUint(uint64(p.Header().Seq), 10),
+				"command_status", fmt.Sprintf("0x%08X", uint32(p.Header().Status)))
 		default:
 			if sess == nil {
 				return

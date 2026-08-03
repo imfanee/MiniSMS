@@ -37,6 +37,37 @@ func TestMaskAndBackstop(t *testing.T) {
 	}
 }
 
+func TestRedactBodyMasksSecrets(t *testing.T) {
+	// JSON body: credential-shaped keys masked, everything else preserved.
+	in := `{"to":"+10000000000","message":"hi","dlr_secret":"deadbeefdeadbeef","access_token":"abc.def","notify_url":"https://h/x"}`
+	got := RedactBody(in)
+	for _, leak := range []string{"deadbeefdeadbeef", "abc.def"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("secret leaked in JSON body: %q still present in %q", leak, got)
+		}
+	}
+	for _, keep := range []string{`"to":"+10000000000"`, `"message":"hi"`, `"notify_url":"https://h/x"`} {
+		if !strings.Contains(got, keep) {
+			t.Errorf("non-secret field not preserved: want %q in %q", keep, got)
+		}
+	}
+	if !strings.Contains(got, `"dlr_secret":"***"`) {
+		t.Errorf("dlr_secret not masked to ***: %q", got)
+	}
+	// Escaped quote inside a secret value must not break masking.
+	if g := RedactBody(`{"password":"a\"b\"c"}`); strings.Contains(g, `a\"b\"c`) {
+		t.Errorf("escaped-quote secret leaked: %q", g)
+	}
+	// Form body still masked.
+	if g := RedactBody(`to=%2B1&api_key=SECRET123&text=hi`); strings.Contains(g, "SECRET123") {
+		t.Errorf("form secret leaked: %q", g)
+	}
+	// Non-secret JSON unchanged.
+	if g := RedactBody(`{"to":"+1","text":"hello"}`); g != `{"to":"+1","text":"hello"}` {
+		t.Errorf("non-secret JSON altered: %q", g)
+	}
+}
+
 func TestEmitWritesToNamedFileAndMasks(t *testing.T) {
 	dir := t.TempDir()
 	if err := Init(dir, true, 100, 5); err != nil {

@@ -205,7 +205,16 @@ func quoteVal(v string) string {
 	return v
 }
 
-var secretKey = regexp.MustCompile(`(?i)pass|secret|token|authoriz|api[-_]?key|credential|x-api-key`)
+// secretTokens is the shared set of credential-shaped substrings recognised across headers, query/form
+// params and JSON body keys, so masking stays consistent everywhere.
+const secretTokens = `pass|secret|token|authoriz|api[-_]?key|credential`
+
+var secretKey = regexp.MustCompile(`(?i)` + secretTokens + `|x-api-key`)
+
+// jsonSecretRe matches a JSON string member whose key contains a credential token (for example
+// "dlr_secret":"...", "password":"...", "access_token":"...") so its value can be masked. The value
+// pattern tolerates escaped characters. Non-string values are left as-is (secrets are strings here).
+var jsonSecretRe = regexp.MustCompile(`(?i)"([^"]*(?:` + secretTokens + `)[^"]*)"(\s*:\s*)"(?:[^"\\]|\\.)*"`)
 
 // maskKV masks a value whose key looks sensitive, as a backstop to explicit call-site masking.
 func maskKV(key, val string) string {
@@ -254,13 +263,19 @@ func RedactURL(raw string) string {
 	return u.String()
 }
 
-// RedactBody masks credential parameters in a url-encoded (form) body; JSON/other bodies pass through.
+// RedactBody masks credential parameters in a request/response body: credential-shaped keys are masked
+// in JSON bodies and in url-encoded (form) bodies alike. XML bodies (none carry secrets in this system)
+// pass through. Operates textually so it is safe on bodies truncated by the capture cap.
 func RedactBody(body string) string {
 	t := strings.TrimSpace(body)
-	if t == "" || strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[") || strings.HasPrefix(t, "<") {
+	switch {
+	case t == "":
 		return body
-	}
-	if strings.Contains(body, "=") {
+	case strings.HasPrefix(t, "{") || strings.HasPrefix(t, "["):
+		return jsonSecretRe.ReplaceAllString(body, `"${1}"${2}"***"`)
+	case strings.HasPrefix(t, "<"):
+		return body
+	case strings.Contains(body, "="):
 		return redactQueryValues(body)
 	}
 	return body

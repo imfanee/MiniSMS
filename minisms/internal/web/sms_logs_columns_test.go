@@ -24,8 +24,10 @@ func TestSelectedSMSLogColumns(t *testing.T) {
 		want []string
 	}{
 		{"absent returns all", "", allKeys},
-		{"subset in canonical order", "to,status", []string{"to", "status"}},
-		{"order is registry order not request order", "status,to", []string{"to", "status"}},
+		{"subset preserved", "to,status", []string{"to", "status"}},
+		{"honors request order (reordering)", "status,to", []string{"status", "to"}},
+		{"custom order across many keys", "charged,to,received", []string{"charged", "to", "received"}},
+		{"duplicates collapse to first position", "to,to,status", []string{"to", "status"}},
 		{"unknown keys dropped", "to,bogus,charged", []string{"to", "charged"}},
 		{"all-unknown falls back to full set", "nope,zzz", allKeys},
 		{"blank entries tolerated", "to,,,status,", []string{"to", "status"}},

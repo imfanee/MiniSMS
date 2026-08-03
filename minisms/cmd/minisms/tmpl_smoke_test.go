@@ -21,4 +21,14 @@ func TestSMSLogTemplatesParse(t *testing.T) {
 	); err != nil {
 		t.Fatalf("parse sms log templates: %v", err)
 	}
+	// The fragment set (table + detail modal + print view) is parsed separately at runtime; guard it too
+	// so the detail-modal Print button and the print view cannot break startup.
+	if _, err := parseTemplateFS(
+		minisms.TemplateFS,
+		"templates/admin/sms_logs/table.html",
+		"templates/admin/sms_logs/detail_modal.html",
+		"templates/admin/sms_logs/print.html",
+	); err != nil {
+		t.Fatalf("parse sms log fragment templates: %v", err)
+	}
 }

@@ -287,7 +287,23 @@ func (h *Handlers) ExportSMSLogsPDF() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
-		pdf := gofpdf.New("L", "mm", "A4", "")
+		// Orientation is operator-selectable: landscape (default) or portrait. A4 printable width with
+		// 8mm side margins is 281mm (landscape) / 194mm (portrait).
+		orientation, pageW := "L", 281.0
+		if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("orientation")), "portrait") {
+			orientation, pageW = "P", 194.0
+		}
+		// Fit the selected columns to the page: scale their widths down proportionally when they would
+		// overrun (never scale up, so the default landscape export is byte-for-byte unchanged).
+		var sumW float64
+		for _, c := range cols {
+			sumW += c.PDFWidth
+		}
+		colScale := 1.0
+		if sumW > pageW && sumW > 0 {
+			colScale = pageW / sumW
+		}
+		pdf := gofpdf.New(orientation, "mm", "A4", "")
 		pdf.SetMargins(8, 8, 8)
 		pdf.SetAutoPageBreak(true, 8)
 		pdf.AddPage()
@@ -319,7 +335,7 @@ func (h *Handlers) ExportSMSLogsPDF() http.HandlerFunc {
 		pdf.Ln(1)
 		pdf.SetFont("Arial", "B", 8)
 		for _, c := range cols {
-			pdf.CellFormat(c.PDFWidth, 6, c.PDFHead, "1", 0, "L", false, 0, "")
+			pdf.CellFormat(c.PDFWidth*colScale, 6, c.PDFHead, "1", 0, "L", false, 0, "")
 		}
 		pdf.Ln(-1)
 		pdf.SetFont("Arial", "", 8)
@@ -329,7 +345,7 @@ func (h *Handlers) ExportSMSLogsPDF() http.HandlerFunc {
 				if c.PDFTrunc > 0 {
 					v = truncateText(v, c.PDFTrunc)
 				}
-				pdf.CellFormat(c.PDFWidth, 5.5, v, "1", 0, "L", false, 0, "")
+				pdf.CellFormat(c.PDFWidth*colScale, 5.5, v, "1", 0, "L", false, 0, "")
 			}
 			pdf.Ln(-1)
 		}
@@ -437,22 +453,28 @@ var smsLogColumns = []smsLogColumn{
 }
 
 // selectedSMSLogColumns returns the export columns named by the `cols` query parameter (comma-separated
-// keys) in canonical registry order. Unknown keys are ignored; when `cols` is absent or names nothing
-// recognised, all columns are returned so a bare export URL still yields the full report.
+// keys) in the order given, so the picker's column reordering carries through to the CSV/PDF export.
+// Duplicates keep their first position; unknown/blank keys are dropped; when `cols` is absent or names
+// nothing recognised, all columns are returned in canonical order so a bare export URL still yields the
+// full report unchanged.
 func selectedSMSLogColumns(r *http.Request) []smsLogColumn {
 	raw := strings.TrimSpace(r.URL.Query().Get("cols"))
 	if raw == "" {
 		return smsLogColumns
 	}
-	want := make(map[string]bool)
-	for _, k := range strings.Split(raw, ",") {
-		if k = strings.TrimSpace(k); k != "" {
-			want[k] = true
-		}
-	}
-	var out []smsLogColumn
+	byKey := make(map[string]smsLogColumn, len(smsLogColumns))
 	for _, c := range smsLogColumns {
-		if want[c.Key] {
+		byKey[c.Key] = c
+	}
+	seen := make(map[string]bool)
+	var out []smsLogColumn
+	for _, k := range strings.Split(raw, ",") {
+		k = strings.TrimSpace(k)
+		if k == "" || seen[k] {
+			continue
+		}
+		if c, ok := byKey[k]; ok {
+			seen[k] = true
 			out = append(out, c)
 		}
 	}

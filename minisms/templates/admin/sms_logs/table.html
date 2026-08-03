@@ -9,7 +9,7 @@
 			{{range .Rows}}
 			<tr>
 				<td data-col="received">{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td>
-				<td data-col="message_id"><span data-bs-toggle="tooltip" title="{{.MessageID}}">{{slice .MessageID 0 8}}...</span></td>
+				<td data-col="message_id"><span class="msgid-cell text-truncate d-inline-block align-middle" data-bs-toggle="tooltip" title="{{.MessageID}}">{{.MessageID}}</span></td>
 				<td data-col="client">{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</td>
 				<td data-col="to">{{.ToNumber}}</td>
 				<td data-col="from">{{if .FromNumber}}{{.FromNumber}}{{else}}-{{end}}</td>

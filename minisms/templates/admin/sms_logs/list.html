@@ -59,39 +59,87 @@ window.smsLogColumns = window.smsLogColumns || function () {
 		{ key: "status", label: "Status" },
 		{ key: "actions", label: "Actions" }
 	];
-	var EXPORTABLE = ALL.filter(function (c) { return c.key !== "actions"; }).map(function (c) { return c.key; });
+	var KEYS = ALL.map(function (c) { return c.key; });
+	var LABELS = {}; ALL.forEach(function (c) { LABELS[c.key] = c.label; });
+	// actions is view-only; every other column is exportable.
+	var EXPORTABLE = {}; ALL.forEach(function (c) { EXPORTABLE[c.key] = c.key !== "actions"; });
+	// normalizeOrder keeps a saved order forward-compatible: known keys in their saved position, then any
+	// registry key the saved order is missing (a column added later), and drops anything unrecognised.
+	function normalizeOrder(saved) {
+		var seen = {}, out = [];
+		(Array.isArray(saved) ? saved : []).forEach(function (k) {
+			if (KEYS.indexOf(k) >= 0 && !seen[k]) { seen[k] = 1; out.push(k); }
+		});
+		KEYS.forEach(function (k) { if (!seen[k]) out.push(k); });
+		return out;
+	}
 	return {
-		all: ALL,
+		order: KEYS.slice(),
 		hidden: {},
+		labelOf(k) { return LABELS[k] || k; },
 		init() {
 			try {
-				var saved = JSON.parse(localStorage.getItem("smsLogHiddenCols") || "{}");
-				if (saved && typeof saved === "object") this.hidden = saved;
+				var h = JSON.parse(localStorage.getItem("smsLogHiddenCols") || "{}");
+				if (h && typeof h === "object") this.hidden = h;
 			} catch (e) { this.hidden = {}; }
+			try {
+				this.order = normalizeOrder(JSON.parse(localStorage.getItem("smsLogColOrder") || "null"));
+			} catch (e) { this.order = KEYS.slice(); }
 			this.apply();
 		},
-		visible(key) { return !this.hidden[key]; },
-		toggle(key) {
-			this.hidden = Object.assign({}, this.hidden, { [key]: !this.hidden[key] });
+		visible(k) { return !this.hidden[k]; },
+		toggle(k) {
+			this.hidden = Object.assign({}, this.hidden, { [k]: !this.hidden[k] });
 			localStorage.setItem("smsLogHiddenCols", JSON.stringify(this.hidden));
-			this.apply();
+			this.applyHide();
 		},
-		showAll() {
+		move(i, delta) {
+			var j = i + delta;
+			if (j < 0 || j >= this.order.length) return;
+			var o = this.order.slice();
+			var t = o[i]; o[i] = o[j]; o[j] = t;
+			this.order = o;
+			localStorage.setItem("smsLogColOrder", JSON.stringify(this.order));
+			this.reorderDOM();
+		},
+		reset() {
 			this.hidden = {};
+			this.order = KEYS.slice();
 			localStorage.setItem("smsLogHiddenCols", "{}");
+			localStorage.setItem("smsLogColOrder", JSON.stringify(this.order));
 			this.apply();
 		},
-		apply() {
+		apply() { this.applyHide(); this.reorderDOM(); },
+		// applyHide writes a single <style> block outside the swapped table container, so hidden columns
+		// stay hidden across auto-refresh / paging / filtering with no re-binding.
+		applyHide() {
 			var css = "", self = this;
-			this.all.forEach(function (c) {
-				if (self.hidden[c.key]) css += '#log-table-container [data-col="' + c.key + '"]{display:none}';
+			KEYS.forEach(function (k) {
+				if (self.hidden[k]) css += '#log-table-container [data-col="' + k + '"]{display:none}';
 			});
 			var el = document.getElementById("sms-col-style");
 			if (el) el.textContent = css;
 		},
+		// reorderDOM moves each row's cells (thead + tbody) into the chosen order. CSS `order` does not
+		// apply to table cells, so we reorder the nodes; appendChild in order sequences them exactly.
+		// Runs on init and after every HTMX table swap (see the root's htmx:after-swap handler).
+		reorderDOM() {
+			var container = document.getElementById("log-table-container");
+			if (!container) return;
+			var order = this.order;
+			container.querySelectorAll("tr").forEach(function (tr) {
+				var cells = {}, has = false;
+				Array.prototype.forEach.call(tr.children, function (cell) {
+					var k = cell.getAttribute("data-col");
+					if (k) { cells[k] = cell; has = true; }
+				});
+				if (!has) return; // skip the empty-state / non-column rows
+				order.forEach(function (k) { if (cells[k]) tr.appendChild(cells[k]); });
+			});
+		},
 		exportCols() {
 			var self = this;
-			return EXPORTABLE.filter(function (k) { return !self.hidden[k]; }).join(",");
+			return this.order.filter(function (k) { return EXPORTABLE[k] && !self.hidden[k]; }).join(",");
 		}
 	};
 };
@@ -145,25 +193,36 @@ window.smsLogColumns = window.smsLogColumns || function () {
 				<a class="btn btn-outline-secondary btn-sm" href="/admin/sms-logs">Reset</a>
 			</div>
 			<div class="col-md-6 d-flex gap-2 align-items-center" x-data="smsLogColumns()" x-init="init()"
+				@htmx:after-swap.document="if ($event.detail && $event.detail.target && $event.detail.target.id === 'log-table-container') reorderDOM()"
 				data-csv="/admin/sms-logs/export.csv?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}"
 				data-pdf="/admin/sms-logs/export.pdf?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}">
 				<div class="dropdown">
 					<button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">Columns</button>
-					<div class="dropdown-menu p-2" style="min-width:220px">
+					<div class="dropdown-menu p-2" style="min-width:240px">
 						<div class="d-flex justify-content-between align-items-center mb-2 px-1">
-							<span class="small text-secondary">Show columns</span>
-							<button type="button" class="btn btn-link btn-sm p-0" @click="showAll()">Show all</button>
+							<span class="small text-secondary">Show &amp; order columns</span>
+							<button type="button" class="btn btn-link btn-sm p-0" @click="reset()">Reset</button>
 						</div>
-						<template x-for="c in all" :key="c.key">
-							<div class="form-check">
-								<input class="form-check-input" type="checkbox" :id="'col-' + c.key" :checked="visible(c.key)" @change="toggle(c.key)">
-								<label class="form-check-label small" :for="'col-' + c.key" x-text="c.label"></label>
+						<template x-for="(k, i) in order" :key="k">
+							<div class="d-flex align-items-center gap-1">
+								<div class="form-check flex-grow-1 mb-0">
+									<input class="form-check-input" type="checkbox" :id="'col-' + k" :checked="visible(k)" @change="toggle(k)">
+									<label class="form-check-label small" :for="'col-' + k" x-text="labelOf(k)"></label>
+								</div>
+								<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move(i, -1)" :disabled="i === 0" title="Move up">&uarr;</button>
+								<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move(i, 1)" :disabled="i === order.length - 1" title="Move down">&darr;</button>
 							</div>
 						</template>
 					</div>
 				</div>
 				<a class="btn btn-outline-success btn-sm" hx-boost="false" download :href="$root.dataset.csv + '&cols=' + exportCols()">Export CSV</a>
-				<a class="btn btn-outline-danger btn-sm" hx-boost="false" download :href="$root.dataset.pdf + '&cols=' + exportCols()">Export PDF</a>
+				<div class="dropdown">
+					<button class="btn btn-outline-danger btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Export PDF</button>
+					<ul class="dropdown-menu">
+						<li><a class="dropdown-item" hx-boost="false" download :href="$root.dataset.pdf + '&cols=' + exportCols() + '&orientation=landscape'">Landscape</a></li>
+						<li><a class="dropdown-item" hx-boost="false" download :href="$root.dataset.pdf + '&cols=' + exportCols() + '&orientation=portrait'">Portrait</a></li>
+					</ul>
+				</div>
 			</div>
 			<div class="col-md-4 d-flex align-items-center gap-2 ms-auto justify-content-end"
 				x-data="smsLogAutoRefresh()"
@@ -184,5 +243,10 @@ window.smsLogColumns = window.smsLogColumns || function () {
 	</div>
 </div>
 <style id="sms-col-style"></style>
+<style>
+/* Message ID: show the full value when the viewport has room, ellipsize only when cramped (full id
+   stays available in the cell tooltip). clamp() adapts the cap to the available width. */
+#log-table-container .msgid-cell { max-width: clamp(12ch, 16vw, 36ch); font-family: var(--bs-font-monospace); }
+</style>
 <div id="log-table-container">{{template "sms_logs_table" .}}</div>
 {{end}}

@@ -875,19 +875,21 @@ Message status changes (for example `accepted` becoming `delivered` or `rejected
 
 This is a display convenience only: it changes nothing server-side and issues the same read the page already performs.
 
-### 9.6 Choosing columns (view and export)
+### 9.6 Choosing and ordering columns (view and export)
 
-The **Columns** button at the top of the SMS Logs screen opens a checklist of every table column (Received, Message ID, Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Actions). Unticking a column does two things at once, so what you see is what you share:
+The **Columns** button at the top of the SMS Logs screen opens a list of every table column (Received, Message ID, Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Actions). It controls both what you see and what you share, so a screenshot and an export always match:
 
-- It hides that column in the on-screen table, which is handy for a clean screenshot with only the fields you want visible (for example, hide Client and Charged before sharing a screenshot externally).
-- It removes that column from the **Export CSV** and **Export PDF** downloads, so a shared report contains only the selected fields. The `Actions` column is view-only and never appears in an export.
+- **Show / hide:** untick a column to remove it from the on-screen table (handy for a clean screenshot with only the fields you want visible) and from the **Export CSV** and **Export PDF** downloads. The `Actions` column is view-only and never appears in an export.
+- **Reorder:** use the up/down arrows next to each column to change the order. The new order is applied to the table immediately and carries through to both exports, so the CSV/PDF columns come out in the order you arranged.
 
 Notes:
 
-- Hiding is purely local to your browser; it never changes the stored data, and it is remembered for next time (the choice is kept in the browser).
-- Column visibility survives auto-refresh, paging, and filtering: the hidden columns stay hidden as the table updates.
-- Exports still respect all active filters (client, carrier, status, date range, and so on); the column choice only narrows which fields each row includes.
-- Use **Show all** in the dropdown to restore every column at once.
+- Both the visibility and the order are purely local to your browser; they never change the stored data, and they are remembered for next time.
+- Column visibility and order survive auto-refresh, paging, and filtering: the table keeps your layout as it updates.
+- Exports still respect all active filters (client, carrier, status, date range, and so on); the column choice only narrows and orders which fields each row includes.
+- **Export PDF** offers **Landscape** or **Portrait**; the columns are scaled to fit the chosen page width. **Export CSV** is orientation-independent.
+- Use **Reset** in the dropdown to restore every column and the default order at once.
+- The **Message ID** column shows the full identifier when the window is wide enough and shortens it with an ellipsis only when space is tight; the complete value is always in the cell tooltip (hover to read or copy it).
 
 ### 9.7 Message detail modal (DLR section)
 

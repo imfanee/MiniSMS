@@ -834,7 +834,7 @@ Message lifecycle status (send pipeline) is separate from DLR status.
 Message lifecycle status values:
 
 - **pending** / **accepted** / **sent** - progressing through / delivered to the carrier.
-- **queued** - accepted and charge reserved; waiting for an async-queue worker to dispatch (only when the send queue is enabled; see 9.7).
+- **queued** - accepted and charge reserved; waiting for an async-queue worker to dispatch (only when the send queue is enabled; see 9.8).
 - **sending** - claimed by a worker and being dispatched right now.
 - **delivered** - carrier confirmed delivery (final DLR).
 - **failed** / **rejected** - the carrier attempt failed, or a carrier receipt reported the message rejected. A carrier `REJECTD` receipt sets the top-level status to `rejected` (not only `dlr_status`), so a rejected message is visible in the list and filters, not left showing `accepted`.
@@ -863,7 +863,19 @@ Use filters for client/carrier/status/date and DLR-focused investigations such a
 - delivered vs failed DLR forwards
 - recent callbacks
 
-### 9.5 Message detail modal (DLR section)
+### 9.5 Auto-refresh (live status updates)
+
+Message status changes (for example `accepted` becoming `delivered` or `rejected` when a carrier DLR arrives) are written to the database as they happen, but the list itself is server-rendered and does not update a page you already have open. Use the **Auto-refresh** switch at the top of the SMS Logs screen to keep the table current without a full reload.
+
+- The switch is off by default. When you turn it on, pick an interval (5s / 10s / 30s / 60s).
+- Only the results table is refreshed in place. Your filters, the page you are on, any open message-detail modal, and your scroll position are all preserved (the current filters and page are read straight from the address bar, so auto-refresh always re-fetches exactly the view you are looking at).
+- A small "updated HH:MM:SS" note next to the switch shows the time of the last refresh.
+- Refreshing pauses automatically while the browser tab is in the background, and stops when you navigate away from the page.
+- Your choice (on/off and interval) is remembered in the browser for next time.
+
+This is a display convenience only: it changes nothing server-side and issues the same read the page already performs.
+
+### 9.6 Message detail modal (DLR section)
 
 You can inspect:
 
@@ -880,13 +892,13 @@ The modal also has two actions:
 - **Print / Save PDF** opens a clean, print-friendly version of the message detail in a new window and triggers the browser print dialog, from which you can print to a physical printer or save as PDF.
 - **Resend DLR to client** (shown once a DLR status is stored) re-delivers the stored receipt to the client over its current DLR channel (HTTP webhook or SMPP `deliver_sm`). It is forward-only: it does not re-rate the message or touch any ledger, only re-attempts client delivery. The action is permission-gated and audited (`dlr.resend`). Use it after a client webhook outage, or after switching a client's DLR delivery mode.
 
-### 9.6 Diagnosing failures quickly
+### 9.7 Diagnosing failures quickly
 
 - `dlr_forward_status=failed` -> client webhook endpoint issue
 - `dlr_forward_status=no_url` -> DLR requested but no webhook URL resolved
 - `dlr_status` empty/null -> carrier callback has not arrived yet
 
-### 9.7 Async send queue
+### 9.8 Async send queue
 
 When the async send queue is enabled (`SEND_QUEUE_ENABLED=true`), a message is not dispatched to the carrier inside the request/bind thread. Instead MiniSMS:
 

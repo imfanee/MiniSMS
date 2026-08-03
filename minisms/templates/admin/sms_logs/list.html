@@ -1,6 +1,44 @@
 {/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "content"}}
 <h1 class="h2 mb-3">SMS Logs</h1>
+<script>
+// Auto-refresh controller for the SMS Logs table. Polls the CURRENT url (filters + page are
+// kept in the address bar by hx-push-url) and swaps only #log-table-container, so the page,
+// modals and filter inputs are never disturbed. Defined as a global so it is available whether
+// the page arrives via full load or a boosted navigation.
+window.smsLogAutoRefresh = window.smsLogAutoRefresh || function () {
+	return {
+		on: localStorage.getItem("smsLogAutoRefresh") === "1",
+		secs: parseInt(localStorage.getItem("smsLogAutoRefreshSecs") || "10", 10) || 10,
+		timer: null,
+		updated: "",
+		init() {
+			this.$watch("on", (v) => {
+				localStorage.setItem("smsLogAutoRefresh", v ? "1" : "0");
+				v ? this.start() : this.stop();
+			});
+			this.$watch("secs", (v) => {
+				localStorage.setItem("smsLogAutoRefreshSecs", v);
+				if (this.on) this.start();
+			});
+			if (this.on) this.start();
+		},
+		start() {
+			this.stop();
+			this.timer = setInterval(() => {
+				// Self-clean if the user has navigated away from the logs page.
+				var c = document.getElementById("log-table-container");
+				if (!c) { this.stop(); return; }
+				if (document.hidden || !window.htmx) return;
+				window.htmx.ajax("GET", window.location.pathname + window.location.search, {
+					target: "#log-table-container", swap: "innerHTML"
+				});
+			}, Math.max(3, this.secs) * 1000);
+		},
+		stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }
+	};
+};
+</script>
 <div class="card bg-body-tertiary border mb-3">
 	<div class="card-body">
 		<div class="row g-2">
@@ -58,6 +96,21 @@
 					hx-boost="false"
 					download
 					href="/admin/sms-logs/export.pdf?client_id={{.Filter.ClientID}}&carrier_id={{.Filter.CarrierID}}&routing_group_id={{.Filter.RoutingGroupID}}&status={{.Filter.Status}}&failover_sequence={{.Filter.FailoverSequence}}&prefix_matched={{.Filter.PrefixMatched}}&date_from={{.Filter.DateFrom}}&date_to={{.Filter.DateTo}}">Export PDF</a>
+			</div>
+			<div class="col-md-4 d-flex align-items-center gap-2 ms-auto justify-content-end"
+				x-data="smsLogAutoRefresh()"
+				@htmx:after-swap.document="if ($event.detail && $event.detail.target && $event.detail.target.id === 'log-table-container') updated = new Date().toLocaleTimeString()">
+				<div class="form-check form-switch mb-0">
+					<input class="form-check-input" type="checkbox" role="switch" id="sms-auto-refresh" x-model="on">
+					<label class="form-check-label small" for="sms-auto-refresh">Auto-refresh</label>
+				</div>
+				<select class="form-select form-select-sm" style="width:auto" x-model.number="secs" x-show="on" x-cloak>
+					<option value="5">5s</option>
+					<option value="10">10s</option>
+					<option value="30">30s</option>
+					<option value="60">60s</option>
+				</select>
+				<span class="small text-secondary" x-show="updated" x-cloak x-text="'updated ' + updated"></span>
 			</div>
 		</div>
 	</div>

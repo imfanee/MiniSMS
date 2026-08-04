@@ -23,6 +23,17 @@ func TemplateFuncs() template.FuncMap {
 			return m, nil
 		},
 		"hasPrefix": strings.HasPrefix,
+		// pctClass maps a success percentage to a Bootstrap contextual suffix for meters/badges.
+		"pctClass": func(p float64) string {
+			switch {
+			case p >= 90:
+				return "success"
+			case p >= 50:
+				return "warning"
+			default:
+				return "danger"
+			}
+		},
 		"hasPerm": func(perms map[string]bool, key string) bool {
 			if perms == nil {
 				return false

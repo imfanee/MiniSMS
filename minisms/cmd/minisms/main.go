@@ -88,6 +88,7 @@ func main() {
 	dashFragT, err := parseTemplateFS(
 		tfs,
 		"templates/admin/dashboard_stats.html",
+		"templates/admin/dashboard_health.html",
 	)
 	if err != nil {
 		log.Error("template dashboard fragment", "err", err)

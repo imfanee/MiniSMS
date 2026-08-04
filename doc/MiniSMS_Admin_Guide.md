@@ -118,11 +118,31 @@ The Dashboard gives live operations visibility.
 
 ### What you see
 
+- **Network & Interconnect Health** panel at the top (live NOC view, see 2.1)
 - top stat cards (message/financial snapshots)
 - failover activity summary
 - carrier health table with balance indicators
 - date-range reports (7 charts)
 - auto-refresh every ~30 seconds
+
+### 2.1 Network & Interconnect Health (live)
+
+The panel at the top of the Dashboard is a NOC-style, always-current view of every carrier and client. Its **Live** switch (top right) turns fast auto-refresh on or off and lets you pick the interval (5s / 10s / 30s); it pauses automatically while the browser tab is in the background, and an "updated HH:MM:SS" note shows the last refresh. Only this panel refreshes, so the rest of the Dashboard is undisturbed.
+
+**System status strip** (tiles across the top):
+
+- **Alerts** - count of carriers plus clients currently in a warning or down state. Green when zero.
+- **SMS last min** - messages in the last 1 minute, with 5-minute and 1-hour counts beneath (live send rate).
+- **Success (1h)** - acceptance success over the last hour (accepted/sent/delivered vs failed/rejected), with a coloured meter and the failed/rejected count.
+- **SMPP egress binds** - aggregate carrier binds up across all SMPP carriers (ready/total). Only shown when at least one carrier uses SMPP.
+- **SMPP ingress** - client binds currently connected to the ESME server. Only shown when SMPP ingress is enabled.
+- **Send queue** - queued and sending counts plus the age of the oldest queued message. Only shown when the async send queue is enabled.
+
+**Carriers** - one box per carrier, its border and header tinted by state. Each box shows: a coloured state dot and state badge (green up / amber warning / red down), the three headline meters (SMPP binds ready/total or "HTTP", 1-hour sent, 1-hour success with a bar), then a details list: admin status, transport (SMPP, or HTTP with method), HTTP endpoint host, balance (red with a "low" badge when below the carrier low-balance threshold), time since last message, unmatched carrier DLRs, rate group, and all-time messages and charged amount. A reason line appears when the box is not green.
+
+**Clients** - one box per client, same layout. Headline meters are live SMPP binds connected, 1-hour sent, and 1-hour success. Details: admin status, the 1-hour interconnect mix (messages in over SMPP vs HTTP, or "idle"), balance vs the client low-balance threshold, time since last message, email, rate group, routing group, API key prefix, and whether a DLR webhook is set.
+
+State colours: **red (down)** = carrier/client not active, or an SMPP carrier with no bind up. **amber (warn)** = partial binds, low balance, unmatched DLRs, or a 1-hour success below 90% (only once at least 20 messages have flowed, to avoid noise). **green (up)** = healthy. Each box title links to that carrier's or client's detail page, where SMPP restart and other controls live. HTTP carriers are not actively probed; their state reflects admin status and recent success.
 
 ### Date-range reports (how to read and act)
 

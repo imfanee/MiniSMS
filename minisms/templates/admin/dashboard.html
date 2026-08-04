@@ -1,6 +1,57 @@
 {/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
 {{define "content"}}
 <h1 class="h2 mb-4">Dashboard</h1>
+
+<script>
+// Network health auto-refresh. Polls the health fragment and swaps only #dashboard-health-body, so the
+// rest of the dashboard (stats, reports, any open modal) is untouched. Mirrors the SMS Logs auto-refresh:
+// pauses while the tab is hidden, self-cleans if the user navigates away, and remembers on/off + interval.
+// Defaults ON at 5s because this is a NOC-style live panel.
+window.dashHealthRefresh = window.dashHealthRefresh || function () {
+	return {
+		on: (localStorage.getItem("dashHealthRefreshOn") || "1") === "1",
+		secs: parseInt(localStorage.getItem("dashHealthRefreshSecs") || "5", 10) || 5,
+		timer: null,
+		updated: "",
+		init() {
+			this.$watch("on", (v) => { localStorage.setItem("dashHealthRefreshOn", v ? "1" : "0"); v ? this.start() : this.stop(); });
+			this.$watch("secs", (v) => { localStorage.setItem("dashHealthRefreshSecs", v); if (this.on) this.start(); });
+			if (this.on) this.start();
+		},
+		start() {
+			this.stop();
+			this.timer = setInterval(() => {
+				var c = document.getElementById("dashboard-health-body");
+				if (!c) { this.stop(); return; }
+				if (document.hidden || !window.htmx) return;
+				window.htmx.ajax("GET", "/admin/dashboard/health", { target: "#dashboard-health-body", swap: "innerHTML" });
+			}, Math.max(3, this.secs) * 1000);
+		},
+		stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }
+	};
+};
+</script>
+
+<section id="dashboard-health" class="mb-4" x-data="dashHealthRefresh()" x-init="init()"
+	@htmx:after-swap.document="if ($event.detail && $event.detail.target && $event.detail.target.id === 'dashboard-health-body') updated = new Date().toLocaleTimeString()">
+	<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+		<h2 class="h5 mb-0 me-auto">Network &amp; Interconnect Health</h2>
+		<div class="form-check form-switch mb-0">
+			<input class="form-check-input" type="checkbox" role="switch" id="health-auto-refresh" x-model="on">
+			<label class="form-check-label small" for="health-auto-refresh">Live</label>
+		</div>
+		<select class="form-select form-select-sm" style="width:auto" x-model.number="secs" x-show="on" x-cloak>
+			<option value="5">5s</option>
+			<option value="10">10s</option>
+			<option value="30">30s</option>
+		</select>
+		<span class="small text-secondary" x-show="updated" x-cloak x-text="'updated ' + updated"></span>
+	</div>
+	<div id="dashboard-health-body" hx-get="/admin/dashboard/health" hx-trigger="load" hx-target="#dashboard-health-body" hx-swap="innerHTML">
+		<div class="card"><div class="card-body text-secondary">Loading health...</div></div>
+	</div>
+</section>
+
 <div id="dashboard-stats" hx-get="/admin/dashboard/stats" hx-trigger="every 30s" hx-target="#dashboard-stats" hx-swap="outerHTML">
 	{{template "dashboard_stats" .}}
 </div>

@@ -65,6 +65,37 @@ func TestCurrenciesListTemplate(t *testing.T) {
 	}
 }
 
+func TestDashboardHealthTemplate(t *testing.T) {
+	tm, err := template.New("dashboard_health.html").Funcs(TemplateFuncs()).ParseFS(minisms.TemplateFS,
+		"templates/admin/dashboard_health.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := DashboardHealthData{
+		System: SystemHealth{SMS1m: 3, SMS5m: 12, SMS1h: 120, SuccessPct1h: 96, HasSMPPCarrier: true,
+			EgressReady: 8, EgressTotal: 8, SMPPIngressEnabled: true, ClientBinds: 2, QueueEnabled: true, Queued: 1},
+		Carriers: []CarrierHealth{{
+			CarrierID: "c1", Name: "Carrier A", Status: "active", Transport: "smpp", IsSMPP: true,
+			Currency: "USD", Balance: "5.00", BalanceLow: true, BindsKnown: true, BindsReady: 5, BindsTotal: 8,
+			Sent1h: 100, SuccessPct1h: 88, State: HealthWarn, Reasons: []string{"partial binds 5/8", "low balance"},
+		}},
+		Clients: []ClientHealth{{
+			ClientID: "cl1", Name: "Client X", Status: "active", Currency: "USD", Balance: "20.00",
+			Binds: 2, Sent1h: 50, ViaSMPP1h: 50, SuccessPct1h: 100, State: HealthOK,
+		}},
+	}
+	var b strings.Builder
+	if err := tm.ExecuteTemplate(&b, "dashboard_health", data); err != nil {
+		t.Fatalf("execute dashboard_health: %v", err)
+	}
+	out := b.String()
+	for _, want := range []string{"Carriers", "Clients", "Carrier A", "Client X", "5/8"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("dashboard_health output missing %q", want)
+		}
+	}
+}
+
 func TestLoginAndDashboardTemplates(t *testing.T) {
 	for _, p := range []struct {
 		names []string

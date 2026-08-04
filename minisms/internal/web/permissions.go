@@ -78,6 +78,7 @@ func RegisterProtectedAdminRoutes(r chi.Router, h *Handlers) {
 	r.Group(func(r chi.Router) {
 		r.Use(RequirePerm(adminauth.PermDashboardStats))
 		r.Get("/dashboard/stats", h.DashboardStatsFragment())
+		r.Get("/dashboard/health", h.DashboardHealthFragment())
 		r.Get("/dashboard/reports", h.GetDashboardReports())
 		r.Get("/dashboard/reports/sms-by-client", h.GetReportSMSByClient())
 		r.Get("/dashboard/reports/sms-by-carrier", h.GetReportSMSByCarrier())

@@ -41,16 +41,39 @@
 	</script>
 	<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" crossorigin="anonymous"></script>
 	<script defer>
+		// Bootstrap tooltip lifecycle. Fixes the long-standing "stuck tooltip" on the SMS Logs table:
+		// Bootstrap parks the tooltip popup on <body>, so when an HTMX swap (auto-refresh, paging,
+		// filtering) replaces #log-table-container, the trigger cell is removed but its popup is orphaned
+		// on <body> and hangs on screen. So before a swap replaces a region we dispose the tooltips inside
+		// it, and after a swap we remove any orphaned popup as a safety net. Tooltips are also hover-only
+		// (the default "hover focus" would otherwise keep the bubble open after a click on a focusable
+		// trigger such as the row action icons), and are (re)initialised on full page load and on every
+		// HTMX swap via getOrCreateInstance so a surviving element is never double-bound.
+		function msInitTooltips(scope) {
+			if (!window.bootstrap) return;
+			(scope || document).querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (t) {
+				bootstrap.Tooltip.getOrCreateInstance(t, { trigger: "hover" });
+			});
+		}
+		function msDisposeTooltips(scope) {
+			if (!window.bootstrap || !scope) return;
+			scope.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (t) {
+				var inst = bootstrap.Tooltip.getInstance(t);
+				if (inst) inst.dispose();
+			});
+		}
+		function msSweepOrphanTooltips() {
+			document.querySelectorAll(".tooltip").forEach(function (n) { n.remove(); });
+		}
+		document.addEventListener("DOMContentLoaded", function () { msInitTooltips(document); });
+		document.addEventListener("htmx:beforeSwap", function (e) {
+			msDisposeTooltips(e && e.detail && e.detail.target);
+		});
 		document.addEventListener("htmx:afterSwap", function (e) {
-			if (!window.Alpine) return;
 			var el = (e && e.detail && (e.detail.elt || e.detail.target)) || e.target;
-			if (el) {
-				Alpine.initTree(el);
-			}
-			if (window.bootstrap) {
-				var tips = (el || document).querySelectorAll('[data-bs-toggle="tooltip"]');
-				tips.forEach(function (t) { new bootstrap.Tooltip(t); });
-			}
+			if (window.Alpine && el) Alpine.initTree(el);
+			msSweepOrphanTooltips();
+			msInitTooltips(el || document);
 		});
 	</script>
 	<link rel="stylesheet" href="/static/css/app.css" />

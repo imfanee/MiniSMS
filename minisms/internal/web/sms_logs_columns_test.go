@@ -50,7 +50,7 @@ func TestSelectedSMSLogColumns(t *testing.T) {
 // TestSMSLogColumnsMatchDefaultCSVHeader guards the backward-compatibility promise: with no cols
 // parameter the export must reproduce the historical CSV header order exactly.
 func TestSMSLogColumnsMatchDefaultCSVHeader(t *testing.T) {
-	want := "received_at,message_id,client,to,from,segments,total_charged,currency,carrier,failover_sequence,status"
+	want := "received_at,message_id,client,to,from,segments,total_charged,currency,carrier,failover_sequence,status,carrier_message_id,client_ref"
 	var heads []string
 	for _, c := range smsLogColumns {
 		heads = append(heads, c.CSVHead)

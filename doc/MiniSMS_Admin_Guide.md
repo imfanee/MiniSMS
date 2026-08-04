@@ -815,7 +815,11 @@ SMS Logs are your primary operational truth source.
 
 ### 9.1 Table columns (including DLR)
 
-The results table shows these columns: Received, Message ID, Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, and Actions (the per-row Detail link). Which columns are shown, and in what order, is up to you (see 9.6); the choice also controls what the CSV/PDF exports contain.
+The results table shows these columns: Received, Message ID (our internal id), Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Carrier's ID (the id the upstream carrier assigned to the message), Client ID (the reference the client sent with the send request), and Actions. Which columns are shown, and in what order, is up to you (see 9.6); the choice also controls what the CSV/PDF exports contain.
+
+The three id columns let you trace one message across all parties: **Message ID** is ours, **Carrier's ID** is the carrier's, and **Client ID** is the client's own reference. Any of them may be blank (shown as `-`) when not yet known or not supplied.
+
+The **Actions** column has two per-row controls: a view (eye) icon that opens the message detail modal (see 9.7), and a copy (clipboard) icon that copies the row's currently visible columns to the clipboard as `Column-Name: Value` lines, one per line, in your chosen column order. Copy respects show/hide and reorder, and always copies the full untruncated id values.
 
 Fuller DLR fields (`dlr_requested`, `dlr_status`, `dlr_received_at`, `dlr_forward_status`, `dlr_forwarded_at`, and the delivery-receipt details) are shown per message in the detail modal (see 9.7), not as list columns.
 
@@ -869,7 +873,7 @@ This is a display convenience only: it changes nothing server-side and issues th
 
 ### 9.6 Choosing and ordering columns (view and export)
 
-The **Columns** button at the top of the SMS Logs screen opens a list of every table column (Received, Message ID, Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Actions). It controls both what you see and what you share, so a screenshot and an export always match:
+The **Columns** button at the top of the SMS Logs screen opens a list of every table column (Received, Message ID, Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Carrier's ID, Client ID, Actions). It controls both what you see and what you share, so a screenshot and an export always match:
 
 - **Show / hide:** untick a column to remove it from the on-screen table (handy for a clean screenshot with only the fields you want visible) and from the **Export CSV** and **Export PDF** downloads. The `Actions` column is view-only and never appears in an export.
 - **Reorder:** use the up/down arrows next to each column to change the order. The new order is applied to the table immediately and carries through to both exports, so the CSV/PDF columns come out in the order you arranged.
@@ -881,7 +885,7 @@ Notes:
 - Exports still respect all active filters (client, carrier, status, date range, and so on); the column choice only narrows and orders which fields each row includes.
 - **Export PDF** offers **Landscape** or **Portrait**; the columns are scaled to fit the chosen page width. **Export CSV** is orientation-independent.
 - Use **Reset** in the dropdown to restore every column and the default order at once.
-- The **Message ID** column shows the full identifier when the window is wide enough and shortens it with an ellipsis only when space is tight; the complete value is always in the cell tooltip (hover to read or copy it).
+- The **Message ID**, **Carrier's ID**, and **Client ID** columns show the full identifier when the window is wide enough and shorten it with an ellipsis only when space is tight; the complete value is always in the cell tooltip (hover to read), and the Actions copy icon always copies the full value.
 
 ### 9.7 Message detail modal (DLR section)
 

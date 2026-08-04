@@ -57,6 +57,8 @@ window.smsLogColumns = window.smsLogColumns || function () {
 		{ key: "carrier", label: "Carrier" },
 		{ key: "failover", label: "Failover" },
 		{ key: "status", label: "Status" },
+		{ key: "carrier_msg_id", label: "Carrier's ID" },
+		{ key: "client_ref", label: "Client ID" },
 		{ key: "actions", label: "Actions" }
 	];
 	var KEYS = ALL.map(function (c) { return c.key; });
@@ -142,6 +144,50 @@ window.smsLogColumns = window.smsLogColumns || function () {
 			return this.order.filter(function (k) { return EXPORTABLE[k] && !self.hidden[k]; }).join(",");
 		}
 	};
+};
+// smsLogCopyRow copies one row's currently VISIBLE, non-action columns to the clipboard as
+// "Column-Name: Value" lines (one per line), in the on-screen column order. It reads labels from the
+// live table header and values from the row cells, so hidden columns (display:none via #sms-col-style)
+// and any reordering are honoured automatically; the full untruncated Message/Carrier/Client id is
+// copied because the ellipsis is CSS-only. Defined as a global so it works on HTMX-swapped table
+// fragments (which carry no Alpine scope). Uses the async Clipboard API with an execCommand fallback
+// for non-secure contexts.
+window.smsLogCopyRow = window.smsLogCopyRow || function (btn) {
+	var tr = btn.closest("tr");
+	if (!tr) return;
+	var labels = {};
+	var head = document.querySelector("#log-table-container thead tr");
+	if (head) {
+		Array.prototype.forEach.call(head.children, function (th) {
+			var k = th.getAttribute("data-col");
+			if (k) labels[k] = (th.textContent || "").trim();
+		});
+	}
+	var lines = [];
+	Array.prototype.forEach.call(tr.children, function (cell) {
+		var k = cell.getAttribute("data-col");
+		if (!k || k === "actions") return;
+		if (window.getComputedStyle(cell).display === "none") return; // skip hidden columns
+		var val = (cell.innerText || cell.textContent || "").trim();
+		lines.push((labels[k] || k) + ": " + val);
+	});
+	var text = lines.join("\n");
+	var flash = function () {
+		btn.classList.add("text-success");
+		setTimeout(function () { btn.classList.remove("text-success"); }, 1200);
+	};
+	var fallback = function (t) {
+		var ta = document.createElement("textarea");
+		ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+		document.body.appendChild(ta); ta.focus(); ta.select();
+		try { document.execCommand("copy"); } catch (e) { /* ignore */ }
+		document.body.removeChild(ta);
+	};
+	if (navigator.clipboard && navigator.clipboard.writeText) {
+		navigator.clipboard.writeText(text).then(flash, function () { fallback(text); flash(); });
+	} else {
+		fallback(text); flash();
+	}
 };
 </script>
 <div class="card bg-body-tertiary border mb-3">

@@ -52,7 +52,7 @@ func TestCarrierState(t *testing.T) {
 		wantState  HealthState
 		wantReason string // substring expected in reasons ("" = no check)
 	}{
-		{"inactive is down", CarrierHealth{Status: "inactive"}, HealthDown, "carrier inactive"},
+		{"inactive is off (not an alert)", CarrierHealth{Status: "inactive"}, HealthOff, "carrier inactive"},
 		{"smpp no binds is down", CarrierHealth{Status: "active", IsSMPP: true, BindsKnown: true, BindsReady: 0, BindsTotal: 8}, HealthDown, "no SMPP binds"},
 		{"smpp partial binds warns", CarrierHealth{Status: "active", IsSMPP: true, BindsKnown: true, BindsReady: 5, BindsTotal: 8, SuccessPct1h: 100}, HealthWarn, "partial binds 5/8"},
 		{"low balance warns", CarrierHealth{Status: "active", BalanceLow: true, SuccessPct1h: 100}, HealthWarn, "low balance"},
@@ -81,8 +81,8 @@ func TestClientState(t *testing.T) {
 		in        ClientHealth
 		wantState HealthState
 	}{
-		{"suspended is down", ClientHealth{Status: "suspended"}, HealthDown},
-		{"disabled is down", ClientHealth{Status: "disabled"}, HealthDown},
+		{"suspended is off", ClientHealth{Status: "suspended"}, HealthOff},
+		{"disabled is off", ClientHealth{Status: "disabled"}, HealthOff},
 		{"low balance warns", ClientHealth{Status: "active", BalanceLow: true, SuccessPct1h: 100}, HealthWarn},
 		{"low success enough sample warns", ClientHealth{Status: "active", Sent1h: 50, SuccessPct1h: 20}, HealthWarn},
 		{"low success tiny sample ok", ClientHealth{Status: "active", Sent1h: 3, SuccessPct1h: 20}, HealthOK},
@@ -94,6 +94,16 @@ func TestClientState(t *testing.T) {
 				t.Fatalf("state=%v want %v", got, c.wantState)
 			}
 		})
+	}
+}
+
+func TestHealthStateIsAlert(t *testing.T) {
+	// Only operational trouble (warn/down) raises an alert; healthy and administratively OFF do not.
+	cases := map[HealthState]bool{HealthOK: false, HealthOff: false, HealthWarn: true, HealthDown: true}
+	for st, want := range cases {
+		if got := st.IsAlert(); got != want {
+			t.Errorf("%q.IsAlert()=%v want %v", st, got, want)
+		}
 	}
 }
 

@@ -30,6 +30,7 @@ const (
 	HealthOK   HealthState = "ok"
 	HealthWarn HealthState = "warn"
 	HealthDown HealthState = "down"
+	HealthOff  HealthState = "off" // administratively inactive/disabled/suspended (not an alert)
 )
 
 // Class maps a state to a Bootstrap contextual suffix (text-bg-*, bg-*, border-*).
@@ -39,6 +40,8 @@ func (s HealthState) Class() string {
 		return "danger"
 	case HealthWarn:
 		return "warning"
+	case HealthOff:
+		return "secondary"
 	default:
 		return "success"
 	}
@@ -51,10 +54,16 @@ func (s HealthState) Label() string {
 		return "DOWN"
 	case HealthWarn:
 		return "WARN"
+	case HealthOff:
+		return "OFF"
 	default:
 		return "UP"
 	}
 }
+
+// IsAlert reports whether a state should count toward the Alerts tile (operational trouble only, so an
+// administratively OFF entity does not raise an alert).
+func (s HealthState) IsAlert() bool { return s == HealthWarn || s == HealthDown }
 
 // SystemHealth is the top status strip: live send rate, 1h success, SMPP interconnect totals, queue.
 type SystemHealth struct {
@@ -192,7 +201,7 @@ func balanceBelow(balance string, threshold float64) bool {
 func carrierState(c CarrierHealth) (HealthState, []string) {
 	var reasons []string
 	if !strings.EqualFold(c.Status, "active") {
-		return HealthDown, []string{"carrier " + strings.ToLower(c.Status)}
+		return HealthOff, []string{"carrier " + strings.ToLower(c.Status)}
 	}
 	if c.IsSMPP && c.BindsKnown && c.BindsReady == 0 {
 		return HealthDown, []string{"no SMPP binds up"}
@@ -220,7 +229,7 @@ func carrierState(c CarrierHealth) (HealthState, []string) {
 // clientState derives the traffic-light state and reasons for one client.
 func clientState(c ClientHealth) (HealthState, []string) {
 	if !strings.EqualFold(c.Status, "active") {
-		return HealthDown, []string{"client " + strings.ToLower(c.Status)}
+		return HealthOff, []string{"client " + strings.ToLower(c.Status)}
 	}
 	var reasons []string
 	state := HealthOK
@@ -509,7 +518,7 @@ func (h *Handlers) collectHealth(ctx context.Context) (*DashboardHealthData, err
 			}
 		}
 		ch.State, ch.Reasons = carrierState(ch)
-		if ch.State != HealthOK {
+		if ch.State.IsAlert() {
 			alerts++
 		}
 		carrierRows = append(carrierRows, ch)
@@ -535,7 +544,7 @@ func (h *Handlers) collectHealth(ctx context.Context) (*DashboardHealthData, err
 			sys.ClientBinds += cl.Binds
 		}
 		cl.State, cl.Reasons = clientState(cl)
-		if cl.State != HealthOK {
+		if cl.State.IsAlert() {
 			alerts++
 		}
 		clientRows = append(clientRows, cl)

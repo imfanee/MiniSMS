@@ -56,93 +56,89 @@
 </div>
 
 <h2 class="h6 text-uppercase text-secondary mb-2">Carriers</h2>
-<div class="row g-3 mb-4">
+<div class="health-grid mb-4">
 	{{range .Carriers}}
-	<div class="col-12 col-md-6 col-xxl-4">
-		<div class="card h-100 border-{{.State.Class}}">
-			<div class="card-header d-flex align-items-center gap-2 bg-{{.State.Class}}-subtle">
-				<span class="d-inline-block rounded-circle bg-{{.State.Class}}" style="width:11px;height:11px" title="{{.State.Label}}"></span>
-				<a class="fw-semibold text-decoration-none" href="/admin/carriers/{{.CarrierID}}">{{.Name}}</a>
-				<span class="badge text-bg-{{.State.Class}} ms-auto">{{.State.Label}}</span>
-			</div>
-			<div class="card-body">
-				<div class="row text-center g-2 mb-3">
-					<div class="col-4">
-						<div class="small text-secondary text-uppercase">Binds</div>
-						<div class="h5 mb-0 {{if .IsSMPP}}text-{{.State.Class}}{{else}}text-secondary{{end}}">{{if .IsSMPP}}{{if .BindsKnown}}{{.BindsReady}}/{{.BindsTotal}}{{else}}-{{end}}{{else}}HTTP{{end}}</div>
-					</div>
-					<div class="col-4">
-						<div class="small text-secondary text-uppercase">1h Sent</div>
-						<div class="h5 mb-0">{{.Sent1h}}</div>
-					</div>
-					<div class="col-4">
-						<div class="small text-secondary text-uppercase">1h Success</div>
-						<div class="h5 mb-0 text-{{pctClass .SuccessPct1h}}">{{printf "%.0f" .SuccessPct1h}}%</div>
-					</div>
+	<div class="card h-100 border-{{.State.Class}}">
+		<div class="card-header d-flex align-items-center gap-2 bg-{{.State.Class}}-subtle">
+			<span class="d-inline-block rounded-circle bg-{{.State.Class}}" style="width:11px;height:11px" title="{{.State.Label}}"></span>
+			<a class="fw-semibold text-decoration-none" href="/admin/carriers/{{.CarrierID}}">{{.Name}}</a>
+			<span class="badge text-bg-{{.State.Class}} ms-auto">{{.State.Label}}</span>
+		</div>
+		<div class="card-body">
+			<div class="row text-center g-2 mb-3">
+				<div class="col-4">
+					<div class="small text-secondary text-uppercase">Binds</div>
+					<div class="h5 mb-0 {{if .IsSMPP}}text-{{.State.Class}}{{else}}text-secondary{{end}}">{{if .IsSMPP}}{{if .BindsKnown}}{{.BindsReady}}/{{.BindsTotal}}{{else}}-{{end}}{{else}}HTTP{{end}}</div>
 				</div>
-				<div class="progress mb-3" style="height:5px"><div class="progress-bar bg-{{pctClass .SuccessPct1h}}" style="width:{{printf "%.0f" .SuccessPct1h}}%"></div></div>
-				<dl class="row row-cols-1 g-0 mb-0 small">
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Status</span><span>{{if eq .Status "active"}}<span class="badge text-bg-success">active</span>{{else}}<span class="badge text-bg-secondary">{{.Status}}</span>{{end}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Transport</span><span>{{if .IsSMPP}}<span class="badge text-bg-info">SMPP</span>{{else}}<span class="badge text-bg-light">HTTP {{.HTTPMethod}}</span>{{end}}</span></div>
-					{{if not .IsSMPP}}<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Endpoint</span><span class="text-truncate ms-2" style="max-width:60%" title="{{.EndpointURL}}">{{.EndpointHost}}</span></div>{{end}}
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Balance</span><span class="{{if .BalanceLow}}text-danger fw-semibold{{end}}">{{.Balance}} {{.Currency}}{{if .BalanceLow}} <span class="badge text-bg-danger">low</span>{{end}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Last message</span><span>{{.LastAge}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Unmatched DLRs</span><span>{{if gt .UnmatchedDLR 0}}<span class="badge text-bg-warning">{{.UnmatchedDLR}}</span>{{else}}0{{end}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Rate group</span><span>{{.RateGroup}}</span></div>
-					<div class="d-flex justify-content-between py-1"><span class="text-secondary">All time</span><span>{{.TotalMessages}} msgs &middot; {{.TotalAmount}} {{.Currency}}</span></div>
-				</dl>
-				{{if .Reasons}}<div class="alert alert-{{.State.Class}} py-1 px-2 mb-0 mt-2 small">{{.ReasonsStr}}</div>{{end}}
+				<div class="col-4">
+					<div class="small text-secondary text-uppercase">1h Sent</div>
+					<div class="h5 mb-0">{{.Sent1h}}</div>
+				</div>
+				<div class="col-4">
+					<div class="small text-secondary text-uppercase">1h Success</div>
+					<div class="h5 mb-0 text-{{pctClass .SuccessPct1h}}">{{printf "%.0f" .SuccessPct1h}}%</div>
+				</div>
 			</div>
+			<div class="progress mb-3" style="height:5px"><div class="progress-bar bg-{{pctClass .SuccessPct1h}}" style="width:{{printf "%.0f" .SuccessPct1h}}%"></div></div>
+			<dl class="row row-cols-1 g-0 mb-0 small">
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Status</span><span>{{if eq .Status "active"}}<span class="badge text-bg-success">active</span>{{else}}<span class="badge text-bg-secondary">{{.Status}}</span>{{end}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Transport</span><span>{{if .IsSMPP}}<span class="badge text-bg-info">SMPP</span>{{else}}<span class="badge text-bg-light">HTTP {{.HTTPMethod}}</span>{{end}}</span></div>
+				{{if not .IsSMPP}}<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Endpoint</span><span class="text-truncate ms-2" style="max-width:60%" title="{{.EndpointURL}}">{{.EndpointHost}}</span></div>{{end}}
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Balance</span><span class="{{if .BalanceLow}}text-danger fw-semibold{{end}}">{{.Balance}} {{.Currency}}{{if .BalanceLow}} <span class="badge text-bg-danger">low</span>{{end}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Last message</span><span>{{.LastAge}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Unmatched DLRs</span><span>{{if gt .UnmatchedDLR 0}}<span class="badge text-bg-warning">{{.UnmatchedDLR}}</span>{{else}}0{{end}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Rate group</span><span>{{.RateGroup}}</span></div>
+				<div class="d-flex justify-content-between py-1"><span class="text-secondary">All time</span><span>{{.TotalMessages}} msgs &middot; {{.TotalAmount}} {{.Currency}}</span></div>
+			</dl>
+			{{if .Reasons}}<div class="alert alert-{{.State.Class}} py-1 px-2 mb-0 mt-2 small">{{.ReasonsStr}}</div>{{end}}
 		</div>
 	</div>
 	{{else}}
-	<div class="col-12"><div class="card"><div class="card-body text-secondary">No carriers.</div></div></div>
+	<div class="card" style="grid-column:1/-1"><div class="card-body text-secondary">No carriers.</div></div>
 	{{end}}
 </div>
 
 <h2 class="h6 text-uppercase text-secondary mb-2">Clients</h2>
-<div class="row g-3">
+<div class="health-grid">
 	{{range .Clients}}
-	<div class="col-12 col-md-6 col-xxl-4">
-		<div class="card h-100 border-{{.State.Class}}">
-			<div class="card-header d-flex align-items-center gap-2 bg-{{.State.Class}}-subtle">
-				<span class="d-inline-block rounded-circle bg-{{.State.Class}}" style="width:11px;height:11px" title="{{.State.Label}}"></span>
-				<a class="fw-semibold text-decoration-none" href="/admin/clients/{{.ClientID}}">{{.Name}}</a>
-				<span class="badge text-bg-{{.State.Class}} ms-auto">{{.State.Label}}</span>
-			</div>
-			<div class="card-body">
-				<div class="row text-center g-2 mb-3">
-					<div class="col-4">
-						<div class="small text-secondary text-uppercase">SMPP Binds</div>
-						<div class="h5 mb-0 {{if gt .Binds 0}}text-success{{else}}text-secondary{{end}}">{{.Binds}}</div>
-					</div>
-					<div class="col-4">
-						<div class="small text-secondary text-uppercase">1h Sent</div>
-						<div class="h5 mb-0">{{.Sent1h}}</div>
-					</div>
-					<div class="col-4">
-						<div class="small text-secondary text-uppercase">1h Success</div>
-						<div class="h5 mb-0 text-{{pctClass .SuccessPct1h}}">{{printf "%.0f" .SuccessPct1h}}%</div>
-					</div>
+	<div class="card h-100 border-{{.State.Class}}">
+		<div class="card-header d-flex align-items-center gap-2 bg-{{.State.Class}}-subtle">
+			<span class="d-inline-block rounded-circle bg-{{.State.Class}}" style="width:11px;height:11px" title="{{.State.Label}}"></span>
+			<a class="fw-semibold text-decoration-none" href="/admin/clients/{{.ClientID}}">{{.Name}}</a>
+			<span class="badge text-bg-{{.State.Class}} ms-auto">{{.State.Label}}</span>
+		</div>
+		<div class="card-body">
+			<div class="row text-center g-2 mb-3">
+				<div class="col-4">
+					<div class="small text-secondary text-uppercase">SMPP Binds</div>
+					<div class="h5 mb-0 {{if gt .Binds 0}}text-success{{else}}text-secondary{{end}}">{{.Binds}}</div>
 				</div>
-				<div class="progress mb-3" style="height:5px"><div class="progress-bar bg-{{pctClass .SuccessPct1h}}" style="width:{{printf "%.0f" .SuccessPct1h}}%"></div></div>
-				<dl class="row row-cols-1 g-0 mb-0 small">
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Status</span><span>{{if eq .Status "active"}}<span class="badge text-bg-success">active</span>{{else}}<span class="badge text-bg-secondary">{{.Status}}</span>{{end}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Interconnect (1h)</span><span>{{if gt .ViaSMPP1h 0}}<span class="badge text-bg-info">SMPP {{.ViaSMPP1h}}</span> {{end}}{{if gt .ViaHTTP1h 0}}<span class="badge text-bg-light">HTTP {{.ViaHTTP1h}}</span>{{end}}{{if and (eq .ViaSMPP1h 0) (eq .ViaHTTP1h 0)}}<span class="text-secondary">idle</span>{{end}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Balance</span><span class="{{if .BalanceLow}}text-danger fw-semibold{{end}}">{{.Balance}} {{.Currency}}{{if .BalanceLow}} <span class="badge text-bg-danger">low</span>{{end}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Last message</span><span>{{.LastAge}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Email</span><span class="text-truncate ms-2" style="max-width:60%" title="{{.Email}}">{{.Email}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Rate group</span><span>{{.RateGroup}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Routing group</span><span>{{.RoutingGroup}}</span></div>
-					<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">API key</span><span class="font-monospace">{{.APIKeyPrefix}}</span></div>
-					<div class="d-flex justify-content-between py-1"><span class="text-secondary">DLR webhook</span><span>{{if .DLRWebhookSet}}<span class="badge text-bg-success">set</span>{{else}}<span class="text-secondary">none</span>{{end}}</span></div>
-				</dl>
-				{{if .Reasons}}<div class="alert alert-{{.State.Class}} py-1 px-2 mb-0 mt-2 small">{{.ReasonsStr}}</div>{{end}}
+				<div class="col-4">
+					<div class="small text-secondary text-uppercase">1h Sent</div>
+					<div class="h5 mb-0">{{.Sent1h}}</div>
+				</div>
+				<div class="col-4">
+					<div class="small text-secondary text-uppercase">1h Success</div>
+					<div class="h5 mb-0 text-{{pctClass .SuccessPct1h}}">{{printf "%.0f" .SuccessPct1h}}%</div>
+				</div>
 			</div>
+			<div class="progress mb-3" style="height:5px"><div class="progress-bar bg-{{pctClass .SuccessPct1h}}" style="width:{{printf "%.0f" .SuccessPct1h}}%"></div></div>
+			<dl class="row row-cols-1 g-0 mb-0 small">
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Status</span><span>{{if eq .Status "active"}}<span class="badge text-bg-success">active</span>{{else}}<span class="badge text-bg-secondary">{{.Status}}</span>{{end}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Interconnect (1h)</span><span>{{if gt .ViaSMPP1h 0}}<span class="badge text-bg-info">SMPP {{.ViaSMPP1h}}</span> {{end}}{{if gt .ViaHTTP1h 0}}<span class="badge text-bg-light">HTTP {{.ViaHTTP1h}}</span>{{end}}{{if and (eq .ViaSMPP1h 0) (eq .ViaHTTP1h 0)}}<span class="text-secondary">idle</span>{{end}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Balance</span><span class="{{if .BalanceLow}}text-danger fw-semibold{{end}}">{{.Balance}} {{.Currency}}{{if .BalanceLow}} <span class="badge text-bg-danger">low</span>{{end}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Last message</span><span>{{.LastAge}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Email</span><span class="text-truncate ms-2" style="max-width:60%" title="{{.Email}}">{{.Email}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Rate group</span><span>{{.RateGroup}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">Routing group</span><span>{{.RoutingGroup}}</span></div>
+				<div class="d-flex justify-content-between border-bottom py-1"><span class="text-secondary">API key</span><span class="font-monospace">{{.APIKeyPrefix}}</span></div>
+				<div class="d-flex justify-content-between py-1"><span class="text-secondary">DLR webhook</span><span>{{if .DLRWebhookSet}}<span class="badge text-bg-success">set</span>{{else}}<span class="text-secondary">none</span>{{end}}</span></div>
+			</dl>
+			{{if .Reasons}}<div class="alert alert-{{.State.Class}} py-1 px-2 mb-0 mt-2 small">{{.ReasonsStr}}</div>{{end}}
 		</div>
 	</div>
 	{{else}}
-	<div class="col-12"><div class="card"><div class="card-body text-secondary">No clients.</div></div></div>
+	<div class="card" style="grid-column:1/-1"><div class="card-body text-secondary">No clients.</div></div>
 	{{end}}
 </div>
 {{end}}

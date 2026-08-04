@@ -603,3 +603,14 @@ body {
 }
 
 /* end of sidebar patch */
+
+/* Dashboard health: fluid card grid. The browser fits as many columns of at least ~300px as the
+   current width allows and shares the width equally between them, so both the column count and each
+   card's width adapt to the viewport and the number of cards. min(100%, 300px) keeps a single card
+   from overflowing on very narrow screens. */
+.health-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  align-items: stretch;
+}

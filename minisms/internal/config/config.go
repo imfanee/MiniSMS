@@ -22,6 +22,7 @@ type Config struct {
 	Port                       string
 	HTTPListenAddr             string // e.g. 127.0.0.1:18080; empty → ":"+PORT
 	CSRFTrustedOrigins         []string // CSRF_TRUSTED_ORIGINS comma-separated (behind nginx TLS)
+	TrustedProxies             []string // TRUSTED_PROXIES comma-separated CIDRs/IPs whose X-Forwarded-For we honor (loopback always trusted)
 	TLSEnabled                 bool
 	TLSCertFile                string
 	TLSKeyFile                 string
@@ -189,6 +190,15 @@ func Load() (*Config, error) {
 			o = strings.TrimSpace(o)
 			if o != "" {
 				c.CSRFTrustedOrigins = append(c.CSRFTrustedOrigins, o)
+			}
+		}
+	}
+
+	if raw := strings.TrimSpace(os.Getenv("TRUSTED_PROXIES")); raw != "" {
+		for _, o := range strings.Split(raw, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				c.TrustedProxies = append(c.TrustedProxies, o)
 			}
 		}
 	}

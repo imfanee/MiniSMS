@@ -39,6 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 	carrier.SetDispatchInsecureTLS(cfg.HTTPCarrierInsecureTLS)
+	web.SetTrustedProxies(cfg.TrustedProxies)
 	if err := wirelog.Init(cfg.WireLogDir, cfg.WireLogEnabled, cfg.WireLogMaxMB, cfg.WireLogMaxFiles); err != nil {
 		slog.Error("wirelog init", "err", err)
 		os.Exit(1)

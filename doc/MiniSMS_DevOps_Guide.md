@@ -196,6 +196,7 @@ MiniSMS reads environment using `godotenv` (`.env` for local/dev).
 | `HTTP_LISTEN_ADDR` | No | host:port | `127.0.0.1:18081` (staging sidecar) |
 | `HTTP_CARRIER_INSECURE_TLS` | No | bool | `false` (lab only) |
 | `CSRF_TRUSTED_ORIGINS` | No | comma-separated URLs | Required if admin UI is served on a non-default origin (e.g. `:18080`) |
+| `TRUSTED_PROXIES` | No | comma-separated CIDRs/IPs | Reverse-proxy networks whose `X-Forwarded-For` is honored for login throttling and audit IPs. Loopback is always trusted, so a same-host proxy needs nothing here; set it only when the proxy is on another host. `X-Forwarded-For` from any peer outside this set is ignored, so a directly-connecting client cannot spoof its source IP. |
 | `SMPP_SERVER_ENABLED` | No | bool | `false` |
 | `SMPP_LISTEN_ADDR` | No | address | `:2775` |
 | `TLS_ENABLED` | No | bool (`true/false`) | `false` |

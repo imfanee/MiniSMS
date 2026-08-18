@@ -149,18 +149,84 @@ func AdminEntryRedirect(pool *pgxpool.Pool, cfg *config.Config) http.HandlerFunc
 	}
 }
 
-// ClientIPString returns a client IP for storage (host part of RemoteAddr or first X-Forwarded-For hop).
-func ClientIPString(r *http.Request) string {
-	if h := r.Header.Get("X-Forwarded-For"); h != "" {
-		p := strings.IndexByte(h, ',')
-		if p > 0 {
-			h = h[:p]
+// trustedProxyNets is the set of peer networks whose X-Forwarded-For header we honor. It starts at
+// loopback and is extended from TRUSTED_PROXIES at startup (SetTrustedProxies). Loopback stays trusted
+// because the app runs behind a same-host reverse proxy.
+var trustedProxyNets = defaultTrustedProxyNets()
+
+func defaultTrustedProxyNets() []*net.IPNet {
+	nets, _ := parseCIDRList([]string{"127.0.0.0/8", "::1/128"})
+	return nets
+}
+
+// SetTrustedProxies extends the trusted-proxy set with the configured CIDRs/IPs (bare IPs become /32 or
+// /128). Loopback always remains trusted. Called once at startup from config; invalid or empty input
+// leaves the loopback-only default in place.
+func SetTrustedProxies(entries []string) {
+	if extra, _ := parseCIDRList(entries); len(extra) > 0 {
+		trustedProxyNets = append(defaultTrustedProxyNets(), extra...)
+	}
+}
+
+func parseCIDRList(entries []string) ([]*net.IPNet, bool) {
+	var out []*net.IPNet
+	saw := false
+	for _, e := range entries {
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
 		}
-		return strings.TrimSpace(h)
+		saw = true
+		if _, n, err := net.ParseCIDR(e); err == nil {
+			out = append(out, n)
+			continue
+		}
+		if ip := net.ParseIP(e); ip != nil {
+			bits := 32
+			if ip.To4() == nil {
+				bits = 128
+			}
+			out = append(out, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+		}
 	}
-	h, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
+	return out, saw
+}
+
+func isTrustedProxy(ip net.IP) bool {
+	for _, n := range trustedProxyNets {
+		if n.Contains(ip) {
+			return true
+		}
 	}
-	return h
+	return false
+}
+
+// ClientIPString returns the client IP for throttling/audit. X-Forwarded-For is honored ONLY when the
+// direct socket peer is a trusted proxy; otherwise the peer is the client and any XFF it sent is
+// ignored, so a directly-connecting client cannot spoof its source IP. When the peer is trusted, the
+// real client is the first address from the right of the XFF list that is not itself a trusted proxy
+// (the reverse proxy appends the true client on the right, so left entries can be attacker-supplied).
+func ClientIPString(r *http.Request) string {
+	peer := r.RemoteAddr
+	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		peer = h
+	}
+	peerIP := net.ParseIP(peer)
+	if peerIP != nil && isTrustedProxy(peerIP) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			for i := len(parts) - 1; i >= 0; i-- {
+				cand := strings.TrimSpace(parts[i])
+				ip := net.ParseIP(cand)
+				if ip == nil {
+					continue
+				}
+				if isTrustedProxy(ip) {
+					continue // a hop inside our own proxy chain; keep walking left
+				}
+				return cand // first untrusted address from the right is the real client
+			}
+		}
+	}
+	return peer
 }

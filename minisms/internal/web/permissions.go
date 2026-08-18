@@ -238,6 +238,14 @@ func RegisterProtectedAdminRoutes(r chi.Router, h *Handlers) {
 		r.Post("/sms-logs/{id}/resend-dlr", h.ResendDLR())
 	})
 
+	// Resend as a new SMS and open the routing simulator prefilled from a log both exercise the send
+	// path, so they sit under the simulate permission rather than plain sms-logs view.
+	r.Group(func(r chi.Router) {
+		r.Use(RequirePerm(adminauth.PermSimulate))
+		r.Get("/sms-logs/{id}/simulate", h.SimulateFromLog())
+		r.Post("/sms-logs/{id}/resend", h.ResendSMSLog())
+	})
+
 	r.Group(func(r chi.Router) {
 		r.Use(RequireSuperAdmin)
 		r.Get("/audit-log", h.ListAuditLog())

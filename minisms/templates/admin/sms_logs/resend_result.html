@@ -1,0 +1,35 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "sms_log_resend_result"}}
+<div class="modal fade show" style="display:block;background:rgba(0,0,0,.6)" tabindex="-1">
+	<div class="modal-dialog modal-dialog-centered">
+		<div class="modal-content border border-2 {{if .OK}}border-success{{else}}border-danger{{end}}">
+			<div class="modal-header">
+				<h5 class="modal-title">Resend SMS</h5>
+				<button type="button" class="btn-close" onclick="document.getElementById('modal-container').innerHTML=''"></button>
+			</div>
+			<div class="modal-body">
+				{{if .OK}}
+				<div class="alert alert-success">The message was resent as a brand new SMS. It was rated, routed and charged like any fresh submission.</div>
+				<dl class="row small mb-0">
+					<dt class="col-sm-4">New Message ID</dt><dd class="col-sm-8 font-monospace">{{.NewMessageID}}</dd>
+					<dt class="col-sm-4">Client</dt><dd class="col-sm-8">{{.Client}}</dd>
+					<dt class="col-sm-4">To</dt><dd class="col-sm-8">{{.To}}</dd>
+					<dt class="col-sm-4">From</dt><dd class="col-sm-8">{{if .From}}{{.From}}{{else}}-{{end}}</dd>
+					<dt class="col-sm-4">Carrier</dt><dd class="col-sm-8">{{if .Carrier}}{{.Carrier}}{{else}}-{{end}}{{if gt .FailoverSequence 0}} <span class="badge bg-warning text-dark">Failover {{.FailoverSequence}}</span>{{end}}</dd>
+					<dt class="col-sm-4">Segments</dt><dd class="col-sm-8">{{.Segments}}</dd>
+					<dt class="col-sm-4">Charged</dt><dd class="col-sm-8">{{.Charged}}</dd>
+					<dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge bg-success">{{.Status}}</span></dd>
+				</dl>
+				{{else}}
+				<div class="alert alert-danger mb-0">Resend failed: {{if .Error}}{{.Error}}{{else}}unknown error{{end}}</div>
+				{{if .NewMessageID}}<p class="small text-secondary mt-2 mb-0">A log was created: <span class="font-monospace">{{.NewMessageID}}</span></p>{{end}}
+				{{end}}
+			</div>
+			<div class="modal-footer">
+				{{if and .OK .NewMessageID}}<a class="btn btn-sm btn-outline-primary" href="/admin/sms-logs/{{.NewMessageID}}" hx-get="/admin/sms-logs/{{.NewMessageID}}" hx-target="#modal-container">View new message</a>{{end}}
+				<button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('modal-container').innerHTML=''">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+{{end}}

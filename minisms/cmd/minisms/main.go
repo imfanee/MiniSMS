@@ -294,6 +294,7 @@ func main() {
 		tfs,
 		"templates/admin/sms_logs/table.html",
 		"templates/admin/sms_logs/detail_modal.html",
+		"templates/admin/sms_logs/resend_result.html",
 		"templates/admin/sms_logs/print.html",
 	)
 	if err != nil {

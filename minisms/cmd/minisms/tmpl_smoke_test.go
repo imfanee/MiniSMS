@@ -27,6 +27,7 @@ func TestSMSLogTemplatesParse(t *testing.T) {
 		minisms.TemplateFS,
 		"templates/admin/sms_logs/table.html",
 		"templates/admin/sms_logs/detail_modal.html",
+		"templates/admin/sms_logs/resend_result.html",
 		"templates/admin/sms_logs/print.html",
 	); err != nil {
 		t.Fatalf("parse sms log fragment templates: %v", err)

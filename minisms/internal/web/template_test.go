@@ -96,6 +96,40 @@ func TestDashboardHealthTemplate(t *testing.T) {
 	}
 }
 
+func TestSMSLogResendResultTemplate(t *testing.T) {
+	tm, err := template.New("resend_result.html").Funcs(TemplateFuncs()).ParseFS(minisms.TemplateFS,
+		"templates/admin/sms_logs/resend_result.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var ok strings.Builder
+	if err := tm.ExecuteTemplate(&ok, "sms_log_resend_result", smsLogResendResult{
+		OK: true, NewMessageID: "new-id-123", Client: "Client X", To: "+10000000000",
+		From: "SENDER", Carrier: "Carrier A", Segments: 1, Charged: "0.05", Status: "accepted",
+	}); err != nil {
+		t.Fatalf("execute resend result (ok): %v", err)
+	}
+	for _, want := range []string{"new-id-123", "Client X", "10000000000", "Carrier A", "View new message"} {
+		if !strings.Contains(ok.String(), want) {
+			t.Fatalf("resend result (ok) missing %q", want)
+		}
+	}
+
+	var bad strings.Builder
+	if err := tm.ExecuteTemplate(&bad, "sms_log_resend_result", smsLogResendResult{
+		Error: "Client is not active; cannot resend.",
+	}); err != nil {
+		t.Fatalf("execute resend result (error): %v", err)
+	}
+	if !strings.Contains(bad.String(), "Resend failed") || !strings.Contains(bad.String(), "cannot resend") {
+		t.Fatalf("resend result (error) missing failure text: %s", bad.String())
+	}
+	if strings.Contains(bad.String(), "View new message") {
+		t.Fatalf("error result must not offer the new-message link")
+	}
+}
+
 func TestLoginAndDashboardTemplates(t *testing.T) {
 	for _, p := range []struct {
 		names []string

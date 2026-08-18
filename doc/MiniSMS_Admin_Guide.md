@@ -841,7 +841,12 @@ The results table shows these columns: Received, Message ID (our internal id), C
 
 The three id columns let you trace one message across all parties: **Message ID** is ours, **Carrier's ID** is the carrier's, and **Client ID** is the client's own reference. Any of them may be blank (shown as `-`) when not yet known or not supplied.
 
-The **Actions** column has two per-row controls: a view (eye) icon that opens the message detail modal (see 9.7), and a copy (clipboard) icon that copies the row's currently visible columns to the clipboard as `Column-Name: Value` lines, one per line, in your chosen column order. Copy respects show/hide and reorder, and always copies the full untruncated id values.
+The **Actions** column has four per-row controls:
+
+- **View** (eye icon): opens the message detail modal (see 9.7).
+- **Resend** (repeat-arrows icon): sends the message again as a brand new SMS, reusing only the original client, sender, destination and text. It runs the full live send path (rating, routing, billing), so it creates a new SMS log and **charges the client again**; a confirmation prompt appears first. The outcome (new Message ID, carrier, segments, charged, status, or the reason it could not be sent) is shown in a modal, with a link to open the new message. It is permission-gated (the `simulate` permission) and audited (`sms.resend`).
+- **Simulate** (wand icon): opens the routing simulator (see the Diagnoses section) pre-filled with this message's client, destination, sender and text, so you can re-run the routing decision for that exact message. Simulation only: no SMS is sent and no log is created. Permission-gated (`simulate`).
+- **Copy** (clipboard icon): copies the row's currently visible columns to the clipboard as `Column-Name: Value` lines, one per line, in your chosen column order. Copy respects show/hide and reorder, and always copies the full untruncated id values.
 
 Fuller DLR fields (`dlr_requested`, `dlr_status`, `dlr_received_at`, `dlr_forward_status`, `dlr_forwarded_at`, and the delivery-receipt details) are shown per message in the detail modal (see 9.7), not as list columns.
 

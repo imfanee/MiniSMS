@@ -7,10 +7,20 @@ import (
 	"math"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 )
 
 var ErrNoRate = errors.New("SMS_ERR_NO_RATE")
+
+// Querier is satisfied by both *pgxpool.Pool and pgx.Tx. Billing read helpers accept it so a caller
+// already inside a transaction runs them on that transaction's connection, never acquiring a SECOND
+// pool connection while holding the first. That nested acquisition is what deadlocked the pool (a tx
+// connection waiting for another connection that the pool cannot hand out under load), so keep these
+// helpers querier-based and pass the active tx when one is open.
+type Querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 type RateEntry struct {
 	RateEntryID string
@@ -27,8 +37,8 @@ var gsm7Runes = func() map[rune]struct{} {
 	return out
 }()
 
-func LookupRate(ctx context.Context, pool *pgxpool.Pool, rateGroupID, destination string) (*RateEntry, error) {
-	rows, err := pool.Query(ctx, `
+func LookupRate(ctx context.Context, q Querier, rateGroupID, destination string) (*RateEntry, error) {
+	rows, err := q.Query(ctx, `
 		SELECT rate_entry_id::text, prefix, rate_per_sms::text
 		FROM v_active_rate_entries
 		WHERE rate_group_id = $1::uuid`, rateGroupID)

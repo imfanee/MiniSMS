@@ -5,12 +5,11 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func LookupCarrierCost(ctx context.Context, pool *pgxpool.Pool, carrierID, destination, fallbackRate string) (string, error) {
+func LookupCarrierCost(ctx context.Context, q Querier, carrierID, destination, fallbackRate string) (string, error) {
 	var rateGroupID *string
-	err := pool.QueryRow(ctx, `SELECT rate_group_id::text FROM carriers WHERE carrier_id = $1::uuid`, carrierID).Scan(&rateGroupID)
+	err := q.QueryRow(ctx, `SELECT rate_group_id::text FROM carriers WHERE carrier_id = $1::uuid`, carrierID).Scan(&rateGroupID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return fallbackRate, nil
@@ -20,7 +19,7 @@ func LookupCarrierCost(ctx context.Context, pool *pgxpool.Pool, carrierID, desti
 	if rateGroupID == nil || *rateGroupID == "" {
 		return fallbackRate, nil
 	}
-	r, err := LookupRate(ctx, pool, *rateGroupID, destination)
+	r, err := LookupRate(ctx, q, *rateGroupID, destination)
 	if err != nil {
 		return fallbackRate, nil
 	}

@@ -188,6 +188,7 @@ MiniSMS reads environment using `godotenv` (`.env` for local/dev).
 | Variable | Required | Format | Example |
 |---|---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL DSN | `postgres://minisms:pass@localhost:5432/minisms?sslmode=disable` |
+| DB connection pool | No | DSN query params | The app sets safe pool defaults in code (`MaxConns=20`, `MinConns=2`, `statement_timeout=30000`ms) so the pool cannot be starved by concurrent admin polling plus API traffic. Override any of them in the DSN, e.g. `...?pool_max_conns=30&pool_min_conns=4&statement_timeout=15000`. Do not drop `MaxConns` near the number of queue workers (`SEND_QUEUE_ENABLED`), or their concurrent polling can starve the web. |
 | `SECRET_KEY` | Yes | 64 hex chars (32 bytes) | `openssl rand -hex 32` |
 | `ADMIN_USERNAME` | Yes | string | Bootstrap super admin username when `admin_users` is empty; required at every startup |
 | `ADMIN_PASSWORD_HASH` | Yes | bcrypt hash | Bootstrap super admin password hash; wrap in single quotes in `.env` if `$` present |

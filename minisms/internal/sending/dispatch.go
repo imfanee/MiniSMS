@@ -172,6 +172,28 @@ func (s *Service) carrierProfile(ctx context.Context, carrierID string) (routeca
 	return p, true
 }
 
+// carrierTemplate returns the carrier's HTTP request template from the in-memory cache (reloaded on
+// admin edit), falling back to a per-message DB read only when the cache has no warmed entry.
+func (s *Service) carrierTemplate(ctx context.Context, carrierID string) (*db.RequestTemplate, error) {
+	if s.Routes != nil {
+		if t, ok := s.Routes.Template(carrierID); ok {
+			return t, nil
+		}
+	}
+	return db.GetRequestTemplate(ctx, s.Pool, carrierID)
+}
+
+// carrierAuthHeaders returns the carrier's decrypted auth headers from the in-memory cache, falling back
+// to a per-message DB read (and decrypt) only when header caching is not active for this cache.
+func (s *Service) carrierAuthHeaders(ctx context.Context, carrierID string) ([]db.AuthHeaderRow, error) {
+	if s.Routes != nil {
+		if h, ok := s.Routes.AuthHeaders(carrierID); ok {
+			return h, nil
+		}
+	}
+	return db.ListAuthHeaders(ctx, s.Pool, carrierID, s.Config.SecretKey)
+}
+
 func (s *Service) trySMPPDispatch(
 	ctx context.Context,
 	out *dispatchOutcome,
@@ -245,7 +267,7 @@ func (s *Service) tryHTTPDispatch(
 	timeout time.Duration,
 	smpp carrier.SMPPParams,
 ) (bool, error) {
-	tpl, err := db.GetRequestTemplate(ctx, s.Pool, c.id)
+	tpl, err := s.carrierTemplate(ctx, c.id)
 	if strings.TrimSpace(endpointURL) == "" {
 		out.LastBody = "carrier HTTP endpoint not configured"
 		return false, nil
@@ -254,7 +276,7 @@ func (s *Service) tryHTTPDispatch(
 		out.LastBody = "carrier template missing"
 		return false, nil
 	}
-	hdrRows, err := db.ListAuthHeaders(ctx, s.Pool, c.id, s.Config.SecretKey)
+	hdrRows, err := s.carrierAuthHeaders(ctx, c.id)
 	if err != nil {
 		out.LastBody = "carrier auth headers unavailable"
 		return false, nil

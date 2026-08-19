@@ -20,6 +20,47 @@ func StampQueued(ctx context.Context, tx pgx.Tx, messageID string, ttl time.Dura
 	return err
 }
 
+// StampSending marks a freshly-created sms_log as in-flight for the SYNCHRONOUS send path and stamps
+// its claim time and validity. The synchronous path has no background reaper, so a crash before finalize
+// leaves a 'sending' row that RecoverStuckSyncSends (run at boot) refunds. Runs inside the reserve tx.
+func StampSending(ctx context.Context, tx pgx.Tx, messageID string, ttl time.Duration) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE sms_logs
+		SET status='sending', claimed_at=now(), expires_at=now() + $2::interval
+		WHERE message_id=$1::uuid`,
+		messageID, ttl.String())
+	return err
+}
+
+// StuckSendingRow identifies a message left in 'sending' by an interrupted synchronous send.
+type StuckSendingRow struct {
+	MessageID    string
+	ClientID     string
+	TotalCharged string
+	Currency     string
+}
+
+// ListStuckSending returns messages still in 'sending' (used only at boot in synchronous mode, where any
+// such row is a leftover from a crash, since no send is in flight yet).
+func ListStuckSending(ctx context.Context, pool *pgxpool.Pool) ([]StuckSendingRow, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT message_id::text, client_id::text, total_charged::text, currency::text
+		FROM sms_logs WHERE status='sending'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []StuckSendingRow
+	for rows.Next() {
+		var r StuckSendingRow
+		if err := rows.Scan(&r.MessageID, &r.ClientID, &r.TotalCharged, &r.Currency); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // QueuedSMS is the data a worker needs to dispatch a claimed message. The client
 // charge is already reserved (total_charged), so dispatch never re-charges the
 // client; it only debits the carrier on success.

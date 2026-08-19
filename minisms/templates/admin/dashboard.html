@@ -12,6 +12,7 @@ window.dashHealthRefresh = window.dashHealthRefresh || function () {
 		on: (localStorage.getItem("dashHealthRefreshOn") || "1") === "1",
 		secs: parseInt(localStorage.getItem("dashHealthRefreshSecs") || "5", 10) || 5,
 		timer: null,
+		busy: false,
 		updated: "",
 		init() {
 			this.$watch("on", (v) => { localStorage.setItem("dashHealthRefreshOn", v ? "1" : "0"); v ? this.start() : this.stop(); });
@@ -20,11 +21,18 @@ window.dashHealthRefresh = window.dashHealthRefresh || function () {
 		},
 		start() {
 			this.stop();
+			this.busy = false;
 			this.timer = setInterval(() => {
 				var c = document.getElementById("dashboard-health-body");
 				if (!c) { this.stop(); return; }
-				if (document.hidden || !window.htmx) return;
-				window.htmx.ajax("GET", "/admin/dashboard/health", { target: "#dashboard-health-body", swap: "innerHTML" });
+				// Skip this tick if the previous poll is still running: the health fragment fans out to
+				// several concurrent DB queries, so overlapping polls under a slow DB would pile up and
+				// exhaust the connection pool. One in-flight request at a time keeps demand bounded.
+				if (document.hidden || !window.htmx || this.busy) return;
+				this.busy = true;
+				Promise.resolve(window.htmx.ajax("GET", "/admin/dashboard/health", { target: "#dashboard-health-body", swap: "innerHTML" }))
+					.catch(() => {})
+					.finally(() => { this.busy = false; });
 			}, Math.max(3, this.secs) * 1000);
 		},
 		stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }

@@ -25,8 +25,8 @@ type LedgerEntryRow struct {
 }
 
 // ListLedgerEntries returns last 100 for carrier, newest first.
-func ListLedgerEntries(ctx context.Context, pool *pgxpool.Pool, carrierID string) ([]LedgerEntryRow, error) {
-	rows, err := pool.Query(ctx, `
+func ListLedgerEntries(ctx context.Context, q rowsQuerier, carrierID string) ([]LedgerEntryRow, error) {
+	rows, err := q.Query(ctx, `
 		SELECT entry_id::text, entry_type, amount::text, direction, balance_after::text, currency::text,
 			payment_reference, invoice_number,
 			CASE WHEN payment_date IS NULL THEN NULL ELSE payment_date::text END,

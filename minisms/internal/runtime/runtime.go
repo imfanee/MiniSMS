@@ -36,6 +36,7 @@ func Start(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) (*App, e
 	egressMgr.Start(ctx)
 
 	routes := routecache.New()
+	routes.SetSecretKey(cfg.SecretKey) // enables cached (decrypted) auth headers; must precede Reload
 	if err := routes.Reload(ctx, pool); err != nil {
 		egressMgr.Stop()
 		return nil, fmt.Errorf("route cache reload: %w", err)
@@ -73,6 +74,12 @@ func Start(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) (*App, e
 		app.Queue = q
 	} else {
 		slog.Info("send queue disabled", "hint", "set SEND_QUEUE_ENABLED=true for async queued dispatch")
+		// The synchronous path reserves the client charge, releases the connection to dispatch, then
+		// finalizes; it has no background reaper, so refund any message left mid-send by a prior crash.
+		// Safe only because the queue is disabled (otherwise 'sending' rows are live worker claims).
+		if _, err := sending.RecoverStuckSyncSends(ctx, sendSvc); err != nil {
+			slog.Warn("sync send recovery failed", "err", err)
+		}
 	}
 
 	if cfg.AcceptedDLRTTLSecs > 0 {

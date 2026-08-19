@@ -157,6 +157,7 @@ func (h *Handlers) CreateAuthHeader() http.HandlerFunc {
 			ServerError(w, r, err, h.Log, h.T500)
 			return
 		}
+		h.reloadRouteCache(r.Context()) // refresh the cached auth headers used by HTTP dispatch
 		row, err := db.GetAuthHeaderRow(r.Context(), h.Pool, cid, hid, h.Config.SecretKey)
 		if err != nil {
 			ServerError(w, r, err, h.Log, h.T500)
@@ -174,6 +175,7 @@ func (h *Handlers) DeleteAuthHeader() http.HandlerFunc {
 		cid := chi.URLParam(r, "id")
 		hid := chi.URLParam(r, "header_id")
 		_, _ = db.DeleteAuthHeader(r.Context(), h.Pool, cid, hid)
+		h.reloadRouteCache(r.Context()) // refresh the cached auth headers used by HTTP dispatch
 		w.WriteHeader(http.StatusOK)
 	}
 }
@@ -370,7 +372,9 @@ func (h *Handlers) RecordPayment() http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 		paymentRef, invoiceNum, _, err := resolvePaymentFields(r.Context(), tx, db.InvoiceEntityCarrier, cid, amt, parsed, errs)
 		if len(errs) > 0 {
-			rows, _ := db.ListLedgerEntries(r.Context(), h.Pool, cid)
+			// Read on tx (not h.Pool): a validation-error render while the tx is still open must not
+			// acquire a second pool connection, or concurrent payments could exhaust and deadlock the pool.
+			rows, _ := db.ListLedgerEntries(r.Context(), tx, cid)
 			w.WriteHeader(422)
 			_ = execT(w, h.CarrFragT, "ledger_panel", ledgerPanelData{
 				Carrier: c, Entries: rows, FormatBal: FormatBalance2dp(c.Balance, c.Currency),

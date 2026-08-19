@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/minisms/minisms/internal/db"
 )
 
 // RouteEntry is an active route row for longest-prefix matching.
@@ -40,21 +42,41 @@ type CarrierProfile struct {
 	SMPPDestAddrNPI        string
 }
 
-// Cache holds routing tables and carrier profiles for fast sends.
+// Cache holds routing tables, carrier profiles, and per-carrier HTTP dispatch config (request template
+// and decrypted auth headers) for fast sends. Caching the template + headers removes two DB round-trips
+// per HTTP send; the cache is reloaded on every carrier/route/template/header admin edit, so it never
+// serves stale config. Balance-sensitive checks (carrier eligibility / in-loss protection) are NOT
+// cached and always hit the DB, so a low-balance carrier is skipped in real time.
 type Cache struct {
-	mu       sync.RWMutex
-	routes   map[string][]RouteEntry
-	carriers map[string]CarrierProfile
+	mu        sync.RWMutex
+	secretKey []byte
+	routes    map[string][]RouteEntry
+	carriers  map[string]CarrierProfile
+	templates map[string]*db.RequestTemplate
+	headers   map[string][]db.AuthHeaderRow
 }
 
 func New() *Cache {
+	// templates/headers stay nil until a successful Reload populates them, so their nil-ness is the
+	// "not warmed" signal: accessors then report a miss and dispatch falls back to a DB read rather than
+	// wrongly treating a carrier as having no template/headers.
 	return &Cache{
 		routes:   make(map[string][]RouteEntry),
 		carriers: make(map[string]CarrierProfile),
 	}
 }
 
-// Reload refreshes all route entries and carrier profiles from PostgreSQL.
+// SetSecretKey provides the AES key used to decrypt cached auth headers. Call once before the first
+// Reload; without it, header caching is skipped and dispatch falls back to a per-message DB read.
+func (c *Cache) SetSecretKey(key []byte) {
+	c.mu.Lock()
+	c.secretKey = key
+	c.mu.Unlock()
+}
+
+// Reload refreshes all route entries, carrier profiles, request templates, and auth headers from
+// PostgreSQL. Header/template loads are best-effort: a failure there does not abort the reload (dispatch
+// falls back to a per-message DB read), so a template/header hiccup never blocks routing config.
 func (c *Cache) Reload(ctx context.Context, pool *pgxpool.Pool) error {
 	routes, err := loadRoutes(ctx, pool)
 	if err != nil {
@@ -64,9 +86,24 @@ func (c *Cache) Reload(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
+	templates, terr := db.ListAllRequestTemplates(ctx, pool)
+	if terr != nil {
+		templates = nil
+	}
+	c.mu.RLock()
+	key := c.secretKey
+	c.mu.RUnlock()
+	var headers map[string][]db.AuthHeaderRow
+	if len(key) > 0 {
+		if h, herr := db.ListAllAuthHeaders(ctx, pool, key); herr == nil {
+			headers = h
+		}
+	}
 	c.mu.Lock()
 	c.routes = routes
 	c.carriers = carriers
+	c.templates = templates
+	c.headers = headers
 	c.mu.Unlock()
 	return nil
 }
@@ -150,6 +187,31 @@ func (c *Cache) Carrier(carrierID string) (CarrierProfile, bool) {
 	p, ok := c.carriers[carrierID]
 	c.mu.RUnlock()
 	return p, ok
+}
+
+// Template returns the cached request template for a carrier. ok is false when the cache has no entry
+// (cache not warmed, or the carrier simply has no template row), so the caller falls back to a DB read
+// that yields the same answer.
+func (c *Cache) Template(carrierID string) (*db.RequestTemplate, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.templates == nil {
+		return nil, false
+	}
+	t, ok := c.templates[carrierID]
+	return t, ok
+}
+
+// AuthHeaders returns the cached, decrypted auth headers for a carrier. ok is false when header caching
+// is not active (no secret key set or the bulk load failed), so the caller falls back to a per-message
+// DB read. When caching is active a carrier with no headers correctly returns (nil, true) - no DB read.
+func (c *Cache) AuthHeaders(carrierID string) ([]db.AuthHeaderRow, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.headers == nil {
+		return nil, false
+	}
+	return c.headers[carrierID], true
 }
 
 func longestPrefix(entries []RouteEntry, destination string) *RouteEntry {

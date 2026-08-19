@@ -260,11 +260,15 @@ func (r *QueueRunner) dispatchOne(ctx context.Context, q db.QueuedSMS) {
 // billing tx fails it forces the message out of the queue anyway (status accepted,
 // carrier-billing miss logged) so a carrier-accepted message is never re-sent.
 func (r *QueueRunner) finalizeSent(ctx context.Context, q db.QueuedSMS, win *dispatchOutcome) {
+	// Compute the carrier cost BEFORE opening the tx so the transaction never acquires a second pool
+	// connection while holding its own. That nested acquisition (a tx connection waiting on the pool for
+	// another connection that busy tx-holding workers will not release) is what deadlocked the whole
+	// service under concurrent sends, with no CPU load and no Postgres deadlock error.
+	carrierCostRate, e1 := billing.LookupCarrierCost(ctx, r.svc.Pool, win.CarrierID, q.To, q.RateApplied)
+	carrierCostTotal, e2 := mulNumeric(ctx, r.svc.Pool, carrierCostRate, segmentsOf(q.Body))
 	tx, err := r.svc.Pool.Begin(ctx)
 	if err == nil {
 		defer func() { _ = tx.Rollback(ctx) }()
-		carrierCostRate, e1 := billing.LookupCarrierCost(ctx, r.svc.Pool, win.CarrierID, q.To, q.RateApplied)
-		carrierCostTotal, e2 := mulNumeric(ctx, r.svc.Pool, carrierCostRate, segmentsOf(q.Body))
 		_, e3 := billing.DeductCarrierBalance(ctx, tx, win.CarrierID, carrierCostTotal, q.Currency, q.MessageID)
 		e4 := billing.IncrementUsage(ctx, tx, win.CarrierID, segmentsOf(q.Body), carrierCostTotal)
 		var smppArr *[4]int16

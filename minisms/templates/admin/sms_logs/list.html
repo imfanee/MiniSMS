@@ -11,6 +11,7 @@ window.smsLogAutoRefresh = window.smsLogAutoRefresh || function () {
 		on: localStorage.getItem("smsLogAutoRefresh") === "1",
 		secs: parseInt(localStorage.getItem("smsLogAutoRefreshSecs") || "10", 10) || 10,
 		timer: null,
+		busy: false,
 		updated: "",
 		init() {
 			this.$watch("on", (v) => {
@@ -25,14 +26,18 @@ window.smsLogAutoRefresh = window.smsLogAutoRefresh || function () {
 		},
 		start() {
 			this.stop();
+			this.busy = false;
 			this.timer = setInterval(() => {
 				// Self-clean if the user has navigated away from the logs page.
 				var c = document.getElementById("log-table-container");
 				if (!c) { this.stop(); return; }
-				if (document.hidden || !window.htmx) return;
-				window.htmx.ajax("GET", window.location.pathname + window.location.search, {
+				// Skip this tick while a previous refresh is still in flight, so a slow DB cannot make
+				// overlapping polls pile up and exhaust the connection pool.
+				if (document.hidden || !window.htmx || this.busy) return;
+				this.busy = true;
+				Promise.resolve(window.htmx.ajax("GET", window.location.pathname + window.location.search, {
 					target: "#log-table-container", swap: "innerHTML"
-				});
+				})).catch(() => {}).finally(() => { this.busy = false; });
 			}, Math.max(3, this.secs) * 1000);
 		},
 		stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }

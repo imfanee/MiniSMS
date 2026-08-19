@@ -44,6 +44,35 @@ func ListAuthHeaders(ctx context.Context, pool *pgxpool.Pool, carrierID string, 
 	return out, rows.Err()
 }
 
+// ListAllAuthHeaders loads and decrypts every carrier's auth headers in one query, keyed by carrier id.
+// Used to warm the in-memory dispatch cache so per-message sends do not re-read and re-decrypt headers.
+func ListAllAuthHeaders(ctx context.Context, pool *pgxpool.Pool, key32 []byte) (map[string][]AuthHeaderRow, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT carrier_id::text, header_id::text, header_name, header_value_enc
+		FROM carrier_auth_headers
+		ORDER BY carrier_id, header_name ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string][]AuthHeaderRow)
+	for rows.Next() {
+		var carrierID string
+		var r AuthHeaderRow
+		var enc string
+		if e := rows.Scan(&carrierID, &r.HeaderID, &r.HeaderName, &enc); e != nil {
+			return nil, e
+		}
+		pt, err := DecryptValue(key32, enc)
+		if err != nil {
+			return nil, err
+		}
+		r.Value = pt
+		out[carrierID] = append(out[carrierID], r)
+	}
+	return out, rows.Err()
+}
+
 // CreateAuthHeader inserts a header with encrypted value.
 func CreateAuthHeader(ctx context.Context, pool *pgxpool.Pool, carrierID, headerName, plainValue string, key32 []byte) (string, error) {
 	enc, err := EncryptValue(key32, plainValue)

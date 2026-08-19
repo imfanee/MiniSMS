@@ -5,8 +5,14 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// rowsQuerier is satisfied by both *pgxpool.Pool and pgx.Tx. Read helpers that a caller may run inside
+// an open transaction take it so they use that tx's connection instead of acquiring a second pool
+// connection (nested acquisition under load deadlocked the pool).
+type rowsQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
 
 type ClientLedgerEntry struct {
 	EntryID      string
@@ -20,8 +26,8 @@ type ClientLedgerEntry struct {
 	CreatedAt    string
 }
 
-func ListClientLedger(ctx context.Context, pool *pgxpool.Pool, clientID string) ([]ClientLedgerEntry, error) {
-	rows, err := pool.Query(ctx, `
+func ListClientLedger(ctx context.Context, q rowsQuerier, clientID string) ([]ClientLedgerEntry, error) {
+	rows, err := q.Query(ctx, `
 		SELECT entry_id::text, entry_type, amount::text, balance_after::text, currency::text, reference, message_id::text, notes,
 			to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		FROM ledger_entries

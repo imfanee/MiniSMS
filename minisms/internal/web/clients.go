@@ -684,7 +684,9 @@ func (h *Handlers) CreditClientBalance() http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 		_, _, clientRef, err := resolvePaymentFields(r.Context(), tx, db.InvoiceEntityClient, id, amount, parsed, errs)
 		if len(errs) > 0 {
-			entries, _ := db.ListClientLedger(r.Context(), h.Pool, id)
+			// Read on tx (not h.Pool): a validation-error render while the tx is still open must not
+			// acquire a second pool connection, or concurrent payments could exhaust and deadlock the pool.
+			entries, _ := db.ListClientLedger(r.Context(), tx, id)
 			render(c, entries, http.StatusUnprocessableEntity)
 			return
 		}

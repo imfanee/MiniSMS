@@ -44,9 +44,11 @@ type SMSLogRow struct {
 	CarrierName      *string
 	FailoverSequence int
 	Status           string
-	ReceivedAt       time.Time
-	CarrierMessageID *string
-	ClientRef        *string
+	ReceivedAt            time.Time
+	CarrierMessageID      *string
+	ClientRef             *string
+	DispatchedSender      *string
+	DispatchedDestination *string
 }
 
 type SMSLogListPage struct {
@@ -455,6 +457,8 @@ var smsLogColumns = []smsLogColumn{
 	{"status", "status", "Status", 16, 0, func(x SMSLogRow) string { return x.Status }},
 	{"carrier_msg_id", "carrier_message_id", "Carrier's ID", 40, 26, func(x SMSLogRow) string { return derefOrDash(x.CarrierMessageID) }},
 	{"client_ref", "client_ref", "Client ID", 34, 22, func(x SMSLogRow) string { return derefOrDash(x.ClientRef) }},
+	{"egress_from", "egress_a_number", "Egress A-Number", 26, 18, func(x SMSLogRow) string { return derefOrDash(x.DispatchedSender) }},
+	{"egress_to", "egress_b_number", "Egress B-Number", 26, 18, func(x SMSLogRow) string { return derefOrDash(x.DispatchedDestination) }},
 }
 
 // selectedSMSLogColumns returns the export columns named by the `cols` query parameter (comma-separated
@@ -503,7 +507,7 @@ func (h *Handlers) querySMSLogs(r *http.Request, f SMSLogFilter) ([]SMSLogRow, i
 	offsetArg := len(args) + 2
 	args = append(args, f.PageSize, (f.Page-1)*f.PageSize)
 	q := fmt.Sprintf(`SELECT sl.message_id::text, c.name, sl.to_number, sl.from_number, sl.segments, sl.total_charged::text, sl.currency::text,
-		ca.name, sl.failover_sequence, sl.status, sl.received_at, sl.carrier_message_id, sl.client_ref %s %s
+		ca.name, sl.failover_sequence, sl.status, sl.received_at, sl.carrier_message_id, sl.client_ref, sl.dispatched_sender, sl.dispatched_destination %s %s
 		ORDER BY sl.received_at DESC LIMIT $%d OFFSET $%d`, baseFrom, whereSQL, limitArg, offsetArg)
 	rows, err := h.Pool.Query(r.Context(), q, args...)
 	if err != nil {
@@ -513,7 +517,7 @@ func (h *Handlers) querySMSLogs(r *http.Request, f SMSLogFilter) ([]SMSLogRow, i
 	var out []SMSLogRow
 	for rows.Next() {
 		var x SMSLogRow
-		if err := rows.Scan(&x.MessageID, &x.ClientName, &x.ToNumber, &x.FromNumber, &x.Segments, &x.TotalCharged, &x.Currency, &x.CarrierName, &x.FailoverSequence, &x.Status, &x.ReceivedAt, &x.CarrierMessageID, &x.ClientRef); err != nil {
+		if err := rows.Scan(&x.MessageID, &x.ClientName, &x.ToNumber, &x.FromNumber, &x.Segments, &x.TotalCharged, &x.Currency, &x.CarrierName, &x.FailoverSequence, &x.Status, &x.ReceivedAt, &x.CarrierMessageID, &x.ClientRef, &x.DispatchedSender, &x.DispatchedDestination); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, x)
@@ -528,7 +532,7 @@ func (h *Handlers) querySMSLogsForExport(r *http.Request, f SMSLogFilter) ([]SMS
 		LEFT JOIN carriers ca ON ca.carrier_id = sl.carrier_id
 		LEFT JOIN routing_groups rg ON rg.routing_group_id = sl.routing_group_id`
 	q := fmt.Sprintf(`SELECT sl.message_id::text, c.name, sl.to_number, sl.from_number, sl.segments, sl.total_charged::text, sl.currency::text,
-		ca.name, sl.failover_sequence, sl.status, sl.received_at, sl.carrier_message_id, sl.client_ref %s %s
+		ca.name, sl.failover_sequence, sl.status, sl.received_at, sl.carrier_message_id, sl.client_ref, sl.dispatched_sender, sl.dispatched_destination %s %s
 		ORDER BY sl.received_at DESC`, baseFrom, whereSQL)
 	rows, err := h.Pool.Query(r.Context(), q, args...)
 	if err != nil {
@@ -538,7 +542,7 @@ func (h *Handlers) querySMSLogsForExport(r *http.Request, f SMSLogFilter) ([]SMS
 	var out []SMSLogRow
 	for rows.Next() {
 		var x SMSLogRow
-		if err := rows.Scan(&x.MessageID, &x.ClientName, &x.ToNumber, &x.FromNumber, &x.Segments, &x.TotalCharged, &x.Currency, &x.CarrierName, &x.FailoverSequence, &x.Status, &x.ReceivedAt, &x.CarrierMessageID, &x.ClientRef); err != nil {
+		if err := rows.Scan(&x.MessageID, &x.ClientName, &x.ToNumber, &x.FromNumber, &x.Segments, &x.TotalCharged, &x.Currency, &x.CarrierName, &x.FailoverSequence, &x.Status, &x.ReceivedAt, &x.CarrierMessageID, &x.ClientRef, &x.DispatchedSender, &x.DispatchedDestination); err != nil {
 			return nil, err
 		}
 		out = append(out, x)

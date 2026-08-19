@@ -3,7 +3,7 @@
 <div class="table-responsive">
 	<table class="table table-sm align-middle">
 		<thead>
-			<tr><th data-col="received">Received</th><th data-col="message_id">Message ID</th><th data-col="client">Client</th><th data-col="to">To</th><th data-col="from">From</th><th data-col="segments">Segments</th><th data-col="charged">Charged</th><th data-col="currency">Currency</th><th data-col="carrier">Carrier</th><th data-col="failover">Failover</th><th data-col="status">Status</th><th data-col="carrier_msg_id">Carrier's ID</th><th data-col="client_ref">Client ID</th><th data-col="actions">Actions</th></tr>
+			<tr><th data-col="received">Received</th><th data-col="message_id">Message ID</th><th data-col="client">Client</th><th data-col="to">To</th><th data-col="from">From</th><th data-col="segments">Segments</th><th data-col="charged">Charged</th><th data-col="currency">Currency</th><th data-col="carrier">Carrier</th><th data-col="failover">Failover</th><th data-col="status">Status</th><th data-col="carrier_msg_id">Carrier's ID</th><th data-col="client_ref">Client ID</th><th data-col="egress_from">Egress A-Number</th><th data-col="egress_to">Egress B-Number</th><th data-col="actions">Actions</th></tr>
 		</thead>
 		<tbody>
 			{{range .Rows}}
@@ -21,6 +21,8 @@
 				<td data-col="status">{{if or (eq .Status "accepted") (eq .Status "sent")}}<span class="badge bg-success">{{.Status}}</span>{{else if eq .Status "delivered"}}<span class="badge bg-primary">{{.Status}}</span>{{else if eq .Status "failed"}}<span class="badge bg-danger">{{.Status}}</span>{{else if eq .Status "rejected"}}<span class="badge bg-secondary">{{.Status}}</span>{{else}}<span class="badge bg-info text-dark">{{.Status}}</span>{{end}}</td>
 				<td data-col="carrier_msg_id">{{if .CarrierMessageID}}<span class="msgid-cell text-truncate d-inline-block align-middle" data-bs-toggle="tooltip" title="{{.CarrierMessageID}}">{{.CarrierMessageID}}</span>{{else}}-{{end}}</td>
 				<td data-col="client_ref">{{if .ClientRef}}<span class="msgid-cell text-truncate d-inline-block align-middle" data-bs-toggle="tooltip" title="{{.ClientRef}}">{{.ClientRef}}</span>{{else}}-{{end}}</td>
+				<td data-col="egress_from">{{if .DispatchedSender}}{{.DispatchedSender}}{{else}}-{{end}}</td>
+				<td data-col="egress_to">{{if .DispatchedDestination}}{{.DispatchedDestination}}{{else}}-{{end}}</td>
 				<td data-col="actions" class="text-nowrap">
 					<a class="text-secondary me-2" href="/admin/sms-logs/{{.MessageID}}" hx-get="/admin/sms-logs/{{.MessageID}}" hx-target="#modal-container" data-bs-toggle="tooltip" title="View details" aria-label="View details"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></svg></a>
 					<button type="button" class="btn btn-link p-0 text-secondary align-baseline me-2" hx-post="/admin/sms-logs/{{.MessageID}}/resend" hx-target="#modal-container" hx-swap="innerHTML" hx-confirm="Resend this SMS as a brand new message? The client will be rated and charged again." data-bs-toggle="tooltip" title="Resend as new SMS" aria-label="Resend as new SMS"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z"/></svg></button>
@@ -29,7 +31,7 @@
 				</td>
 			</tr>
 			{{else}}
-			<tr><td colspan="14" class="text-secondary">No SMS logs found.</td></tr>
+			<tr><td colspan="16" class="text-secondary">No SMS logs found.</td></tr>
 			{{end}}
 		</tbody>
 	</table>

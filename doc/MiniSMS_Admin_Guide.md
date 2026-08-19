@@ -851,7 +851,7 @@ SMS Logs are your primary operational truth source.
 
 ### 9.1 Table columns (including DLR)
 
-The results table shows these columns: Received, Message ID (our internal id), Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Carrier's ID (the id the upstream carrier assigned to the message), Client ID (the reference the client sent with the send request), and Actions. Which columns are shown, and in what order, is up to you (see 9.6); the choice also controls what the CSV/PDF exports contain.
+The results table shows these columns: Received, Message ID (our internal id), Client, To, From, Segments, Charged, Currency, Carrier, Failover, Status, Carrier's ID (the id the upstream carrier assigned to the message), Client ID (the reference the client sent with the send request), Egress A-Number and Egress B-Number (the sender and destination actually sent to the carrier after that carrier's number-translation rules, see 5.7; blank when the message was not dispatched), and Actions. Which columns are shown, and in what order, is up to you (see 9.6); the choice also controls what the CSV/PDF exports contain.
 
 The three id columns let you trace one message across all parties: **Message ID** is ours, **Carrier's ID** is the carrier's, and **Client ID** is the client's own reference. Any of them may be blank (shown as `-`) when not yet known or not supplied.
 

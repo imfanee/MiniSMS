@@ -22,6 +22,7 @@ const (
 	StripDigits       RuleType = "strip_digits"        // remove every digit
 	StripAlpha        RuleType = "strip_alpha"         // remove every letter
 	StripSymbols      RuleType = "strip_symbols"       // remove everything that is not a letter or digit
+	Uppercase         RuleType = "uppercase"           // capitalize all alphabetic characters (letters -> upper case)
 	AddPrefix         RuleType = "add_prefix"          // prepend Prefix when the value does not already start with it
 	RegexReplace      RuleType = "regex_replace"       // replace Pattern with Replacement ($1 / ${name} capture substitution)
 )
@@ -76,7 +77,7 @@ func compileList(rules []Rule) ([]compiledRule, error) {
 	for i, r := range rules {
 		cr := compiledRule{rule: r}
 		switch r.Type {
-		case StripLeadingZeros, StripLeadingPlus, StripDigits, StripAlpha, StripSymbols:
+		case StripLeadingZeros, StripLeadingPlus, StripDigits, StripAlpha, StripSymbols, Uppercase:
 			// no params
 		case AddPrefix:
 			if r.Prefix == "" {
@@ -131,6 +132,8 @@ func (cr compiledRule) apply(in string) string {
 		return removeFunc(in, unicode.IsLetter)
 	case StripSymbols:
 		return removeFunc(in, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	case Uppercase:
+		return strings.ToUpper(in)
 	case AddPrefix:
 		if !strings.HasPrefix(in, cr.rule.Prefix) {
 			return cr.rule.Prefix + in
@@ -161,7 +164,7 @@ func removeFunc(s string, drop func(rune) bool) string {
 // ValidRuleType reports whether t is a supported rule type (for form validation).
 func ValidRuleType(t string) bool {
 	switch RuleType(t) {
-	case StripLeadingZeros, StripLeadingPlus, StripDigits, StripAlpha, StripSymbols, AddPrefix, RegexReplace:
+	case StripLeadingZeros, StripLeadingPlus, StripDigits, StripAlpha, StripSymbols, Uppercase, AddPrefix, RegexReplace:
 		return true
 	}
 	return false

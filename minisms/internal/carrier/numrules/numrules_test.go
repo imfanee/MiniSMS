@@ -26,6 +26,8 @@ func TestIndividualRules(t *testing.T) {
 		{"strip alpha", Rule{Type: StripAlpha}, "AB243CD", "243"},
 		{"strip symbols", Rule{Type: StripSymbols}, "+243 (81) 234-5678", "243812345678"},
 		{"strip symbols keeps alnum", Rule{Type: StripSymbols}, "Mini SMS!", "MiniSMS"},
+		{"uppercase all alpha", Rule{Type: Uppercase}, "BrandX-90", "BRANDX-90"},
+		{"uppercase leaves non-alpha", Rule{Type: Uppercase}, "+243abc", "+243ABC"},
 		{"add prefix missing", Rule{Type: AddPrefix, Prefix: "243"}, "812345", "243812345"},
 		{"add prefix present", Rule{Type: AddPrefix, Prefix: "243"}, "243812345", "243812345"},
 		{"add plus missing", Rule{Type: AddPrefix, Prefix: "+"}, "243812345", "+243812345"},

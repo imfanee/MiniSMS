@@ -277,6 +277,7 @@ Rules are an **ordered list** applied top to bottom, so you compose them. A comm
 
 - **Remove leading zeros** / **Remove leading + sign**
 - **Remove numeric digits** / **Remove alpha characters** / **Remove symbols** (keeps only letters and digits)
+- **Capitalize all alpha** (uppercase every letter, e.g. `BrandX` becomes `BRANDX`; useful on the A-number / Sender ID)
 - **Add prefix if missing** — prepend a value (for example `243`, `00`, or `+`) only when the number does not already start with it
 - **Regex replace** — match a Go regular expression and replace it, using `$1` or `${name}` to substitute captured parts (for example match `^\+?0*(\d+)$` and replace with `00$1`)
 

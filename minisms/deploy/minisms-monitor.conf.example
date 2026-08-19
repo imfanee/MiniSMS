@@ -1,0 +1,33 @@
+# Architected and Developed by :- Faisal Hanif | imfanee@gmail.com.
+# Example config for minisms-monitor.sh. Copy to /etc/minisms-monitor/monitor.conf and `chmod 600`.
+# NEVER commit the real file - it holds the SMTP password. Edit it ON THE SERVER (nano/vi) to avoid
+# Windows CRLF line endings, which corrupt the values.
+
+# Where alerts and the hourly report are sent.
+ALERT_EMAIL=you@example.com
+
+# Optional: alert if the carrier SMPP egress binds drop to 0. Set the port the egress binds use and the
+# expected count. Leave EXPECTED_EGRESS_BINDS at 0 (or omit both) to skip this check.
+# EGRESS_SMPP_PORT=2775
+# EXPECTED_EGRESS_BINDS=8
+
+# --- Email delivery: Gmail SMTP with an App Password ---
+# Use port 587 (STARTTLS). Many hosts block 465, so smtps://...:465 will time out - prefer 587.
+# Generate a 16-character App Password (Google account -> Security -> App passwords; needs 2-Step
+# Verification) and paste it with NO spaces and NO dashes.
+# SMTP_URL=smtp://smtp.gmail.com:587
+# SMTP_USER=you@example.com
+# SMTP_PASS=your16charapppwd
+# MAIL_FROM=you@example.com
+
+# Thresholds (defaults shown; uncomment to override):
+# HEALTHZ_URL=http://127.0.0.1:8080/healthz
+# PG_SERVICE=postgresql@15-main
+# PROBES=11
+# PROBE_GAP=5
+# HEALTHZ_FAIL_THRESHOLD=3
+# CPU_LOAD_FACTOR=2.0
+# MEM_AVAIL_MIN_PCT=10
+# DISK_MAX_PCT=90
+# REPORT_INTERVAL_MIN=60
+# REALERT_INTERVAL_MIN=15

@@ -682,6 +682,22 @@ Fields: `in_flight_requests` (concurrent HTTP requests), `db_conns_in_use` / `db
 - Carrier callback volume drops unexpectedly (possible carrier callback outage)
 - Low client balances and low carrier balances crossing configured thresholds
 
+### 10.5 External host watchdog (email alerts)
+
+`deploy/minisms-monitor.sh` is a standalone cron watchdog (bash + curl, no other deps) that runs outside the app. Each minute it probes `/healthz` every few seconds and checks OS logs (kernel OOM, failed systemd units), CPU load, memory, disk, PostgreSQL (service + `SELECT 1`), the MiniSMS service, and optionally the SMPP egress binds. It emails an alert on any abnormality (repeated every `REALERT_INTERVAL_MIN` until it clears), a recovery notice when it clears, and an hourly "all normal" report otherwise; without SMTP settings it still logs every event locally.
+
+Install:
+
+```bash
+install -m 0755 deploy/minisms-monitor.sh /usr/local/bin/minisms-monitor.sh
+mkdir -p /etc/minisms-monitor
+install -m 0600 deploy/minisms-monitor.conf.example /etc/minisms-monitor/monitor.conf
+# edit /etc/minisms-monitor/monitor.conf ON THE SERVER (avoid Windows CRLF), fill ALERT_EMAIL + SMTP_*
+( crontab -l 2>/dev/null | grep -v minisms-monitor.sh; echo '* * * * * /usr/local/bin/minisms-monitor.sh' ) | crontab -
+```
+
+Email uses an authenticated SMTP relay (a bare local MTA is spam-filtered from a server IP). For Gmail: an App Password over `smtp://smtp.gmail.com:587` (STARTTLS); port 465 is blocked on many hosts and will time out. Log at `/var/log/minisms-monitor.log`, state in `/var/lib/minisms-monitor/`. The real `monitor.conf` holds the SMTP password and is never committed.
+
 ## 11. Troubleshooting
 
 Format: symptom -> cause -> diagnostic -> fix.

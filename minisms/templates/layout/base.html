@@ -71,7 +71,9 @@
 		});
 		document.addEventListener("htmx:afterSwap", function (e) {
 			var el = (e && e.detail && (e.detail.elt || e.detail.target)) || e.target;
-			if (window.Alpine && el) Alpine.initTree(el);
+			// NOTE: do NOT call Alpine.initTree(el) here. Alpine v3's MutationObserver already initializes
+			// HTMX-swapped DOM, so a manual initTree processes every x-for/x-data in the swapped fragment a
+			// SECOND time, duplicating x-for output (this doubled the carrier Number Rules A/B columns).
 			msSweepOrphanTooltips();
 			msInitTooltips(el || document);
 		});

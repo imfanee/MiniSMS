@@ -16,50 +16,84 @@
 		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}">
 		<input type="hidden" name="rules_json" :value="serialize()">
 		<div class="row g-3">
-			<template x-for="list in ['sender','destination']" :key="list">
-				<div class="col-lg-6">
-					<div class="card h-100">
-						<div class="card-header d-flex align-items-center">
-							<strong x-text="list === 'sender' ? 'A-number — Sender ID' : 'B-number — Destination'"></strong>
-							<button type="button" class="btn btn-sm btn-outline-primary ms-auto" @click="add(list)">+ Add rule</button>
-						</div>
-						<div class="card-body">
-							<template x-if="me(list).length === 0">
-								<div class="text-secondary small">No rules — numbers pass through unchanged.</div>
-							</template>
-							<template x-for="(rule, i) in me(list)" :key="i">
-								<div class="border rounded p-2 mb-2 bg-body-tertiary">
-									<div class="d-flex align-items-center gap-2 mb-2">
-										<span class="badge bg-secondary" x-text="i + 1"></span>
-										<select class="form-select form-select-sm" x-model="rule.type">
-											<template x-for="t in types" :key="t.v">
-												<option :value="t.v" x-text="t.label"></option>
-											</template>
-										</select>
-										<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move(list, i, -1)" :disabled="i===0" title="Move up">&uarr;</button>
-										<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move(list, i, 1)" :disabled="i===me(list).length-1" title="Move down">&darr;</button>
-										<button type="button" class="btn btn-sm btn-link p-0 px-1 text-danger" @click="remove(list, i)" title="Remove">&times;</button>
+			<!-- A-number (Sender ID) -->
+			<div class="col-lg-6">
+				<div class="card h-100">
+					<div class="card-header d-flex align-items-center">
+						<strong>A-number &mdash; Sender ID</strong>
+						<button type="button" class="btn btn-sm btn-outline-primary ms-auto" @click="add('sender')">+ Add rule</button>
+					</div>
+					<div class="card-body">
+						<div class="text-secondary small" x-show="sender.length === 0">No rules &mdash; the sender passes through unchanged.</div>
+						<template x-for="(rule, i) in sender" :key="i">
+							<div class="border rounded p-2 mb-2 bg-body-tertiary">
+								<div class="d-flex align-items-center gap-2 mb-2">
+									<span class="badge bg-secondary" x-text="i + 1"></span>
+									<select class="form-select form-select-sm" x-model="rule.type">
+										<template x-for="t in types" :key="t.v"><option :value="t.v" x-text="t.label"></option></template>
+									</select>
+									<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move('sender', i, -1)" :disabled="i===0" title="Move up">&uarr;</button>
+									<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move('sender', i, 1)" :disabled="i===sender.length-1" title="Move down">&darr;</button>
+									<button type="button" class="btn btn-sm btn-link p-0 px-1 text-danger" @click="remove('sender', i)" title="Remove">&times;</button>
+								</div>
+								<div x-show="rule.type === 'add_prefix'">
+									<label class="form-label small mb-1">Prefix to add if missing</label>
+									<input type="text" class="form-control form-control-sm" x-model="rule.prefix" placeholder="e.g. 243, 00, or +">
+								</div>
+								<div x-show="rule.type === 'regex_replace'" class="row g-2">
+									<div class="col-12">
+										<label class="form-label small mb-1">Match (Go RE2 pattern)</label>
+										<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.pattern" placeholder="^\+?0*(\d+)$">
 									</div>
-									<div x-show="rule.type === 'add_prefix'">
-										<label class="form-label small mb-1">Prefix to add if missing</label>
-										<input type="text" class="form-control form-control-sm" x-model="rule.prefix" placeholder="e.g. 243, 00, or +">
-									</div>
-									<div x-show="rule.type === 'regex_replace'" class="row g-2">
-										<div class="col-12">
-											<label class="form-label small mb-1">Match (Go RE2 pattern)</label>
-											<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.pattern" placeholder="^\+?0*(\d+)$">
-										</div>
-										<div class="col-12">
-											<label class="form-label small mb-1">Replace with (use $1 / ${name} for captures)</label>
-											<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.replacement" placeholder="00$1">
-										</div>
+									<div class="col-12">
+										<label class="form-label small mb-1">Replace with (use $1 / ${name} for captures)</label>
+										<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.replacement" placeholder="00$1">
 									</div>
 								</div>
-							</template>
-						</div>
+							</div>
+						</template>
 					</div>
 				</div>
-			</template>
+			</div>
+			<!-- B-number (Destination) -->
+			<div class="col-lg-6">
+				<div class="card h-100">
+					<div class="card-header d-flex align-items-center">
+						<strong>B-number &mdash; Destination</strong>
+						<button type="button" class="btn btn-sm btn-outline-primary ms-auto" @click="add('destination')">+ Add rule</button>
+					</div>
+					<div class="card-body">
+						<div class="text-secondary small" x-show="destination.length === 0">No rules &mdash; the destination passes through unchanged.</div>
+						<template x-for="(rule, i) in destination" :key="i">
+							<div class="border rounded p-2 mb-2 bg-body-tertiary">
+								<div class="d-flex align-items-center gap-2 mb-2">
+									<span class="badge bg-secondary" x-text="i + 1"></span>
+									<select class="form-select form-select-sm" x-model="rule.type">
+										<template x-for="t in types" :key="t.v"><option :value="t.v" x-text="t.label"></option></template>
+									</select>
+									<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move('destination', i, -1)" :disabled="i===0" title="Move up">&uarr;</button>
+									<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move('destination', i, 1)" :disabled="i===destination.length-1" title="Move down">&darr;</button>
+									<button type="button" class="btn btn-sm btn-link p-0 px-1 text-danger" @click="remove('destination', i)" title="Remove">&times;</button>
+								</div>
+								<div x-show="rule.type === 'add_prefix'">
+									<label class="form-label small mb-1">Prefix to add if missing</label>
+									<input type="text" class="form-control form-control-sm" x-model="rule.prefix" placeholder="e.g. 243, 00, or +">
+								</div>
+								<div x-show="rule.type === 'regex_replace'" class="row g-2">
+									<div class="col-12">
+										<label class="form-label small mb-1">Match (Go RE2 pattern)</label>
+										<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.pattern" placeholder="^\+?0*(\d+)$">
+									</div>
+									<div class="col-12">
+										<label class="form-label small mb-1">Replace with (use $1 / ${name} for captures)</label>
+										<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.replacement" placeholder="00$1">
+									</div>
+								</div>
+							</div>
+						</template>
+					</div>
+				</div>
+			</div>
 		</div>
 		<button type="submit" class="btn btn-primary btn-sm mt-3">Save rules</button>
 	</form>
@@ -105,10 +139,10 @@ function numberRules(seed) {
 			{ v: 'add_prefix', label: 'Add prefix if missing' },
 			{ v: 'regex_replace', label: 'Regex replace (capture groups)' }
 		],
-		me: function (list) { return list === 'sender' ? this.sender : this.destination; },
-		add: function (list) { this.me(list).push(norm({})); },
-		remove: function (list, i) { this.me(list).splice(i, 1); },
-		move: function (list, i, d) { var a = this.me(list); var j = i + d; if (j < 0 || j >= a.length) return; var t = a[i]; a[i] = a[j]; a[j] = t; },
+		listRef: function (list) { return list === 'sender' ? this.sender : this.destination; },
+		add: function (list) { this.listRef(list).push(norm({})); },
+		remove: function (list, i) { this.listRef(list).splice(i, 1); },
+		move: function (list, i, d) { var a = this.listRef(list); var j = i + d; if (j < 0 || j >= a.length) return; var t = a[i]; a[i] = a[j]; a[j] = t; },
 		serialize: function () {
 			var clean = function (r) {
 				var o = { type: r.type };

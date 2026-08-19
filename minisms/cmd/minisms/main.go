@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,11 +20,12 @@ import (
 	"github.com/minisms/minisms"
 	"github.com/minisms/minisms/internal/api"
 	"github.com/minisms/minisms/internal/carrier"
-	"github.com/minisms/minisms/internal/wirelog"
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/runtime"
+	"github.com/minisms/minisms/internal/watchdog"
 	"github.com/minisms/minisms/internal/web"
+	"github.com/minisms/minisms/internal/wirelog"
 )
 
 var (
@@ -385,36 +388,36 @@ func main() {
 	}
 
 	h := &web.Handlers{
-		Config:        cfg,
-		Pool:          pool,
-		Log:           log,
-		LoginT:        loginT,
-		DashT:         dashT,
-		SimulateT:     simulateT,
-		CarrListT:     carrierListT,
-		CarrDetT:      carrierDetT,
-		CarrFragT:     carrierFragT,
-		SMPPLogsT:     carrierSMPPLogsT,
-		RGListT:       rateGroupListT,
-		RGDetT:        rateGroupDetT,
-		RGFragT:       rateGroupFragT,
-		ROGListT:      routingGroupListT,
-		ROGDetT:       routingGroupDetT,
-		ROGFragT:      routingGroupFragT,
-		CLIListT:      clientListT,
-		CLIDetT:       clientDetT,
-		CLIFragT:      clientFragT,
-		DashFragT:     dashFragT,
-		SMSLogT:       smsLogT,
-		SMSLogFragT:   smsLogFragT,
-		AuditT:        auditLogT,
-		SettingsT:        settingsT,
-		SettingsFragT:    settingsFragT,
-		AdminUsersListT:  adminUsersListT,
-		AdminUsersFormT:  adminUsersFormT,
-		CurrenciesT:      currenciesT,
-		SenderIDsT:       senderIDsT,
-		T500:             t500,
+		Config:          cfg,
+		Pool:            pool,
+		Log:             log,
+		LoginT:          loginT,
+		DashT:           dashT,
+		SimulateT:       simulateT,
+		CarrListT:       carrierListT,
+		CarrDetT:        carrierDetT,
+		CarrFragT:       carrierFragT,
+		SMPPLogsT:       carrierSMPPLogsT,
+		RGListT:         rateGroupListT,
+		RGDetT:          rateGroupDetT,
+		RGFragT:         rateGroupFragT,
+		ROGListT:        routingGroupListT,
+		ROGDetT:         routingGroupDetT,
+		ROGFragT:        routingGroupFragT,
+		CLIListT:        clientListT,
+		CLIDetT:         clientDetT,
+		CLIFragT:        clientFragT,
+		DashFragT:       dashFragT,
+		SMSLogT:         smsLogT,
+		SMSLogFragT:     smsLogFragT,
+		AuditT:          auditLogT,
+		SettingsT:       settingsT,
+		SettingsFragT:   settingsFragT,
+		AdminUsersListT: adminUsersListT,
+		AdminUsersFormT: adminUsersFormT,
+		CurrenciesT:     currenciesT,
+		SenderIDsT:      senderIDsT,
+		T500:            t500,
 	}
 	app, err := runtime.Start(ctx, pool, cfg)
 	if err != nil {
@@ -440,6 +443,12 @@ func main() {
 	}
 	r := chi.NewRouter()
 	r.Use(web.WithRequestID)
+	r.Use(watchdog.Middleware) // count in-flight requests for the load watchdog
+
+	// Live load/capacity watchdog: periodically logs in-flight requests, DB pool usage + acquire-waits,
+	// CPU and RSS. Enabled by default; tune with WATCHDOG_INTERVAL_S (0 disables).
+	watchdogInterval := time.Duration(envIntDefault("WATCHDOG_INTERVAL_S", 30)) * time.Second
+	watchdog.Start(ctx, pool, watchdogInterval, newLoggerAt(slog.LevelInfo)) // always emit stats regardless of LOG_LEVEL
 
 	entryRedirect := web.AdminEntryRedirect(pool, cfg)
 	r.Get("/", entryRedirect)
@@ -541,11 +550,27 @@ func newLogger(level string) *slog.Logger {
 	default:
 		lv = slog.LevelInfo
 	}
+	return newLoggerAt(lv)
+}
+
+// newLoggerAt builds a logger at a fixed level, matching the app's output format. Used for the watchdog
+// so its periodic stats are always emitted even when LOG_LEVEL is raised to warn/error.
+func newLoggerAt(lv slog.Level) *slog.Logger {
 	opts := &slog.HandlerOptions{Level: lv}
 	if os.Getenv("APP_ENV") == "production" {
 		return slog.New(slog.NewJSONHandler(os.Stdout, opts))
 	}
 	return slog.New(slog.NewTextHandler(os.Stdout, opts))
+}
+
+// envIntDefault reads a non-negative integer env var, or returns def when unset/invalid.
+func envIntDefault(name string, def int) int {
+	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
+		}
+	}
+	return def
 }
 
 func parseTemplateFS(fsys fs.FS, patterns ...string) (*template.Template, error) {

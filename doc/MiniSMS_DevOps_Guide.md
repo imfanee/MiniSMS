@@ -189,6 +189,9 @@ MiniSMS reads environment using `godotenv` (`.env` for local/dev).
 |---|---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL DSN | `postgres://minisms:pass@localhost:5432/minisms?sslmode=disable` |
 | DB connection pool | No | DSN query params | The app sets safe pool defaults in code (`MaxConns=20`, `MinConns=2`, `statement_timeout=30000`ms) so the pool cannot be starved by concurrent admin polling plus API traffic. Override any of them in the DSN, e.g. `...?pool_max_conns=30&pool_min_conns=4&statement_timeout=15000`. Do not drop `MaxConns` near the number of queue workers (`SEND_QUEUE_ENABLED`), or their concurrent polling can starve the web. |
+| `DB_MAX_CONNS` | No | integer | Pool max connections when the DSN has no `pool_max_conns` (default 20). Keep it safely below PostgreSQL `max_connections`, leaving headroom for psql/admin/monitoring (e.g. app 200 with server 250). |
+| `DB_MIN_CONNS` | No | integer | Pool warm/min connections (default 2). Raise (e.g. 10) to pre-warm connections for bursty load. |
+| `WATCHDOG_INTERVAL_S` | No | integer seconds | Load/capacity watchdog log interval (default 30; `0` disables). Emits an INFO `watchdog` line with `in_flight_requests`, `db_conns_in_use/idle/total/max`, `db_acquire_waits` (pool-pressure signal), `cpu_cores_used`/`cpu_pct`, `rss_mb`, `goroutines` regardless of `LOG_LEVEL`. Tail with `journalctl -u minisms -f | grep watchdog`. |
 | `SECRET_KEY` | Yes | 64 hex chars (32 bytes) | `openssl rand -hex 32` |
 | `ADMIN_USERNAME` | Yes | string | Bootstrap super admin username when `admin_users` is empty; required at every startup |
 | `ADMIN_PASSWORD_HASH` | Yes | bcrypt hash | Bootstrap super admin password hash; wrap in single quotes in `.env` if `$` present |

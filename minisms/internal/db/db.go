@@ -4,6 +4,8 @@ package db
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,11 +48,15 @@ func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 // already specified (pgxpool.ParseConfig has already applied those). Kept as a pure function so the
 // sizing policy is unit-tested without a live database.
 func applyPoolDefaults(cfg *pgxpool.Config, databaseURL string) {
+	// DB_MAX_CONNS / DB_MIN_CONNS env vars tune the pool for a given host without editing the DSN; a
+	// pool_* param in the DSN still wins (it was already applied by ParseConfig). Keep MaxConns safely
+	// below the server's max_connections, leaving headroom for psql/admin/monitoring.
 	if !strings.Contains(databaseURL, "pool_max_conns") {
-		cfg.MaxConns = defaultPoolMaxConns
+		cfg.MaxConns = int32(envIntDefault("DB_MAX_CONNS", defaultPoolMaxConns))
 	}
-	if !strings.Contains(databaseURL, "pool_min_conns") && cfg.MinConns < defaultPoolMinConns {
-		cfg.MinConns = defaultPoolMinConns
+	minConns := envIntDefault("DB_MIN_CONNS", defaultPoolMinConns)
+	if !strings.Contains(databaseURL, "pool_min_conns") && int(cfg.MinConns) < minConns {
+		cfg.MinConns = int32(minConns)
 	}
 	// Keep pool hygiene sane (pgx defaults are already 1h / 30m / 1m, but be explicit and never leave
 	// MaxConns below MinConns if a DSN set an odd combination).
@@ -72,4 +78,14 @@ func applyPoolDefaults(cfg *pgxpool.Config, databaseURL string) {
 	if _, ok := cfg.ConnConfig.RuntimeParams["statement_timeout"]; !ok {
 		cfg.ConnConfig.RuntimeParams["statement_timeout"] = defaultStatementTimeoutMS
 	}
+}
+
+// envIntDefault reads a positive integer env var, or returns def when unset/invalid.
+func envIntDefault(name string, def int) int {
+	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
 }

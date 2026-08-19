@@ -15,7 +15,10 @@ import (
 	"github.com/minisms/minisms/internal/db"
 )
 
-var simulateE164Re = regexp.MustCompile(`^\+[1-9]\d{6,14}$`)
+// The leading + is optional: browsers/HTMX post the field as x-www-form-urlencoded, where a literal '+'
+// decodes to a space (then trimmed), so requiring '+' wrongly rejected numbers the operator typed with
+// one. Routing/rating normalize to digits anyway, and a genuine '+' is preserved when it survives.
+var simulateE164Re = regexp.MustCompile(`^\+?[1-9]\d{6,14}$`)
 
 type simulatePage struct {
 	AdminView

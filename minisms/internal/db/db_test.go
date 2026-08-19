@@ -62,3 +62,20 @@ func TestApplyPoolDefaults(t *testing.T) {
 		}
 	})
 }
+
+func TestApplyPoolDefaultsEnvOverride(t *testing.T) {
+	t.Setenv("DB_MAX_CONNS", "200")
+	t.Setenv("DB_MIN_CONNS", "10")
+	dsn := "postgres://u:p@localhost:5432/db"
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	applyPoolDefaults(cfg, dsn)
+	if cfg.MaxConns != 200 {
+		t.Errorf("MaxConns=%d want 200 (DB_MAX_CONNS)", cfg.MaxConns)
+	}
+	if cfg.MinConns != 10 {
+		t.Errorf("MinConns=%d want 10 (DB_MIN_CONNS)", cfg.MinConns)
+	}
+}

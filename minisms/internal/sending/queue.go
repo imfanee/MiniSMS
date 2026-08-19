@@ -276,7 +276,7 @@ func (r *QueueRunner) finalizeSent(ctx context.Context, q db.QueuedSMS, win *dis
 			tmp := [4]int16{*win.SourceAddrTON, *win.SourceAddrNPI, *win.DestAddrTON, *win.DestAddrNPI}
 			smppArr = &tmp
 		}
-		e5 := db.MarkSMSAccepted(ctx, tx, q.MessageID, win.CarrierID, win.FailoverSequence, win.CarrierMessageID, win.LastBodyText, win.StatusCode, smppArr, egressTransportString(win.Egress))
+		e5 := db.MarkSMSAccepted(ctx, tx, q.MessageID, win.CarrierID, win.FailoverSequence, win.CarrierMessageID, win.LastBodyText, win.StatusCode, smppArr, egressTransportString(win.Egress), win.DispatchedSender, win.DispatchedDestination)
 		e6 := db.AppendSMSEventTimeline(ctx, tx, q.MessageID, win.Timeline...)
 		if e1 == nil && e2 == nil && e3 == nil && e4 == nil && e5 == nil && e6 == nil {
 			if err := tx.Commit(ctx); err == nil {

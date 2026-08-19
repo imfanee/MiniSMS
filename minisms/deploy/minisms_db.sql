@@ -1527,3 +1527,18 @@ ALTER TABLE route_entries
     DROP CONSTRAINT IF EXISTS chk_route_entries_weights,
     ADD  CONSTRAINT chk_route_entries_weights
         CHECK (primary_weight BETWEEN 0 AND 1000 AND failover1_weight BETWEEN 0 AND 1000 AND failover2_weight BETWEEN 0 AND 1000);
+
+-- >>> 005_number_rules.up.sql <<<
+-- Per-carrier number translation/manipulation rules, plus the transformed values actually dispatched.
+-- Additive and backward-compatible: a carrier with '{}' rules dispatches numbers unchanged, and
+-- dispatched_sender/dispatched_destination stay NULL until a message is dispatched with rules applied.
+-- Apply on prod with `make schema DB_URL=...` (rehearse on a restored copy first).
+
+-- carriers.number_rules: {"sender":[{type,...}], "destination":[{type,...}]} applied in list order to
+-- the A-number (sender ID) and B-number (destination) just before the carrier request is built.
+ALTER TABLE carriers ADD COLUMN IF NOT EXISTS number_rules JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- sms_logs: keep the client's original from_number/to_number AND record what was actually sent to the
+-- winning carrier after its number rules (NULL when no transform was applied).
+ALTER TABLE sms_logs ADD COLUMN IF NOT EXISTS dispatched_sender      TEXT DEFAULT NULL;
+ALTER TABLE sms_logs ADD COLUMN IF NOT EXISTS dispatched_destination TEXT DEFAULT NULL;

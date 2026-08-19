@@ -142,6 +142,7 @@ func main() {
 		"templates/admin/carriers/template_form.html",
 		"templates/admin/carriers/dlr_panel.html",
 		"templates/admin/carriers/smpp_addressing_panel.html",
+		"templates/admin/carriers/number_rules_panel.html",
 		"templates/admin/carriers/smpp_panel.html",
 		"templates/admin/carriers/interconnect_panel.html",
 		"templates/admin/carriers/http_interconnect_panel.html",

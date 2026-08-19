@@ -74,7 +74,7 @@ func CreateSMSLog(ctx context.Context, tx pgx.Tx, in SMSLog) (string, error) {
 	return id, err
 }
 
-func MarkSMSAccepted(ctx context.Context, tx pgx.Tx, messageID, carrierID string, failoverSequence int, carrierMessageID, carrierResponseBody string, carrierResponseCode int, tonNPI *[4]int16, egressTransport string) error {
+func MarkSMSAccepted(ctx context.Context, tx pgx.Tx, messageID, carrierID string, failoverSequence int, carrierMessageID, carrierResponseBody string, carrierResponseCode int, tonNPI *[4]int16, egressTransport, dispatchedSender, dispatchedDestination string) error {
 	var sourceTON, sourceNPI, destTON, destNPI *int16
 	if tonNPI != nil {
 		sourceTON, sourceNPI, destTON, destNPI = &tonNPI[0], &tonNPI[1], &tonNPI[2], &tonNPI[3]
@@ -92,10 +92,12 @@ func MarkSMSAccepted(ctx context.Context, tx pgx.Tx, messageID, carrierID string
 			dest_addr_ton=$9,
 			dest_addr_npi=$10,
 			egress_transport=COALESCE(NULLIF($11, ''), 'http'),
+			dispatched_sender=NULLIF($12, ''),
+			dispatched_destination=NULLIF($13, ''),
 			dispatched_at=now()
 		WHERE message_id=$6::uuid`,
 		carrierID, failoverSequence, carrierMessageID, carrierResponseCode, carrierResponseBody, messageID,
-		sourceTON, sourceNPI, destTON, destNPI, egressTransport)
+		sourceTON, sourceNPI, destTON, destNPI, egressTransport, dispatchedSender, dispatchedDestination)
 	return err
 }
 

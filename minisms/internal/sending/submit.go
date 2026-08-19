@@ -207,7 +207,7 @@ func (s *Service) finalizeSendAccepted(ctx context.Context, logID string, client
 	}
 	_, e1 := billing.DeductCarrierBalance(ctx, tx, win.CarrierID, carrierCostTotal, client.Currency, logID)
 	e2 := billing.IncrementUsage(ctx, tx, win.CarrierID, segments, carrierCostTotal)
-	e3 := db.MarkSMSAccepted(ctx, tx, logID, win.CarrierID, win.FailoverSequence, win.CarrierMessageID, win.LastBodyText, win.StatusCode, smppArr, egressTransportString(win.Egress))
+	e3 := db.MarkSMSAccepted(ctx, tx, logID, win.CarrierID, win.FailoverSequence, win.CarrierMessageID, win.LastBodyText, win.StatusCode, smppArr, egressTransportString(win.Egress), win.DispatchedSender, win.DispatchedDestination)
 	e4 := db.AppendSMSEventTimeline(ctx, tx, logID, win.Timeline...)
 	if e1 == nil && e2 == nil && e3 == nil && e4 == nil {
 		if err := tx.Commit(ctx); err == nil {

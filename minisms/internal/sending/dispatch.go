@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minisms/minisms/internal/billing"
 	"github.com/minisms/minisms/internal/carrier"
+	"github.com/minisms/minisms/internal/carrier/numrules"
 	"github.com/minisms/minisms/internal/config"
 	"github.com/minisms/minisms/internal/db"
 	"github.com/minisms/minisms/internal/routecache"
@@ -81,12 +82,24 @@ func (s *Service) dispatchWithFailover(
 			))
 			continue
 		}
+		// Apply this carrier's number-translation rules to the A-number (sender) and B-number
+		// (destination) just before building the request. The transformed values are what actually go
+		// to the carrier (and are recorded on the sms_log as dispatched_sender/destination); TON/NPI is
+		// resolved from the transformed values so the numbering plan matches what is sent.
+		rules := s.carrierNumberRules(ctx, c.id)
+		dispatchSender := rules.Sender(effectiveSenderID)
+		dispatchMsg := msg
+		dispatchMsg.From = dispatchSender
+		dispatchMsg.To = rules.Destination(msg.To)
+		out.DispatchedSender = dispatchSender
+		out.DispatchedDestination = dispatchMsg.To
+
 		smppResolved := carrier.ResolveTONNPI(carrier.SMPPConfig{
 			SourceAddrTON: prof.SMPPSourceAddrTON,
 			SourceAddrNPI: prof.SMPPSourceAddrNPI,
 			DestAddrTON:   prof.SMPPDestAddrTON,
 			DestAddrNPI:   prof.SMPPDestAddrNPI,
-		}, effectiveSenderID, msg.To)
+		}, dispatchSender, dispatchMsg.To)
 
 		attempts := egressAttempts(egressTransport)
 		for _, mode := range attempts {
@@ -104,9 +117,9 @@ func (s *Service) dispatchWithFailover(
 			var ok bool
 			switch mode {
 			case EgressSMPP:
-				ok, err = s.trySMPPDispatch(ctx, out, c, carrierName, messageID, effectiveSenderID, msg, encoding, segments, timeout, smppResolved)
+				ok, err = s.trySMPPDispatch(ctx, out, c, carrierName, messageID, dispatchSender, dispatchMsg, encoding, segments, timeout, smppResolved)
 			case EgressHTTP:
-				ok, err = s.tryHTTPDispatch(ctx, out, c, carrierName, messageID, clientID, effectiveSenderID, msg, method, endpointURL, dlrCallbackURLTemplate, timeout, smppResolved)
+				ok, err = s.tryHTTPDispatch(ctx, out, c, carrierName, messageID, clientID, dispatchSender, dispatchMsg, method, endpointURL, dlrCallbackURLTemplate, timeout, smppResolved)
 			}
 			recordCarrierResponseTimeline(out, carrierName, c.n, ok)
 			if ok {
@@ -123,7 +136,7 @@ func (s *Service) dispatchWithFailover(
 					"",
 					map[string]any{
 						"carrier_id": c.id, "carrier_name": carrierName,
-						"failover_sequence": c.n,
+						"failover_sequence":  c.n,
 						"carrier_message_id": out.CarrierMessageID,
 					},
 				))
@@ -192,6 +205,26 @@ func (s *Service) carrierAuthHeaders(ctx context.Context, carrierID string) ([]d
 		}
 	}
 	return db.ListAuthHeaders(ctx, s.Pool, carrierID, s.Config.SecretKey)
+}
+
+// carrierNumberRules returns the carrier's compiled number-translation rules from the in-memory cache,
+// falling back to a per-message DB read + compile only when the cache is not warmed. A nil result is a
+// safe pass-through (the compiled type's methods no-op on nil).
+func (s *Service) carrierNumberRules(ctx context.Context, carrierID string) *numrules.Compiled {
+	if s.Routes != nil {
+		if r, ok := s.Routes.NumberRules(carrierID); ok {
+			return r
+		}
+	}
+	cfg, err := db.GetCarrierNumberRules(ctx, s.Pool, carrierID)
+	if err != nil {
+		return nil
+	}
+	compiled, err := numrules.Compile(cfg)
+	if err != nil {
+		return nil
+	}
+	return compiled
 }
 
 func (s *Service) trySMPPDispatch(
@@ -294,18 +327,18 @@ func (s *Service) tryHTTPDispatch(
 		dlrCallbackURLEncoded = url.QueryEscape(dlrCallbackURL)
 	}
 	vars := map[string]string{
-		"to":                         msg.To,
-		"from":                       from,
-		"message":                    msg.Body,
-		"message_id":                 messageID,
-		"timestamp":                  time.Now().UTC().Format(time.RFC3339),
-		"client_id":                  clientID,
-		"dlr_callback_url":           dlrCallbackURL,
-		"dlr_callback_url_encoded":   dlrCallbackURLEncoded,
-		"source_addr_ton":  strconv.Itoa(int(smpp.SourceAddrTON)),
-		"source_addr_npi":  strconv.Itoa(int(smpp.SourceAddrNPI)),
-		"dest_addr_ton":    strconv.Itoa(int(smpp.DestAddrTON)),
-		"dest_addr_npi":    strconv.Itoa(int(smpp.DestAddrNPI)),
+		"to":                       msg.To,
+		"from":                     from,
+		"message":                  msg.Body,
+		"message_id":               messageID,
+		"timestamp":                time.Now().UTC().Format(time.RFC3339),
+		"client_id":                clientID,
+		"dlr_callback_url":         dlrCallbackURL,
+		"dlr_callback_url_encoded": dlrCallbackURLEncoded,
+		"source_addr_ton":          strconv.Itoa(int(smpp.SourceAddrTON)),
+		"source_addr_npi":          strconv.Itoa(int(smpp.SourceAddrNPI)),
+		"dest_addr_ton":            strconv.Itoa(int(smpp.DestAddrTON)),
+		"dest_addr_npi":            strconv.Itoa(int(smpp.DestAddrNPI)),
 	}
 	resp, err := HTTPTransport{}.Dispatch(ctx, CarrierDispatchInput{
 		Method:      method,
@@ -334,10 +367,10 @@ func (s *Service) tryHTTPDispatch(
 
 func recordCarrierResponseTimeline(out *dispatchOutcome, carrierName string, failoverSeq int, accepted bool) {
 	meta := map[string]any{
-		"carrier_name": carrierName,
+		"carrier_name":      carrierName,
 		"failover_sequence": failoverSeq,
-		"failover_label": smslog.FailoverLabel(failoverSeq),
-		"accepted": accepted,
+		"failover_label":    smslog.FailoverLabel(failoverSeq),
+		"accepted":          accepted,
 	}
 	if out.LastCode != nil {
 		meta["http_status"] = *out.LastCode

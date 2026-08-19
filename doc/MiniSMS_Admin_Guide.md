@@ -267,6 +267,20 @@ Primary navigation on the carrier detail page:
 - **Invoices**
 - **DLR Settings**
 - **SMPP** (when interconnect is SMPP — bind credentials, TON/NPI)
+- **Number Rules** (per-carrier number translation — see 5.7)
+
+### 5.7 Number translation rules (per carrier)
+
+Some interconnects expect numbers in a specific format (E.164 with a leading `+`, national with a leading `0`, a bare MSISDN with a country code, an alphanumeric sender with no digits, and so on). The **Number Rules** tab lets you transform the **A-number (Sender ID)** and the **B-number (Destination)** independently, just before each message is handed to this carrier.
+
+Rules are an **ordered list** applied top to bottom, so you compose them. A common chain to force E.164 on the destination is: *Remove leading + sign* -> *Remove leading zeros* -> *Add prefix if missing* (`243`) -> *Add prefix if missing* (`+`). Available rules:
+
+- **Remove leading zeros** / **Remove leading + sign**
+- **Remove numeric digits** / **Remove alpha characters** / **Remove symbols** (keeps only letters and digits)
+- **Add prefix if missing** — prepend a value (for example `243`, `00`, or `+`) only when the number does not already start with it
+- **Regex replace** — match a Go regular expression and replace it, using `$1` or `${name}` to substitute captured parts (for example match `^\+?0*(\d+)$` and replace with `00$1`)
+
+Use the **Test** box at the bottom to enter a sample sender and destination and see the exact transformed output for your current (unsaved) rules; it runs the same engine as live sending. The client's original sender and destination are always kept on the SMS log; the transformed values that were actually sent appear in the message detail as "Sender/Destination sent to carrier". Rules take effect immediately on save (no restart). A carrier with no rules sends numbers unchanged.
 
 ### 5.2.1 Interconnect (HTTP vs SMPP)
 

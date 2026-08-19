@@ -93,6 +93,8 @@
 				<h6 class="border-bottom border-secondary pb-2 mb-3">Technical details</h6>
 				<dl class="row mb-0 small">
 					<dt class="col-sm-4">Client Ref</dt><dd class="col-sm-8">{{if .ClientRef}}{{.ClientRef}}{{else}}-{{end}}</dd>
+					{{if .DispatchedSender}}<dt class="col-sm-4">Sender sent to carrier</dt><dd class="col-sm-8"><span class="font-monospace">{{.DispatchedSender}}</span> <span class="text-secondary">(after number rules)</span></dd>{{end}}
+					{{if .DispatchedDestination}}<dt class="col-sm-4">Destination sent to carrier</dt><dd class="col-sm-8"><span class="font-monospace">{{.DispatchedDestination}}</span> <span class="text-secondary">(after number rules)</span></dd>{{end}}
 					<dt class="col-sm-4">Ingress</dt><dd class="col-sm-8">{{if .IngressTransport}}{{.IngressTransport}}{{else}}http{{end}}</dd>
 					<dt class="col-sm-4">Segments / Encoding</dt><dd class="col-sm-8">{{.Segments}} / {{.Encoding}}</dd>
 					<dt class="col-sm-4">Rate Group</dt><dd class="col-sm-8">{{if .RateGroupID}}{{.RateGroupID}}{{else}}-{{end}}</dd>

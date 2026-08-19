@@ -38,6 +38,9 @@
 			<button class="nav-link" :class="{ 'active': tab === 'smppparams' }" @click="tab = 'smppparams'" type="button" hx-get="/admin/carriers/{{.Carrier.CarrierID}}/smpp-addressing" hx-target="#tab-content" hx-swap="innerHTML">SMPP Parameters</button>
 		</li>
 		<li class="nav-item">
+			<button class="nav-link" :class="{ 'active': tab === 'numberrules' }" @click="tab = 'numberrules'" type="button" hx-get="/admin/carriers/{{.Carrier.CarrierID}}/number-rules" hx-target="#tab-content" hx-swap="innerHTML">Number Rules</button>
+		</li>
+		<li class="nav-item">
 			<button class="nav-link" :class="{ 'active': tab === 'invoices' }" @click="tab = 'invoices'" type="button" hx-get="/admin/carriers/{{.Carrier.CarrierID}}/invoices" hx-target="#tab-content" hx-swap="innerHTML">Invoices</button>
 		</li>
 	</ul>

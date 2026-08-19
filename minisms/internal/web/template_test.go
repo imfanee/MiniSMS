@@ -168,3 +168,36 @@ func TestLoginAndDashboardTemplates(t *testing.T) {
 		}
 	}
 }
+
+func TestNumberRulesPanelTemplate(t *testing.T) {
+	tm, err := template.New("number_rules_panel.html").Funcs(TemplateFuncs()).ParseFS(minisms.TemplateFS,
+		"templates/admin/carriers/number_rules_panel.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Panel seeds the Alpine editor from RulesJSON embedded in x-data; a regex rule exercises escaping.
+	var b strings.Builder
+	if err := tm.ExecuteTemplate(&b, "number_rules_panel", numberRulesPanelData{
+		CarrierID: "c1", CSRFToken: "t",
+		RulesJSON: `{"sender":[{"type":"strip_digits"}],"destination":[{"type":"regex_replace","pattern":"^0","replacement":"243"}]}`,
+		Success:   "",
+	}); err != nil {
+		t.Fatalf("execute number_rules_panel: %v", err)
+	}
+	out := b.String()
+	for _, want := range []string{"Number Translation Rules", "numberRules(", "/admin/carriers/c1/number-rules", "regex_replace"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("panel missing %q", want)
+		}
+	}
+
+	var tr strings.Builder
+	if err := tm.ExecuteTemplate(&tr, "number_rules_test_result", struct {
+		SampleSender, SampleDest, Sender, Destination, Error string
+	}{SampleSender: "+00812345", SampleDest: "0812345", Sender: "812345", Destination: "243812345"}); err != nil {
+		t.Fatalf("execute number_rules_test_result: %v", err)
+	}
+	if !strings.Contains(tr.String(), "243812345") {
+		t.Fatalf("test result missing transformed value: %s", tr.String())
+	}
+}

@@ -77,4 +77,8 @@ type dispatchOutcome struct {
 	DestAddrTON      *int16
 	DestAddrNPI      *int16
 	Egress           EgressTransport
+	// DispatchedSender/DispatchedDestination are the A/B numbers actually sent to the winning carrier
+	// after its number-translation rules (may equal the originals when the carrier has no rules).
+	DispatchedSender      string
+	DispatchedDestination string
 }

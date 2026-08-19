@@ -1,0 +1,139 @@
+{/* Architected and Developed by :- Faisal Hanif | imfanee@gmail.com. */}
+{{define "number_rules_panel"}}
+<div id="carrier-number-rules-panel" x-data="numberRules({{.RulesJSON}})">
+	<div class="d-flex align-items-center mb-2">
+		<h2 class="h5 mb-0 me-auto">Number Translation Rules</h2>
+	</div>
+	<p class="text-secondary small">Rules run top to bottom, separately on the <strong>A-number (Sender ID)</strong> and the
+		<strong>B-number (Destination)</strong>, just before the message is sent to this carrier. The original
+		numbers from the client are always kept on the SMS log; the transformed values are recorded as the
+		dispatched values. Order matters (for example: remove <code>+</code>, remove leading zeros, then add a country prefix).</p>
+
+	{{if .Success}}<div class="alert alert-success py-2">{{.Success}}</div>{{end}}
+	{{if .Error}}<div class="alert alert-danger py-2">{{.Error}}</div>{{end}}
+
+	<form hx-post="/admin/carriers/{{.CarrierID}}/number-rules" hx-target="#carrier-number-rules-panel" hx-swap="outerHTML">
+		<input type="hidden" name="gorilla.csrf.Token" value="{{.CSRFToken}}">
+		<input type="hidden" name="rules_json" :value="serialize()">
+		<div class="row g-3">
+			<template x-for="list in ['sender','destination']" :key="list">
+				<div class="col-lg-6">
+					<div class="card h-100">
+						<div class="card-header d-flex align-items-center">
+							<strong x-text="list === 'sender' ? 'A-number — Sender ID' : 'B-number — Destination'"></strong>
+							<button type="button" class="btn btn-sm btn-outline-primary ms-auto" @click="add(list)">+ Add rule</button>
+						</div>
+						<div class="card-body">
+							<template x-if="me(list).length === 0">
+								<div class="text-secondary small">No rules — numbers pass through unchanged.</div>
+							</template>
+							<template x-for="(rule, i) in me(list)" :key="i">
+								<div class="border rounded p-2 mb-2 bg-body-tertiary">
+									<div class="d-flex align-items-center gap-2 mb-2">
+										<span class="badge bg-secondary" x-text="i + 1"></span>
+										<select class="form-select form-select-sm" x-model="rule.type">
+											<template x-for="t in types" :key="t.v">
+												<option :value="t.v" x-text="t.label"></option>
+											</template>
+										</select>
+										<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move(list, i, -1)" :disabled="i===0" title="Move up">&uarr;</button>
+										<button type="button" class="btn btn-sm btn-link p-0 px-1 text-secondary" @click="move(list, i, 1)" :disabled="i===me(list).length-1" title="Move down">&darr;</button>
+										<button type="button" class="btn btn-sm btn-link p-0 px-1 text-danger" @click="remove(list, i)" title="Remove">&times;</button>
+									</div>
+									<div x-show="rule.type === 'add_prefix'">
+										<label class="form-label small mb-1">Prefix to add if missing</label>
+										<input type="text" class="form-control form-control-sm" x-model="rule.prefix" placeholder="e.g. 243, 00, or +">
+									</div>
+									<div x-show="rule.type === 'regex_replace'" class="row g-2">
+										<div class="col-12">
+											<label class="form-label small mb-1">Match (Go RE2 pattern)</label>
+											<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.pattern" placeholder="^\+?0*(\d+)$">
+										</div>
+										<div class="col-12">
+											<label class="form-label small mb-1">Replace with (use $1 / ${name} for captures)</label>
+											<input type="text" class="form-control form-control-sm font-monospace" x-model="rule.replacement" placeholder="00$1">
+										</div>
+									</div>
+								</div>
+							</template>
+						</div>
+					</div>
+				</div>
+			</template>
+		</div>
+		<button type="submit" class="btn btn-primary btn-sm mt-3">Save rules</button>
+	</form>
+
+	<hr class="my-3">
+	<div class="nr-tester">
+		<h3 class="h6">Test rules (uses the live engine)</h3>
+		<p class="text-secondary small mb-2">Enter a sample sender and destination and see the transformed output for the <strong>current, unsaved</strong> rules above.</p>
+		<input type="hidden" id="nr-rules-for-test" name="rules_json" :value="serialize()">
+		<div class="row g-2 align-items-end">
+			<div class="col-md-4">
+				<label class="form-label small mb-1">Sample A-number (sender)</label>
+				<input type="text" class="form-control form-control-sm" name="sample_sender" x-model="sample_sender" placeholder="e.g. BrandX or +2430812345">
+			</div>
+			<div class="col-md-4">
+				<label class="form-label small mb-1">Sample B-number (destination)</label>
+				<input type="text" class="form-control form-control-sm" name="sample_dest" x-model="sample_dest" placeholder="e.g. +00812345678">
+			</div>
+			<div class="col-md-4">
+				<button type="button" class="btn btn-outline-secondary btn-sm"
+					hx-post="/admin/carriers/{{.CarrierID}}/number-rules/test"
+					hx-include="#nr-rules-for-test, [name='sample_sender'], [name='sample_dest']"
+					hx-target="#nr-test-result" hx-swap="innerHTML">Test</button>
+			</div>
+		</div>
+		<div id="nr-test-result" class="mt-2"></div>
+	</div>
+</div>
+<script>
+function numberRules(seed) {
+	var s = (seed && typeof seed === 'object') ? seed : {};
+	var norm = function (r) { return { type: (r && r.type) || 'strip_leading_zeros', prefix: (r && r.prefix) || '', pattern: (r && r.pattern) || '', replacement: (r && r.replacement) || '' }; };
+	return {
+		sender: (s.sender || []).map(norm),
+		destination: (s.destination || []).map(norm),
+		sample_sender: '', sample_dest: '',
+		types: [
+			{ v: 'strip_leading_zeros', label: 'Remove leading zeros' },
+			{ v: 'strip_leading_plus', label: 'Remove leading + sign' },
+			{ v: 'strip_digits', label: 'Remove numeric digits' },
+			{ v: 'strip_alpha', label: 'Remove alpha characters' },
+			{ v: 'strip_symbols', label: 'Remove symbols (keep letters/digits)' },
+			{ v: 'add_prefix', label: 'Add prefix if missing' },
+			{ v: 'regex_replace', label: 'Regex replace (capture groups)' }
+		],
+		me: function (list) { return list === 'sender' ? this.sender : this.destination; },
+		add: function (list) { this.me(list).push(norm({})); },
+		remove: function (list, i) { this.me(list).splice(i, 1); },
+		move: function (list, i, d) { var a = this.me(list); var j = i + d; if (j < 0 || j >= a.length) return; var t = a[i]; a[i] = a[j]; a[j] = t; },
+		serialize: function () {
+			var clean = function (r) {
+				var o = { type: r.type };
+				if (r.type === 'add_prefix') o.prefix = r.prefix || '';
+				if (r.type === 'regex_replace') { o.pattern = r.pattern || ''; o.replacement = r.replacement || ''; }
+				return o;
+			};
+			return JSON.stringify({ sender: this.sender.map(clean), destination: this.destination.map(clean) });
+		}
+	};
+}
+</script>
+{{end}}
+
+{{define "number_rules_test_result"}}
+{{if .Error}}
+<div class="alert alert-danger py-2 mb-0">Invalid rule: {{.Error}}</div>
+{{else}}
+<table class="table table-sm mb-0">
+	<tbody>
+		<tr><th class="w-25">A-number in</th><td class="font-monospace">{{if .SampleSender}}{{.SampleSender}}{{else}}<span class="text-secondary">(empty)</span>{{end}}</td></tr>
+		<tr><th>A-number out</th><td class="font-monospace text-success">{{if .Sender}}{{.Sender}}{{else}}<span class="text-secondary">(empty)</span>{{end}}</td></tr>
+		<tr><th>B-number in</th><td class="font-monospace">{{if .SampleDest}}{{.SampleDest}}{{else}}<span class="text-secondary">(empty)</span>{{end}}</td></tr>
+		<tr><th>B-number out</th><td class="font-monospace text-success">{{if .Destination}}{{.Destination}}{{else}}<span class="text-secondary">(empty)</span>{{end}}</td></tr>
+	</tbody>
+</table>
+{{end}}
+{{end}}

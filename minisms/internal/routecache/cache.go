@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/minisms/minisms/internal/carrier/numrules"
 	"github.com/minisms/minisms/internal/db"
 )
 
@@ -54,6 +55,7 @@ type Cache struct {
 	carriers  map[string]CarrierProfile
 	templates map[string]*db.RequestTemplate
 	headers   map[string][]db.AuthHeaderRow
+	numRules  map[string]*numrules.Compiled
 }
 
 func New() *Cache {
@@ -99,11 +101,23 @@ func (c *Cache) Reload(ctx context.Context, pool *pgxpool.Pool) error {
 			headers = h
 		}
 	}
+	// Compile each carrier's number-translation rules once here (regexes precompiled), so per-message
+	// dispatch is a pure in-memory transform. A carrier with no/invalid rules maps to nil (pass-through).
+	var numRules map[string]*numrules.Compiled
+	if cfgs, nerr := db.ListAllNumberRules(ctx, pool); nerr == nil {
+		numRules = make(map[string]*numrules.Compiled, len(cfgs))
+		for id, cfg := range cfgs {
+			if compiled, cerr := numrules.Compile(cfg); cerr == nil {
+				numRules[id] = compiled
+			}
+		}
+	}
 	c.mu.Lock()
 	c.routes = routes
 	c.carriers = carriers
 	c.templates = templates
 	c.headers = headers
+	c.numRules = numRules
 	c.mu.Unlock()
 	return nil
 }
@@ -212,6 +226,18 @@ func (c *Cache) AuthHeaders(carrierID string) ([]db.AuthHeaderRow, bool) {
 		return nil, false
 	}
 	return c.headers[carrierID], true
+}
+
+// NumberRules returns the compiled A/B number-translation rules for a carrier. ok is false until the
+// cache is warmed (caller falls back to a DB read); when warmed, a carrier with no rules returns
+// (nil, true), and a nil *Compiled is a safe pass-through.
+func (c *Cache) NumberRules(carrierID string) (*numrules.Compiled, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.numRules == nil {
+		return nil, false
+	}
+	return c.numRules[carrierID], true
 }
 
 func longestPrefix(entries []RouteEntry, destination string) *RouteEntry {

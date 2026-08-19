@@ -138,6 +138,7 @@ type SMSLogDetailPage struct {
 	CSRFToken                                                                                           string
 	MessageID, ClientID, ToNumber, MessageBody, Encoding, RateApplied, TotalCharged, Currency, Status string
 	ClientRef, FromNumber, PrefixMatched, CarrierMessageID, CarrierResponseBody, IngressTransport       *string
+	DispatchedSender, DispatchedDestination                                                             *string
 	RateGroupID, RoutingGroupID, RouteEntryID, CarrierID, DLRWebhookURL, DLRStatus, DLRForwardStatus    *string
 	Segments, FailoverSequence, DLRForwardAttempts                                                      int
 	DLRRequested                                                                                        bool
@@ -162,7 +163,7 @@ func (h *Handlers) loadSMSLogDetail(r *http.Request, id string) (*SMSLogDetailPa
 				sl.carrier_response_code, sl.carrier_response_body, sl.status, sl.received_at, sl.dispatched_at, sl.delivered_at, sl.failed_at,
 				sl.dlr_requested, sl.dlr_webhook_url, sl.dlr_status, sl.dlr_received_at, sl.dlr_forwarded_at, sl.dlr_forward_status, sl.dlr_forward_attempts,
 				sl.source_addr_ton, sl.source_addr_npi, sl.dest_addr_ton, sl.dest_addr_npi, sl.carrier_skip_reason::text,
-				sl.ingress_transport, sl.event_timeline,
+				sl.ingress_transport, sl.dispatched_sender, sl.dispatched_destination, sl.event_timeline,
 				c.name, ca.name, rg.name
 			FROM sms_logs sl
 			LEFT JOIN clients c ON c.client_id = sl.client_id
@@ -176,7 +177,7 @@ func (h *Handlers) loadSMSLogDetail(r *http.Request, id string) (*SMSLogDetailPa
 				&d.CarrierResponseCode, &d.CarrierResponseBody, &d.Status, &d.ReceivedAt, &d.DispatchedAt, &d.DeliveredAt, &d.FailedAt,
 				&d.DLRRequested, &d.DLRWebhookURL, &d.DLRStatus, &d.DLRReceivedAt, &d.DLRForwardedAt, &d.DLRForwardStatus, &d.DLRForwardAttempts,
 				&d.SourceAddrTON, &d.SourceAddrNPI, &d.DestAddrTON, &d.DestAddrNPI, &d.CarrierSkipReason,
-				&d.IngressTransport, &timelineRaw,
+				&d.IngressTransport, &d.DispatchedSender, &d.DispatchedDestination, &timelineRaw,
 				&d.ClientName, &d.CarrierName, &d.RoutingGroupName,
 			)
 	if err != nil {

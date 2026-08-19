@@ -177,6 +177,21 @@ MiniSMS uses pure-Go libphonenumber:
 go list -m github.com/nyaruka/phonenumbers
 ```
 
+### 3.6 PostgreSQL performance tuning
+
+The app pool and the server must be sized together. Set the server (`postgresql.conf` or `ALTER SYSTEM SET ...`), then the app pool via `DB_MAX_CONNS` / `DB_MIN_CONNS` (see 4.1). Guidance for a single-node deployment:
+
+- **`max_connections`** must exceed the app pool (`DB_MAX_CONNS`) plus headroom for psql, admin tooling, backups and monitoring. Example: app pool 200 -> server 250. Requires a **restart**.
+- **`shared_buffers`** ~= 25% of system RAM (for example 2GB on an 8GB host). Requires a **restart**. The memory is reserved but only becomes resident as the cache warms, so `free -m` right after a restart understates it.
+- **`effective_cache_size`** ~= 50-75% of RAM (for example 5GB on an 8GB host). This is a **planner hint only** (no memory is allocated) and is applied with a **reload**, no restart:
+  ```bash
+  sudo -u postgres psql -c "ALTER SYSTEM SET effective_cache_size = '5GB';"
+  sudo -u postgres psql -c "SELECT pg_reload_conf();"
+  ```
+- **`work_mem`** is per-sort/hash and multiplies by concurrent operations; keep it modest (a few MB) when `max_connections` is high so a burst of sorts cannot exhaust RAM.
+
+Apply with `ALTER SYSTEM SET <name> = <value>;` (persists to `postgresql.auto.conf`), then `systemctl restart postgresql@<version>-main` for restart-only settings, or `SELECT pg_reload_conf();` for reloadable ones. `SELECT name, setting, pending_restart FROM pg_settings WHERE name IN ('max_connections','shared_buffers','effective_cache_size');` shows the effective values and whether a restart is still pending. Restarting PostgreSQL drops all DB connections briefly (the app pool reconnects automatically; SMPP carrier binds are separate TCP sessions and are unaffected), so do it in a maintenance window. After tuning, watch the load watchdog (10.4) under real traffic; if `db_acquire_waits` climbs, the pool is the bottleneck (raise `DB_MAX_CONNS` toward `max_connections`, or add a connection pooler such as PgBouncer in transaction mode).
+
 ## 4. Configuration Reference
 
 MiniSMS reads environment using `godotenv` (`.env` for local/dev).
@@ -647,7 +662,17 @@ curl -f http://127.0.0.1:8080/healthz
 
 MiniSMS uses structured logging (`slog`). Ship `journalctl` or container stdout to your log backend.
 
-### 10.3 Alert conditions
+### 10.3 Load/capacity watchdog
+
+The app logs a periodic `watchdog` line (interval `WATCHDOG_INTERVAL_S`, default 30s, `0` disables) at INFO regardless of `LOG_LEVEL`, so you can confirm the connection-pool sizing holds under load and spot a bottleneck early:
+
+```bash
+journalctl -u minisms -f | grep watchdog
+```
+
+Fields: `in_flight_requests` (concurrent HTTP requests), `db_conns_in_use` / `db_conns_idle` / `db_conns_total` / `db_conns_max` (pool state; max reflects `DB_MAX_CONNS`), `db_acquire_waits` (cumulative count of times a caller waited for a free connection - the key pool-pressure signal), `db_acquire_canceled`, `cpu_cores_used` / `cpu_pct` / `cpu_cores_total`, `rss_mb`, `goroutines`. Interpretation: if `db_conns_in_use` rises toward `db_conns_max` and `db_acquire_waits` keeps climbing, the pool is the bottleneck; if `db_conns_in_use` stays well below max with flat `db_acquire_waits`, the tuning is holding. Relax the interval (for example `WATCHDOG_INTERVAL_S=300`) on quiet days to cut log volume.
+
+### 10.4 Alert conditions
 
 - Service health check failures (`/healthz` down)
 - High `SMS_ERR_TEMPORARY_UNAVAILABLE` rate
